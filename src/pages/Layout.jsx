@@ -1,14 +1,14 @@
 
 import React from 'react';
-import { AuthProvider } from './components/auth/Auth';
-import { CartProvider } from './components/cart/CartContext';
-import { ThemeProvider } from './components/layout/ThemeProvider';
+import { AuthProvider } from '@/components/auth/Auth';
+import { CartProvider } from '@/components/cart/CartContext';
+import { ThemeProvider } from '@/components/layout/ThemeProvider';
 import { Toaster } from 'sonner';
 import { AnimatePresence, motion } from 'framer-motion';
-import Header from './components/layout/Header';
-import SubNavigation from './components/layout/SubNavigation';
-import Footer from './components/layout/Footer';
-import { ExchangeRateProvider } from './components/utils/ExchangeRateContext';
+import Header from '@/components/layout/Header';
+import SubNavigation from '@/components/layout/SubNavigation';
+import Footer from '@/components/layout/Footer';
+import { ExchangeRateProvider } from '@/components/utils/ExchangeRateContext';
 
 const pageVariants = {
   initial: { 
