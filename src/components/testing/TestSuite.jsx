@@ -17,8 +17,8 @@ import {
   Moon,
   Sun
 } from 'lucide-react';
-import { supabase } from '../utils/supabase.js';
-import { useMobile, useTheme } from '../utils/hooks.js';
+import { supabase } from '../utils/supabase.jsx';
+import { useMobile, useTheme } from '../utils/hooks.jsx';
 import { useTranslation } from '../i18n/SimpleI18n';
 
 export default function TestSuite() {
@@ -376,7 +376,7 @@ export default function TestSuite() {
    */
   const testMultiLangUpload = async () => {
     try {
-      const { uploadFile } = await import('../utils/supabase');
+      const { uploadFile } = await import('../utils/supabase.jsx');
       
       // Создаём одинаковые файлы для разных языков
       const ruFile = new File(['Русский контент'], 'test.txt', { type: 'text/plain' });

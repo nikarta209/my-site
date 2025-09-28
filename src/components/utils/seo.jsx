@@ -1,5 +1,5 @@
 // SEO utilities for dynamic sitemap and robots.txt generation
-import { supabase } from './supabase.js';
+import { supabase } from './supabase.jsx';
 
 export const seoUtils = {
   // Generate dynamic sitemap.xml

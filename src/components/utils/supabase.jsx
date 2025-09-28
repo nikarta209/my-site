@@ -6,6 +6,44 @@ import { User } from '@/api/entities';
 import { UploadFile as CoreUploadFile } from '@/api/integrations';
 import { UserBookData } from '@/api/entities';
 
+const createQueryBuilder = () => {
+  const result = { data: [], error: null };
+
+  const builder = {
+    select() {
+      return builder;
+    },
+    eq() {
+      return builder;
+    },
+    ilike() {
+      return builder;
+    },
+    limit() {
+      return Promise.resolve(result);
+    },
+    then(onFulfilled, onRejected) {
+      return Promise.resolve(result).then(onFulfilled, onRejected);
+    },
+    catch(onRejected) {
+      return Promise.resolve(result).catch(onRejected);
+    }
+  };
+
+  return builder;
+};
+
+export const supabase = {
+  auth: {
+    async getSession() {
+      return { data: { session: null } };
+    }
+  },
+  from() {
+    return createQueryBuilder();
+  }
+};
+
 // ОПТИМИЗАЦИЯ: Простой кэш в памяти с TTL
 const cache = new Map();
 const CACHE_TTL = 60000; // 1 минута
