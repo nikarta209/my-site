@@ -1,5 +1,5 @@
 {
-  "name": "base44-app",
+  "name": "kasbook-app",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -11,7 +11,7 @@
     "start": "vite preview --host 0.0.0.0 --port ${PORT:-4173}"
   },
   "dependencies": {
-    "@base44/sdk": "^0.1.2",
+    "@supabase/supabase-js": "^2.48.0",
     "@hookform/resolvers": "^4.1.2",
     "@radix-ui/react-accordion": "^1.2.3",
     "@radix-ui/react-alert-dialog": "^1.1.6",

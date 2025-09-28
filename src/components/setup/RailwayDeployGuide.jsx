@@ -310,7 +310,7 @@ export const healthCheck = async () => {
             </CardHeader>
             <CardContent>
               <p className="text-sm text-muted-foreground mb-4">
-                Уже реализован в components/base44Client.js
+                Уже реализован в api/supabaseClient.js
               </p>
               
               <div className="relative">
