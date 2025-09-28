@@ -242,7 +242,7 @@ const limiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   handler: (req, res) => {
-    logger.warn(`Rate limit exceeded for IP: ${req.ip}`);
+    logger.warn(\`Rate limit exceeded for IP: \${req.ip}\`);
     res.status(429).json({
       error: 'Too many requests',
       retryAfter: '15 minutes'
@@ -314,7 +314,7 @@ app.use(errorHandler);
 
 const PORT = process.env.PORT || 5000;
 const server = app.listen(PORT, () => {
-  logger.info(`KASBOOK Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
+  logger.info(\`KASBOOK Server running in \${process.env.NODE_ENV} mode on port \${PORT}\`);
 });
 
 // Graceful shutdown
@@ -340,7 +340,7 @@ const connectDB = async () => {
       socketTimeoutMS: 45000, // Close sockets after 45 seconds of inactivity
     });
 
-    logger.info(`✅ MongoDB Connected: ${conn.connection.host}`);
+    logger.info(\`✅ MongoDB Connected: \${conn.connection.host}\`);
 
     // Connection event listeners
     mongoose.connection.on('error', (err) => {
@@ -374,7 +374,7 @@ const logFormat = winston.format.combine(
   winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
   winston.format.errors({ stack: true }),
   winston.format.printf(({ timestamp, level, message, stack }) => {
-    return `${timestamp} [${level.toUpperCase()}]: ${stack || message}`;
+    return \`\${timestamp} [\${level.toUpperCase()}]: \${stack || message}\`;
   })
 );
 
@@ -420,7 +420,7 @@ const errorHandler = (err, req, res, next) => {
   error.message = err.message;
 
   // Log error
-  logger.error(`${err.message} - ${req.method} ${req.originalUrl} - ${req.ip}`);
+  logger.error(\`\${err.message} - \${req.method} \${req.originalUrl} - \${req.ip}\`);
 
   // Mongoose bad ObjectId
   if (err.name === 'CastError') {
@@ -538,7 +538,7 @@ const storage = multer.diskStorage({
   filename: (req, file, cb) => {
     // Generate unique filename with timestamp
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, `${file.fieldname}-${uniqueSuffix}${path.extname(file.originalname)}`);
+    cb(null, \`\${file.fieldname}-\${uniqueSuffix}\${path.extname(file.originalname)}\`);
   }
 });
 
@@ -601,7 +601,7 @@ exports.protect = async (req, res, next) => {
 
     // If user not found, return 401 Unauthorized
     if (!req.user) {
-        logger.warn(`Access denied: User with ID ${decoded.id} not found`);
+        logger.warn(\`Access denied: User with ID \${decoded.id} not found\`);
         return res.status(401).json({ success: false, message: 'User not found' });
     }
     next();
@@ -616,10 +616,10 @@ exports.authorize = (...roles) => {
   return (req, res, next) => {
     // Check if the user's role is included in the allowed roles
     if (!roles.includes(req.user.role)) {
-      logger.warn(`Access denied: User '${req.user.id}' with role '${req.user.role}' attempted to access restricted route`);
+      logger.warn(\`Access denied: User '\${req.user.id}' with role '\${req.user.role}' attempted to access restricted route\`);
       return res.status(403).json({ 
         success: false, 
-        message: `User role '${req.user.role}' is not authorized to access this route`
+        message: \`User role '\${req.user.role}' is not authorized to access this route\`
       });
     }
     next();
@@ -756,21 +756,21 @@ module.exports = client;`;
 
 exports.validateWallet = async (address) => {
   // Mock: In reality, call Kaspa RPC to check if address is valid
-  console.log(`Validating KAS address: ${address}`);
+  console.log(\`Validating KAS address: \${address}\`);
   return address.startsWith('kaspa:');
 };
 
 exports.mintNFTForBook = async (bookId, ownerAddress) => {
   // Mock: Simulate minting an NFT for a book purchase
-  const nftId = `kas-nft-${bookId}-${Date.now()}`;
-  console.log(`Minted NFT ${nftId} for book ${bookId} to ${ownerAddress}`);
+  const nftId = \`kas-nft-\${bookId}-\${Date.now()}\`;
+  console.log(\`Minted NFT \${nftId} for book \${bookId} to \${ownerAddress}\`);
   return { success: true, nftId };
 };
 
 exports.transferRoyalties = async (transaction) => {
   // Mock: "Smart contract" logic for royalty split
-  console.log(`Transferring ${transaction.royaltySplit.author} KAS to author and ${transaction.royaltySplit.platform} KAS to platform.`);
-  return { success: true, txHash: `kas_tx_royalties_${Date.now()}` };
+  console.log(\`Transferring \${transaction.royaltySplit.author} KAS to author and \${transaction.royaltySplit.platform} KAS to platform.\`);
+  return { success: true, txHash: \`kas_tx_royalties_\${Date.now()}\` };
 };`;
   
   const ipfsServiceCode = `// services/ipfsService.js
@@ -1066,7 +1066,7 @@ describe('Book Upload Flow', () => {
 
     const res = await request(app)
       .post('/api/books/upload')
-      .set('Authorization', `Bearer ${authorToken}`)
+      .set('Authorization', \`Bearer \${authorToken}\`)
       .field('title', 'Plagiarized Book')
       .field('authorId', userId.toString()) // Assuming authorId is sent from frontend
       .field('description', 'This is a plagiarized book.')
@@ -1090,7 +1090,7 @@ describe('Book Upload Flow', () => {
 
     const res = await request(app)
       .post('/api/books/upload')
-      .set('Authorization', `Bearer ${authorToken}`)
+      .set('Authorization', \`Bearer \${authorToken}\`)
       .field('title', 'Original Book')
       .field('authorId', userId.toString())
       .field('description', 'This is an original book.')
