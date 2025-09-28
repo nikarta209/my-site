@@ -3,7 +3,6 @@
 
 /*
 import { createClient } from 'npm:@supabase/supabase-js@2';
-import { createClientFromRequest } from 'npm:@base44/sdk@0.5.0';
 
 const supabaseAdmin = createClient(
   Deno.env.get('SUPABASE_URL'),
@@ -11,28 +10,29 @@ const supabaseAdmin = createClient(
 );
 
 const supabaseAnon = createClient(
-  Deno.env.get('SUPABASE_URL'), 
-  Deno.env.get('VITE_SUPABASE_ANON_KEY')
+  Deno.env.get('SUPABASE_URL'),
+  Deno.env.get('SUPABASE_ANON_KEY')
 );
 
 Deno.serve(async (req) => {
   if (req.method !== 'POST') {
-    return new Response(JSON.stringify({ error: 'Метод не разрешен' }), { 
+    return new Response(JSON.stringify({ error: 'Метод не разрешен' }), {
       status: 405,
       headers: { 'Content-Type': 'application/json' }
     });
   }
 
   try {
-    const base44 = createClientFromRequest(req);
     const { action, params = {} } = await req.json();
-    
-    let user = null;
-    try {
-      user = await base44.auth.me();
-    } catch (e) {
-      // Не аутентифицирован - ОК для публичных действий
-    }
+    const supabaseUser = createClient(
+      Deno.env.get('SUPABASE_URL'),
+      Deno.env.get('SUPABASE_ANON_KEY'),
+      { global: { headers: { Authorization: req.headers.get('Authorization') ?? '' } } }
+    );
+
+    const {
+      data: { user }
+    } = await supabaseUser.auth.getUser();
 
     let result;
     

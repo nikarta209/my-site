@@ -3,7 +3,6 @@
 
 /*
 import { createClient } from 'npm:@supabase/supabase-js@2';
-import { createClientFromRequest } from 'npm:@base44/sdk@0.5.0';
 
 const supabaseAdmin = createClient(
   Deno.env.get('SUPABASE_URL'),
@@ -12,15 +11,26 @@ const supabaseAdmin = createClient(
 
 Deno.serve(async (req) => {
   if (req.method !== 'POST') {
-    return new Response(JSON.stringify({ error: 'Метод не разрешен' }), { 
-      status: 405, 
+    return new Response(JSON.stringify({ error: 'Метод не разрешен' }), {
+      status: 405,
       headers: { 'Content-Type': 'application/json' }
     });
   }
 
   try {
-    const base44 = createClientFromRequest(req);
-    const user = await base44.auth.me();
+    const supabaseUser = createClient(
+      Deno.env.get('SUPABASE_URL'),
+      Deno.env.get('SUPABASE_ANON_KEY'),
+      {
+        global: {
+          headers: { Authorization: req.headers.get('Authorization') ?? '' }
+        }
+      }
+    );
+
+    const {
+      data: { user }
+    } = await supabaseUser.auth.getUser();
     if (!user) throw new Error('Требуется аутентификация');
 
     const formData = await req.formData();

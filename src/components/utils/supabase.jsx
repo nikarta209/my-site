@@ -1,48 +1,10 @@
 
 import { toast } from 'sonner';
-import { Book } from '@/api/entities';
-import { Purchase } from '@/api/entities';
-import { User } from '@/api/entities';
+import { Book, Purchase, User, UserBookData } from '@/api/entities';
 import { UploadFile as CoreUploadFile } from '@/api/integrations';
-import { UserBookData } from '@/api/entities';
+import supabaseClient from '@/api/supabaseClient';
 
-const createQueryBuilder = () => {
-  const result = { data: [], error: null };
-
-  const builder = {
-    select() {
-      return builder;
-    },
-    eq() {
-      return builder;
-    },
-    ilike() {
-      return builder;
-    },
-    limit() {
-      return Promise.resolve(result);
-    },
-    then(onFulfilled, onRejected) {
-      return Promise.resolve(result).then(onFulfilled, onRejected);
-    },
-    catch(onRejected) {
-      return Promise.resolve(result).catch(onRejected);
-    }
-  };
-
-  return builder;
-};
-
-export const supabase = {
-  auth: {
-    async getSession() {
-      return { data: { session: null } };
-    }
-  },
-  from() {
-    return createQueryBuilder();
-  }
-};
+export const supabase = supabaseClient;
 
 // ОПТИМИЗАЦИЯ: Простой кэш в памяти с TTL
 const cache = new Map();
