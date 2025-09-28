@@ -22,9 +22,9 @@ import { Purchase } from '@/api/entities';
 import { User } from '@/api/entities';
 import { toast } from 'sonner';
 
-import ResaleGrid from '../components/resale/ResaleGrid';
-import ResaleFilters from '../components/resale/ResaleFilters';
-import ListForResaleModal from '../components/resale/ListForResaleModal';
+import ResaleGrid from '@/components/resale/ResaleGrid';
+import ResaleFilters from '@/components/resale/ResaleFilters';
+import ListForResaleModal from '@/components/resale/ListForResaleModal';
 
 // Mock NFT minting
 const mockNFTMint = {
