@@ -302,8 +302,20 @@ exports.claimReward = async (req, res, next) => {
               <div className="mt-4 space-y-2">
                 <h4 className="font-semibold">Ключевые процессы:</h4>
                 <ul className="list-disc list-inside text-sm space-y-1">
-                  <li><Badge variant="secondary">Загрузка</Badge>: Проверка на плагиат (mock Copyleaks), пиннинг в IPFS, добавление в очередь модерации.</li>
-                  <li><Badge variant="secondary">Поиск</Badge>: Агрегационный запрос с динамической фильтрацией и расчетом очков релевантности (<code>0.4*sales + 0.3*likes + 0.3*rating</code>) для сортировки.</li>
+                  <li>
+                    <Badge variant="secondary">Загрузка</Badge>
+                    <span>
+                      {': Проверка на плагиат (mock Copyleaks), пиннинг в IPFS, добавление в очередь модерации.'}
+                    </span>
+                  </li>
+                  <li>
+                    <Badge variant="secondary">Поиск</Badge>
+                    <span>
+                      {': Агрегационный запрос с динамической фильтрацией и расчетом очков релевантности '}
+                      <code>0.4*sales + 0.3*likes + 0.3*rating</code>
+                      {' для сортировки.'}
+                    </span>
+                  </li>
                 </ul>
               </div>
             </CardContent>
@@ -320,9 +332,22 @@ exports.claimReward = async (req, res, next) => {
                <div className="mt-4 space-y-2">
                 <h4 className="font-semibold">Ключевые процессы:</h4>
                 <ul className="list-disc list-inside text-sm space-y-1">
-                  <li><Badge variant="secondary">Покупка</Badge>: Интеграция с NOWPayments, минтинг NFT на Kaspa (mock), обновление записей о владении.</li>
-                  <li><Badge variant="secondary">Перепродажа</Badge>: Мок смарт-контракта для перевода NFT и распределения роялти (5% автору).</li>
-                   <li><Badge variant="secondary">Вывод</Badge>: Расчет и удержание комиссии платформы (3%).</li>
+                  <li>
+                    <Badge variant="secondary">Покупка</Badge>
+                    <span>
+                      {': Интеграция с NOWPayments, минтинг NFT на Kaspa (mock), обновление записей о владении.'}
+                    </span>
+                  </li>
+                  <li>
+                    <Badge variant="secondary">Перепродажа</Badge>
+                    <span>
+                      {': Мок смарт-контракта для перевода NFT и распределения роялти (5% автору).'}
+                    </span>
+                  </li>
+                  <li>
+                    <Badge variant="secondary">Вывод</Badge>
+                    <span>{': Расчет и удержание комиссии платформы (3%).'}</span>
+                  </li>
                 </ul>
               </div>
             </CardContent>
@@ -339,8 +364,18 @@ exports.claimReward = async (req, res, next) => {
               <div className="mt-4 space-y-2">
                 <h4 className="font-semibold">Ключевые процессы:</h4>
                 <ul className="list-disc list-inside text-sm space-y-1">
-                  <li><Badge variant="secondary">Статистика</Badge>: Агрегация данных о продажах и доходе для графиков Recharts на фронтенде.</li>
-                  <li><Badge variant="secondary">Уровни роялти</Badge>: Расчет тира (80-90%) на основе "квалифицированных продаж" (те, что >= $5).</li>
+                  <li>
+                    <Badge variant="secondary">Статистика</Badge>
+                    <span>
+                      {': Агрегация данных о продажах и доходе для графиков Recharts на фронтенде.'}
+                    </span>
+                  </li>
+                  <li>
+                    <Badge variant="secondary">Уровни роялти</Badge>
+                    <span>
+                      {': Расчет тира (80-90%) на основе "квалифицированных продаж" (те, что ≥ $5).'}
+                    </span>
+                  </li>
                 </ul>
               </div>
             </CardContent>
@@ -354,12 +389,25 @@ exports.claimReward = async (req, res, next) => {
             </CardHeader>
             <CardContent>
               <CodeBlock code={rewardsControllerCode} />
-              <div className="mt-4 space-y-2">
-                <h4 className="font-semibold">Ключевые процессы:</h4>
-                <ul className="list-disc list-inside text-sm space-y-1">
-                  <li><Badge variant="secondary">Награды</Badge>: Начисление +0.1 KAS на баланс пользователя за определенные действия (отзыв, покупка) и запись транзакции.</li>
-                </ul>
-              </div>
+                <div className="mt-4 space-y-2">
+                  <h4 className="font-semibold">Ключевые процессы:</h4>
+                  <ul className="list-disc list-inside text-sm space-y-1">
+                    <li>
+                      <Badge variant="secondary">Награды</Badge>
+                      <span>
+                        {': Начисление +0.1 KAS на баланс пользователя за определенные действия (отзыв, покупка) и запись транзакции.'}
+                      </span>
+                    </li>
+                    <li>
+                      <Badge variant="secondary">Баланс</Badge>
+                      <span>{': Перерасчет баланса в KAS с учетом истории наград и покупок.'}</span>
+                    </li>
+                    <li>
+                      <Badge variant="secondary">Аналитика</Badge>
+                      <span>{': Вычисление лучших читателей/авторов по метрикам вовлеченности.'}</span>
+                    </li>
+                  </ul>
+                </div>
             </CardContent>
           </Card>
         </TabsContent>

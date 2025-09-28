@@ -6,6 +6,30 @@ import { User } from '@/api/entities';
 import { UploadFile as CoreUploadFile } from '@/api/integrations';
 import { UserBookData } from '@/api/entities';
 
+const noopPromise = async () => ({ data: [], error: null });
+
+const createQueryChain = () => ({
+  select: () => ({
+    ilike: () => ({ limit: noopPromise }),
+    eq: () => ({ limit: noopPromise }),
+    limit: noopPromise
+  }),
+  ilike: () => ({ limit: noopPromise }),
+  eq: () => ({ limit: noopPromise }),
+  limit: noopPromise
+});
+
+export const supabase = {
+  auth: {
+    async getSession() {
+      return { data: { session: null }, error: null };
+    }
+  },
+  from() {
+    return createQueryChain();
+  }
+};
+
 // ОПТИМИЗАЦИЯ: Простой кэш в памяти с TTL
 const cache = new Map();
 const CACHE_TTL = 60000; // 1 минута

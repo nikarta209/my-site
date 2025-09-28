@@ -35,7 +35,7 @@ export const useRealTimeData = (table, filter = {}) => {
     const fetchData = async () => {
       try {
         setLoading(true);
-        const { supabase } = await import('./supabase.js');
+        const { supabase } = await import('./supabase.jsx');
         
         let query = supabase.from(table).select('*');
         

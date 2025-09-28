@@ -1,5 +1,5 @@
 import React from 'react';
-import { Helmet } from 'react-helmet-async';
+import { Helmet } from './Helmet';
 import { useTranslation } from '../i18n/SimpleI18n';
 
 export default function MetaTags({ 
