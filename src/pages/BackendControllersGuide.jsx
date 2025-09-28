@@ -330,7 +330,7 @@ exports.claimReward = async (req, res, next) => {
         </TabsContent>
 
         <TabsContent value="analytics">
-           <Card>
+          <Card>
             <CardHeader>
               <CardTitle>Analytics Controller (для авторов)</CardTitle>
             </CardHeader>
@@ -340,15 +340,15 @@ exports.claimReward = async (req, res, next) => {
                 <h4 className="font-semibold">Ключевые процессы:</h4>
                 <ul className="list-disc list-inside text-sm space-y-1">
                   <li><Badge variant="secondary">Статистика</Badge>: Агрегация данных о продажах и доходе для графиков Recharts на фронтенде.</li>
-                  <li><Badge variant="secondary">Уровни роялти</Badge>: Расчет тира (80-90%) на основе "квалифицированных продаж" (те, что >= $5).</li>
+                  <li><Badge variant="secondary">Уровни роялти</Badge>: Расчет тира (80-90%) на основе "квалифицированных продаж" (те, что &gt;= $5).</li>
                 </ul>
               </div>
             </CardContent>
           </Card>
         </TabsContent>
 
-         <TabsContent value="rewards">
-           <Card>
+        <TabsContent value="rewards">
+          <Card>
             <CardHeader>
               <CardTitle>Rewards Controller</CardTitle>
             </CardHeader>
