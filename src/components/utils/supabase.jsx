@@ -6,30 +6,6 @@ import { User } from '@/api/entities';
 import { UploadFile as CoreUploadFile } from '@/api/integrations';
 import { UserBookData } from '@/api/entities';
 
-const noopPromise = async () => ({ data: [], error: null });
-
-const createQueryChain = () => ({
-  select: () => ({
-    ilike: () => ({ limit: noopPromise }),
-    eq: () => ({ limit: noopPromise }),
-    limit: noopPromise
-  }),
-  ilike: () => ({ limit: noopPromise }),
-  eq: () => ({ limit: noopPromise }),
-  limit: noopPromise
-});
-
-export const supabase = {
-  auth: {
-    async getSession() {
-      return { data: { session: null }, error: null };
-    }
-  },
-  from() {
-    return createQueryChain();
-  }
-};
-
 // ОПТИМИЗАЦИЯ: Простой кэш в памяти с TTL
 const cache = new Map();
 const CACHE_TTL = 60000; // 1 минута
@@ -55,6 +31,42 @@ const getCache = (key) => {
   }
 
   return cached.data;
+};
+
+const createQueryResult = (data = [], error = null) => ({ data, error });
+
+const createSupabaseQuery = (data = []) => {
+  const result = createQueryResult(data);
+  const chain = {
+    select: () => chain,
+    eq: () => chain,
+    neq: () => chain,
+    ilike: () => chain,
+    like: () => chain,
+    limit: () => chain,
+    order: () => chain,
+    range: () => chain,
+    single: () => chain,
+    insert: () => chain,
+    update: () => chain,
+    delete: () => chain,
+    then: (onFulfilled, onRejected) => Promise.resolve(result).then(onFulfilled, onRejected),
+    catch: (onRejected) => Promise.resolve(result).catch(onRejected),
+    finally: (onFinally) => Promise.resolve().finally(onFinally)
+  };
+
+  return chain;
+};
+
+export const supabase = {
+  auth: {
+    async getSession() {
+      return { data: { session: null }, error: null };
+    }
+  },
+  from() {
+    return createSupabaseQuery();
+  }
 };
 
 /**

@@ -366,15 +366,11 @@ exports.claimReward = async (req, res, next) => {
                 <ul className="list-disc list-inside text-sm space-y-1">
                   <li>
                     <Badge variant="secondary">Статистика</Badge>
-                    <span>
-                      {': Агрегация данных о продажах и доходе для графиков Recharts на фронтенде.'}
-                    </span>
+                    <span>{': Агрегация данных о продажах и доходе для графиков Recharts на фронтенде.'}</span>
                   </li>
                   <li>
                     <Badge variant="secondary">Уровни роялти</Badge>
-                    <span>
-                      {': Расчет тира (80-90%) на основе "квалифицированных продаж" (те, что ≥ $5).'}
-                    </span>
+                    <span>{': Расчет тира (80-90%) на основе "квалифицированных продаж" (те, что >= $5).'}</span>
                   </li>
                 </ul>
               </div>
@@ -389,25 +385,17 @@ exports.claimReward = async (req, res, next) => {
             </CardHeader>
             <CardContent>
               <CodeBlock code={rewardsControllerCode} />
-                <div className="mt-4 space-y-2">
-                  <h4 className="font-semibold">Ключевые процессы:</h4>
-                  <ul className="list-disc list-inside text-sm space-y-1">
-                    <li>
-                      <Badge variant="secondary">Награды</Badge>
-                      <span>
-                        {': Начисление +0.1 KAS на баланс пользователя за определенные действия (отзыв, покупка) и запись транзакции.'}
-                      </span>
-                    </li>
-                    <li>
-                      <Badge variant="secondary">Баланс</Badge>
-                      <span>{': Перерасчет баланса в KAS с учетом истории наград и покупок.'}</span>
-                    </li>
-                    <li>
-                      <Badge variant="secondary">Аналитика</Badge>
-                      <span>{': Вычисление лучших читателей/авторов по метрикам вовлеченности.'}</span>
-                    </li>
-                  </ul>
-                </div>
+              <div className="mt-4 space-y-2">
+                <h4 className="font-semibold">Ключевые процессы:</h4>
+                <ul className="list-disc list-inside text-sm space-y-1">
+                  <li>
+                    <Badge variant="secondary">Награды</Badge>
+                    <span>
+                      {': Начисление +0.1 KAS на баланс пользователя за определенные действия (отзыв, покупка) и запись транзакции.'}
+                    </span>
+                  </li>
+                </ul>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>

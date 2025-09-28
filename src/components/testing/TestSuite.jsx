@@ -376,7 +376,7 @@ export default function TestSuite() {
    */
   const testMultiLangUpload = async () => {
     try {
-      const { uploadFile } = await import('../utils/supabase.jsx');
+      const { uploadFile } = await import('../utils/supabase');
       
       // Создаём одинаковые файлы для разных языков
       const ruFile = new File(['Русский контент'], 'test.txt', { type: 'text/plain' });
