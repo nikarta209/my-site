@@ -11,6 +11,8 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
+      'react-helmet-async': fileURLToPath(new URL('./src/components/seo/HelmetShim.js', import.meta.url)),
+      'jspdf': fileURLToPath(new URL('./src/shims/jspdf.js', import.meta.url)),
     },
     extensions: ['.mjs', '.js', '.jsx', '.ts', '.tsx', '.json']
   },
