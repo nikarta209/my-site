@@ -108,7 +108,7 @@ function MobileBottomNav({ currentPageName, user, isAuthenticated, cartItems }) 
   );
 }
 
-export default function Header({ currentPageName }) {
+export default function Header({ currentPageName, onLoginClick }) {
   const { user, isAuthenticated, login, logout, isLoading: isAuthLoading } = useAuth();
   const { cartItems } = useCart();
   const { theme, toggleTheme, isMobile } = useTheme();
@@ -120,6 +120,15 @@ export default function Header({ currentPageName }) {
 
   const isAuthor = user?.role === 'author';
   const isAdmin = user?.role === 'admin';
+
+  const handleLoginClick = () => {
+    if (onLoginClick) {
+      onLoginClick();
+      return;
+    }
+
+    login();
+  };
 
   const getThemeIcon = () => {
     switch(theme) {
@@ -352,7 +361,7 @@ export default function Header({ currentPageName }) {
               </DropdownMenu>
             ) : (
               <motion.div whileTap={{ scale: 0.95 }}>
-                <Button onClick={login} size="sm" className="h-6 px-3 text-sm">
+                <Button onClick={handleLoginClick} size="sm" className="h-6 px-3 text-sm">
                   <LogIn className="mr-1 h-3 w-3" />
                   Войти
                 </Button>

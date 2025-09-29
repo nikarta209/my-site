@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { AuthProvider } from '@/components/auth/Auth';
 import { CartProvider } from '@/components/cart/CartContext';
 import { ThemeProvider } from '@/components/layout/ThemeProvider';
@@ -9,6 +9,7 @@ import Header from '@/components/layout/Header';
 import SubNavigation from '@/components/layout/SubNavigation';
 import Footer from '@/components/layout/Footer';
 import { ExchangeRateProvider } from '@/components/utils/ExchangeRateContext';
+import AuthModal from '@/components/auth/AuthModal';
 
 const pageVariants = {
   initial: { 
@@ -35,13 +36,22 @@ const pageTransition = {
 };
 
 export default function Layout({ children, currentPageName }) {
+  const [isAuthOpen, setAuthOpen] = useState(false);
+
   return (
     <ThemeProvider>
       <AuthProvider>
         <ExchangeRateProvider>
           <CartProvider>
+            <AuthModal
+              isOpen={isAuthOpen}
+              onClose={() => setAuthOpen(false)}
+            />
             <div className="min-h-screen flex flex-col bg-background text-foreground font-sans">
-              <Header currentPageName={currentPageName} />
+              <Header
+                currentPageName={currentPageName}
+                onLoginClick={() => setAuthOpen(true)}
+              />
               <SubNavigation />
               
               <main className="flex-1 mobile-safe-bottom">
