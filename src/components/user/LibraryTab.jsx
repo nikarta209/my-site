@@ -1,50 +1,118 @@
-import React, { useState, useEffect } from 'react';
-import { getBooks } from '../utils/localStorage';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { motion } from 'framer-motion';
+import { toast } from 'sonner';
+import { useAuth } from '../auth/Auth';
+import { SharedNote, UserBookData } from '@/api/entities';
+import { getUserPurchases } from '../utils/supabase';
 
-// Mock purchased book IDs for the current user
-const mockPurchasedBookIds = ['1', '3', '5'];
-// Mock reading progress
-const mockProgress = {
-    '1': { progress: 75, totalPages: 400, highlights: ['"Все счастливые семьи похожи друг на друга..."', '"Анна бросила веер..."'] },
-    '3': { progress: 20, totalPages: 350, highlights: ['"...рукописи не горят."', '"Понтий Пилат"'] },
-    '5': { progress: 95, totalPages: 250, highlights: ['"Когда чего-нибудь сильно захочешь..."'] },
-};
-
-export default function LibraryTab({ user }) {
+export default function LibraryTab() {
+  const { user } = useAuth();
   const [libraryBooks, setLibraryBooks] = useState([]);
   const [sortBy, setSortBy] = useState('recent');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const allBooks = getBooks();
-    const userBooks = allBooks.filter(book => mockPurchasedBookIds.includes(book.id));
-    
-    // Add progress data to each book
-    const booksWithProgress = userBooks.map(book => ({
-        ...book,
-        ...mockProgress[book.id],
-    }));
+    if (!user) return;
 
-    setLibraryBooks(booksWithProgress);
-    setLoading(false);
-  }, []);
+    let isMounted = true;
 
-  const sortedBooks = [...libraryBooks].sort((a, b) => {
+    const loadLibrary = async () => {
+      setLoading(true);
+      try {
+        const purchases = await getUserPurchases();
+        const ownedBooks = purchases
+          .map((purchase) => purchase.book)
+          .filter(Boolean);
+
+        if (!isMounted) return;
+
+        if (ownedBooks.length === 0) {
+          setLibraryBooks([]);
+          return;
+        }
+
+        const bookIds = ownedBooks.map((book) => book.id).filter(Boolean);
+
+        const [progressRecords, sharedNotes] = await Promise.all([
+          bookIds.length
+            ? UserBookData.filter({ user_email: user.email, book_id: { '$in': bookIds } })
+            : [],
+          bookIds.length
+            ? SharedNote.filter({ user_email: user.email, book_id: { '$in': bookIds } }, '-created_at', 10)
+            : []
+        ]);
+
+        if (!isMounted) return;
+
+        const progressByBook = Array.isArray(progressRecords)
+          ? progressRecords.reduce((acc, record) => {
+              acc[record.book_id] = {
+                progress: Number(record.reading_progress) || 0,
+                totalPages: Number(record.total_pages) || Number(record.page_count) || 0
+              };
+              return acc;
+            }, {})
+          : {};
+
+        const highlightsByBook = Array.isArray(sharedNotes)
+          ? sharedNotes.reduce((acc, note) => {
+              if (!note?.book_id) return acc;
+              if (!acc[note.book_id]) acc[note.book_id] = [];
+              acc[note.book_id].push(note.selected_text || note.text);
+              return acc;
+            }, {})
+          : {};
+
+        const booksWithMeta = ownedBooks.map((book) => {
+          const progress = progressByBook[book.id] || {};
+          const highlights = highlightsByBook[book.id] || [];
+          return {
+            ...book,
+            progress: progress.progress,
+            totalPages: progress.totalPages || book.page_count || 0,
+            highlights: highlights.slice(0, 3)
+          };
+        });
+
+        setLibraryBooks(booksWithMeta);
+      } catch (error) {
+        console.error('[LibraryTab] Failed to load library', error);
+        toast.error('Не удалось загрузить библиотеку');
+        setLibraryBooks([]);
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    loadLibrary();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [user]);
+
+  const sortedBooks = useMemo(() => {
+    const books = [...libraryBooks];
     if (sortBy === 'progress_desc') {
-      return (b.progress || 0) - (a.progress || 0);
+      return books.sort((a, b) => (b.progress || 0) - (a.progress || 0));
     }
-     if (sortBy === 'progress_asc') {
-      return (a.progress || 0) - (b.progress || 0);
+    if (sortBy === 'progress_asc') {
+      return books.sort((a, b) => (a.progress || 0) - (b.progress || 0));
     }
-    // Default to recent (assuming higher ID is more recent)
-    return parseInt(b.id) - parseInt(a.id);
-  });
+
+    return books.sort((a, b) => {
+      const dateA = new Date(a.updated_at || a.created_at || 0).getTime();
+      const dateB = new Date(b.updated_at || b.created_at || 0).getTime();
+      return dateB - dateA;
+    });
+  }, [libraryBooks, sortBy]);
 
   return (
     <div>
