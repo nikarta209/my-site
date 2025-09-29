@@ -40,7 +40,6 @@ import {
   Loader2
 } from 'lucide-react';
 
-import { Book } from '@/api/entities';
 import { useAuth } from '../auth/Auth';
 import { UploadFile } from '@/api/integrations';
 import { useExchangeRate } from '../utils/ExchangeRateContext';
@@ -48,6 +47,7 @@ import { useCoinGecko, AnimatedPrice } from '../api/CoinGeckoAPI';
 import { getAuthorStats } from '@/api/functions'; // Added getAuthorStats
 import { detectLanguageFromFile, getLanguageMetadata, isSameLanguage } from '@/utils/languageDetection';
 import { buildSupabasePath } from '@/utils/storagePaths';
+import { createBook } from '../utils/supabase';
 
 const GENRES_DATA = [
     {
@@ -1328,7 +1328,7 @@ export default function UploadTab() {
         status: 'pending'
       };
 
-      const createdBook = await Book.create(bookData);
+      const createdBook = await createBook(bookData);
       setUploadedBookId(createdBook.id);
       setUploadProgress(100);
 
@@ -1359,6 +1359,13 @@ export default function UploadTab() {
 
     } catch (error) {
       console.error('Ошибка при создании книги:', error);
+
+      if (error instanceof Error && error.message.includes('Требуется аутентификация')) {
+        toast.error('Сессия истекла. Пожалуйста, войдите снова, чтобы продолжить загрузку книги.', {
+          id: toastId
+        });
+        return;
+      }
 
       let errorMessage = 'Не удалось создать книгу';
       if (error instanceof Error) {
