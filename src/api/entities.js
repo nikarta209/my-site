@@ -177,6 +177,36 @@ const createEntity = (tableName) => {
 const createUserEntity = () => {
   const base = createEntity('User');
 
+  const sanitizeObject = (obj = {}) =>
+    Object.entries(obj).reduce((acc, [key, value]) => {
+      if (value !== undefined) {
+        acc[key] = value;
+      }
+      return acc;
+    }, {});
+
+  const ensureUserProfile = async (user, metadata = {}) => {
+    if (!user?.id) return null;
+
+    const profilePayload = sanitizeObject({
+      id: user.id,
+      email: user.email,
+      ...sanitizeObject({
+        ...(user.user_metadata || {}),
+        ...metadata
+      })
+    });
+
+    const { data, error } = await supabase
+      .from(TABLES.User)
+      .upsert(profilePayload, { onConflict: 'id' })
+      .select()
+      .maybeSingle();
+
+    handleQueryError(error, 'User.ensureProfile');
+    return data;
+  };
+
   return {
     ...base,
     async me() {
@@ -193,7 +223,12 @@ const createUserEntity = () => {
         .eq('id', session.user.id)
         .maybeSingle();
       handleQueryError(error, 'User.me');
-      return profile ? { ...session.user, ...profile } : session.user;
+      if (profile) {
+        return { ...session.user, ...profile };
+      }
+
+      const ensuredProfile = await ensureUserProfile(session.user);
+      return ensuredProfile ? { ...session.user, ...ensuredProfile } : session.user;
     },
     async login(options = {}) {
       if (!isSupabaseConfigured) {
@@ -262,6 +297,8 @@ const createUserEntity = () => {
           return errorResult;
         }
 
+        const ensuredProfile = await ensureUserProfile(data?.user, metadata);
+
         if (enable2FA && phoneNumber) {
           const { error: otpError } = await supabase.auth.signInWithOtp({
             phone: phoneNumber,
@@ -274,7 +311,8 @@ const createUserEntity = () => {
           return { success: false, requires2FA: true };
         }
 
-        return { success: true, user: data?.user || null };
+        const user = data?.user || null;
+        return { success: true, user: ensuredProfile ? { ...user, ...ensuredProfile } : user };
       }
 
       if (email && password) {
@@ -283,6 +321,8 @@ const createUserEntity = () => {
         if (errorResult) {
           return errorResult;
         }
+
+        const ensuredProfile = await ensureUserProfile(data?.user, metadata);
 
         if (enable2FA && phoneNumber) {
           const { error: otpError } = await supabase.auth.signInWithOtp({
@@ -296,7 +336,8 @@ const createUserEntity = () => {
           return { success: false, requires2FA: true, user: data?.user || null };
         }
 
-        return { success: true, user: data?.user || null };
+        const user = data?.user || null;
+        return { success: true, user: ensuredProfile ? { ...user, ...ensuredProfile } : user };
       }
 
       if (provider) {
@@ -337,10 +378,14 @@ const createUserEntity = () => {
     },
     async updateMyUserData(patch) {
       const { data: sessionData } = await supabase.auth.getSession();
-      const userId = sessionData?.session?.user?.id;
+      const sessionUser = sessionData?.session?.user;
+      const userId = sessionUser?.id;
       if (!userId) {
         throw new Error('Необходима авторизация');
       }
+
+      await ensureUserProfile(sessionUser);
+
       const { data, error } = await supabase
         .from(TABLES.User)
         .update(patch)
