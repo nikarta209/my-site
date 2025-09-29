@@ -1314,6 +1314,7 @@ export default function UploadTab() {
         title: data.title,
         author: data.author || user?.full_name || 'Неизвестный автор',
         author_email: user?.email,
+        author_id: user?.id,
         genres: selectedGenres,
         mood: data.mood,
         description: data.description,

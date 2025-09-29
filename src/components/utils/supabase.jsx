@@ -283,7 +283,8 @@ export const createBook = (bookData) => withRetry(async () => {
   const bookWithAuthor = {
     ...bookData,
     author_email: user.email,
-    author: bookData.author || user.full_name || 'Неизвестный автор'
+    author: bookData.author || user.full_name || 'Неизвестный автор',
+    author_id: user.id
   };
   
   return Book.create(bookWithAuthor);
