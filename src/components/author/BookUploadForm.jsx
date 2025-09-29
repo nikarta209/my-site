@@ -371,6 +371,7 @@ export default function BookUploadForm({ onUploadSuccess }) {
         title: data.title,
         author: user?.full_name || 'Неизвестный автор',
         author_email: user?.email,
+        author_id: user?.id,
         description: data.description,
         price_kas: parseFloat(data.price_kas),
         genre: selectedGenres[0],
