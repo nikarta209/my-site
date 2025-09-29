@@ -22,14 +22,15 @@ import {
   DollarSign,
   Zap,
   Shield,
-  BookOpen
+  BookOpen,
+  Loader2
 } from 'lucide-react';
 
 import { Book } from '@/api/entities';
 import { useAuth } from '../auth/Auth';
 import { UploadFile } from '@/api/integrations';
-import { n8nTranslateWebhook } from '@/api/functions';
-import { nowpayments } from '@/api/functions';
+import { detectLanguageFromFile, getLanguageMetadata, isSameLanguage } from '@/utils/languageDetection';
+import { buildSupabasePath } from '@/utils/storagePaths';
 
 const GENRES = [
   { value: 'fiction', label: 'Художественная литература', emoji: '📚' },
@@ -182,16 +183,30 @@ export default function BookUploadForm({ onUploadSuccess }) {
   const [step, setStep] = useState(1);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
-  
+
   // Files
   const [bookFile, setBookFile] = useState(null);
   const [coverFile, setCoverFile] = useState(null);
-  
+  const [detectedLanguage, setDetectedLanguage] = useState(null);
+  const [isDetectingLanguage, setIsDetectingLanguage] = useState(false);
+  const [languageDetectionError, setLanguageDetectionError] = useState(null);
+  const [languageDetectionInfo, setLanguageDetectionInfo] = useState(null);
+
   // Form data
   const [selectedGenres, setSelectedGenres] = useState([]);
   const [selectedLanguages, setSelectedLanguages] = useState([]);
   const [plagiarismResult, setPlagiarismResult] = useState(null);
   const [translationPrice, setTranslationPrice] = useState(0);
+
+  const originalLanguage = detectedLanguage || 'ru';
+  const originalLanguageMeta = React.useMemo(
+    () => getLanguageMetadata(originalLanguage),
+    [originalLanguage]
+  );
+  const translationLanguages = React.useMemo(
+    () => LANGUAGES.filter((lang) => !isSameLanguage(lang.value, originalLanguage)),
+    [originalLanguage]
+  );
 
   const { register, handleSubmit, formState: { errors }, watch } = useForm({
     defaultValues: {
@@ -214,6 +229,10 @@ export default function BookUploadForm({ onUploadSuccess }) {
     }
   }, [bookFile, selectedLanguages]);
 
+  React.useEffect(() => {
+    setSelectedLanguages((prev) => prev.filter((lang) => translationLanguages.some((option) => option.value === lang)));
+  }, [translationLanguages]);
+
   const handleGenreToggle = (genreValue) => {
     setSelectedGenres(prev => {
       if (prev.includes(genreValue)) {
@@ -228,6 +247,11 @@ export default function BookUploadForm({ onUploadSuccess }) {
   };
 
   const handleLanguageToggle = (langValue) => {
+    if (!translationLanguages.some((lang) => lang.value === langValue)) {
+      toast.info('Этот язык уже является языком оригинала и не требует перевода.');
+      return;
+    }
+
     setSelectedLanguages(prev => {
       if (prev.includes(langValue)) {
         return prev.filter(l => l !== langValue);
@@ -242,10 +266,50 @@ export default function BookUploadForm({ onUploadSuccess }) {
 
   const handleBookFileDrop = useCallback(async (file) => {
     setBookFile(file);
-    
+    setDetectedLanguage(null);
+    setLanguageDetectionError(null);
+    setLanguageDetectionInfo(null);
+    setSelectedLanguages([]);
+    setPlagiarismResult(null);
+
+    if (!file) {
+      setIsDetectingLanguage(false);
+      return;
+    }
+
+    const detectionToastId = 'language-detection';
+    setIsDetectingLanguage(true);
+    toast.loading('Определяем язык книги...', { id: detectionToastId });
+
+    try {
+      const language = await detectLanguageFromFile(file);
+      if (language) {
+        setDetectedLanguage(language);
+        setLanguageDetectionInfo(null);
+        setSelectedLanguages((prev) => prev.filter((value) => !isSameLanguage(value, language)));
+        const meta = getLanguageMetadata(language);
+        toast.success(`Язык оригинала: ${meta.flag} ${meta.label}`, { id: detectionToastId });
+      } else {
+        setDetectedLanguage(null);
+        setLanguageDetectionError(null);
+        const message = 'Не удалось автоматически определить язык книги. По умолчанию используется русский.';
+        setLanguageDetectionInfo(message);
+        toast.warning(message, { id: detectionToastId });
+      }
+    } catch (error) {
+      console.error('Language detection error:', error);
+      const message = error instanceof Error ? error.message : 'Не удалось определить язык книги.';
+      setDetectedLanguage(null);
+      setLanguageDetectionError(message);
+      setLanguageDetectionInfo(null);
+      toast.error(message, { id: detectionToastId });
+    } finally {
+      setIsDetectingLanguage(false);
+    }
+
     // Запуск проверки на плагиат (мок)
     toast.loading('Проверка на плагиат...', { id: 'plagiarism' });
-    
+
     setTimeout(() => {
       const mockScore = Math.floor(Math.random() * 20) + 5; // 5-25%
       setPlagiarismResult({
@@ -292,10 +356,11 @@ export default function BookUploadForm({ onUploadSuccess }) {
       // 1. Загрузка файлов
       setUploadProgress(25);
       toast.loading('Загрузка файлов...', { id: 'upload' });
-      
+
+      const originalLang = detectedLanguage || 'ru';
       const [{ file_url: bookUrl }, { file_url: coverUrl }] = await Promise.all([
-        UploadFile({ file: bookFile }),
-        UploadFile({ file: coverFile })
+        UploadFile({ file: bookFile, path: buildSupabasePath('books/originals', bookFile) }),
+        UploadFile({ file: coverFile, path: buildSupabasePath('books/covers', coverFile) })
       ]);
 
       // 2. Создание книги
@@ -313,10 +378,11 @@ export default function BookUploadForm({ onUploadSuccess }) {
         cover_url: coverUrl,
         languages: [
           {
-            lang: 'ru',
+            lang: originalLang,
             title: data.title,
             description: data.description,
-            file_url: bookUrl
+            file_url: bookUrl,
+            original: true
           }
         ],
         status: 'pending'
@@ -325,29 +391,8 @@ export default function BookUploadForm({ onUploadSuccess }) {
       const createdBook = await Book.create(bookData);
       setUploadProgress(75);
 
-      // 3. Оплата и перевод (если выбраны языки)
-      if (selectedLanguages.length > 0 && translationPrice > 0) {
-        toast.loading('Обработка оплаты за перевод...', { id: 'upload' });
-        
-        // Создание платежа через NOWPayments
-        const paymentResult = await nowpayments({
-          action: 'createPayment',
-          books: [createdBook],
-          totalAmount: translationPrice
-        });
-
-        if (paymentResult.success) {
-          toast.success('Платеж создан! Переходим к оплате...', { id: 'upload' });
-          
-          // После успешной оплаты отправляем на перевод
-          const formData = new FormData();
-          formData.append('file', bookFile);
-          formData.append('languages', JSON.stringify(selectedLanguages));
-          formData.append('bookId', createdBook.id);
-          
-          await n8nTranslateWebhook(formData);
-          toast.success('Перевод запущен! Результаты будут готовы в течение часа.');
-        }
+      if (selectedLanguages.length > 0) {
+        toast.info('Автоматический перевод временно отключен. Выбранные языки сохранены для последующей обработки.', { id: 'upload' });
       }
 
       setUploadProgress(100);
@@ -359,6 +404,9 @@ export default function BookUploadForm({ onUploadSuccess }) {
       setSelectedGenres([]);
       setSelectedLanguages([]);
       setPlagiarismResult(null);
+      setDetectedLanguage(null);
+      setLanguageDetectionError(null);
+      setLanguageDetectionInfo(null);
       setStep(1);
       
       onUploadSuccess?.(createdBook);
@@ -605,6 +653,62 @@ export default function BookUploadForm({ onUploadSuccess }) {
                     )}
                   </DropZone>
 
+                  {isDetectingLanguage && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="mt-4"
+                    >
+                      <Alert className="border-primary/20">
+                        <AlertDescription className="flex items-center gap-2 text-sm">
+                          <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                          Определяем язык книги...
+                        </AlertDescription>
+                      </Alert>
+                    </motion.div>
+                  )}
+
+                  {!isDetectingLanguage && detectedLanguage && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="mt-4"
+                    >
+                      <Alert className="border-green-500/40 bg-green-50/40 dark:bg-green-950/20">
+                        <AlertDescription className="flex items-center gap-2 text-sm">
+                          <span className="text-xl">{originalLanguageMeta.flag}</span>
+                          <span>
+                            Язык оригинала: <span className="font-medium">{originalLanguageMeta.label}</span>
+                          </span>
+                        </AlertDescription>
+                      </Alert>
+                    </motion.div>
+                  )}
+
+                  {!isDetectingLanguage && languageDetectionInfo && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="mt-4"
+                    >
+                      <Alert className="border-amber-300 bg-amber-50/60 dark:bg-amber-950/20">
+                        <AlertDescription className="text-sm">{languageDetectionInfo}</AlertDescription>
+                      </Alert>
+                    </motion.div>
+                  )}
+
+                  {!isDetectingLanguage && languageDetectionError && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="mt-4"
+                    >
+                      <Alert variant="destructive">
+                        <AlertDescription className="text-sm">{languageDetectionError}</AlertDescription>
+                      </Alert>
+                    </motion.div>
+                  )}
+
                   {/* Результат проверки на плагиат */}
                   {plagiarismResult && (
                     <motion.div
@@ -710,8 +814,26 @@ export default function BookUploadForm({ onUploadSuccess }) {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-6">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <Badge variant="outline" className="flex items-center gap-2 px-3 py-1">
+                    <span className="text-lg">{originalLanguageMeta.flag}</span>
+                    <span className="text-sm font-medium">Язык оригинала: {originalLanguageMeta.label}</span>
+                  </Badge>
+                  <span className="text-xs text-muted-foreground">
+                    Выберите языки, отличные от оригинала, для будущего перевода
+                  </span>
+                </div>
+
+                {!detectedLanguage && !isDetectingLanguage && (
+                  <Alert className="border-amber-300 bg-amber-50/60 dark:bg-amber-950/20">
+                    <AlertDescription className="text-xs">
+                      Не удалось автоматически определить язык файла. По умолчанию используется русский.
+                    </AlertDescription>
+                  </Alert>
+                )}
+
                 <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {LANGUAGES.map((lang) => (
+                  {translationLanguages.map((lang) => (
                     <motion.div
                       key={lang.value}
                       whileHover={{ scale: 1.05 }}
@@ -731,6 +853,12 @@ export default function BookUploadForm({ onUploadSuccess }) {
                     </motion.div>
                   ))}
                 </div>
+
+                <Alert className="border-amber-300 bg-amber-50/60 dark:bg-amber-950/20">
+                  <AlertDescription className="text-sm">
+                    Автоматический перевод временно отключен. Мы сохраним выбранные языки и запустим перевод позднее.
+                  </AlertDescription>
+                </Alert>
 
                 {selectedLanguages.length > 0 && (
                   <motion.div
@@ -777,7 +905,7 @@ export default function BookUploadForm({ onUploadSuccess }) {
                       </>
                     ) : selectedLanguages.length > 0 ? (
                       <>
-                        Загрузить и перевести
+                        Загрузить книгу (перевод позже)
                         <Zap className="w-4 h-4 ml-2" />
                       </>
                     ) : (
