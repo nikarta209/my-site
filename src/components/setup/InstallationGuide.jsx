@@ -42,22 +42,34 @@ export default function InstallationGuide() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="mb-4">Создайте файл <code>.env.local</code> в корне проекта:</p>
+          <p className="mb-4">
+            Создайте файл <code>.env</code> (или <code>.env.local</code>) в корне проекта и
+            добавьте необходимые переменные окружения:
+          </p>
           <div className="bg-gray-900 text-white p-4 rounded-lg text-sm">
-            <pre>{`# Supabase Configuration
+            <pre>{`# Supabase (обязательно для Vite-фронтенда)
+VITE_SUPABASE_URL=your_supabase_project_url
+VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+
+# Supabase (для Edge Functions или серверных скриптов)
 SUPABASE_URL=your_supabase_project_url
 SUPABASE_SERVICE_KEY=your_service_role_key
 
-# Base44 Configuration  
-BASE44_APP_ID=your_app_id
-
-# OpenAI для AI функций (опционально)
-OPENAI_API_KEY=your_openai_key
-
-# Для разработки
-NODE_ENV=development
-NEXT_PUBLIC_APP_URL=http://localhost:3000`}</pre>
+# Дополнительные настройки (опционально)
+VITE_SUPABASE_STORAGE_BUCKET=books
+VITE_SUPABASE_EDGE_FUNCTION_URL=https://your-edge-function-url
+VITE_SUPABASE_OAUTH_PROVIDER=google
+VITE_SUPABASE_AUTH_REDIRECT_URL=http://localhost:5173/auth/callback
+VITE_N8N_URL=https://your-n8n-webhook
+VITE_APP_ID=kasbook-local
+VITE_THEME_DEFAULT=system`}</pre>
           </div>
+          <p className="text-sm text-muted-foreground mt-3">
+            Переменные с префиксом <code>VITE_</code> доступны только на клиенте и необходимы
+            для работы Vite-приложения. <code>SUPABASE_SERVICE_KEY</code> и другие значения без
+            префикса следует использовать только в защищенных средах (например, при запуске
+            Supabase Edge Functions или серверных скриптов).
+          </p>
         </CardContent>
       </Card>
 
@@ -88,11 +100,10 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000`}</pre>
         <CardContent>
           <div className="bg-gray-900 text-white p-4 rounded-lg text-sm">
             <pre>{`"scripts": {
-  "dev": "next dev",
-  "build": "next build", 
-  "start": "next start",
-  "postinstall": "npm run check-deps",
-  "check-deps": "node -e \\"try { require('idb-keyval'); require('localforage'); console.log('✅ Deps OK'); } catch(e) { console.error('❌ Missing deps:', e.message); }\\""
+  "dev": "vite",
+  "build": "vite build",
+  "preview": "vite preview",
+  "start": "vite preview --host 0.0.0.0 --port \${PORT:-4173}"
 }`}</pre>
           </div>
         </CardContent>
