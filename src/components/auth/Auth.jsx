@@ -237,10 +237,24 @@ export function AuthProvider({ children }) {
     return () => clearInterval(interval);
   }, [user, isInitialized, syncToLocalStorage]);
 
-  const login = useCallback(() => {
+  const login = useCallback(async (options = {}) => {
     setIsLoading(true);
-    User.login();
-  }, []);
+    try {
+      const result = await User.login(options);
+
+      if (result?.user) {
+        setUser(result.user);
+        syncToLocalStorage(result.user);
+      }
+
+      return result;
+    } catch (error) {
+      console.error('Login error:', error);
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  }, [syncToLocalStorage]);
 
   const logout = useCallback(async () => {
     try {
