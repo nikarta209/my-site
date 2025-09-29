@@ -26,11 +26,11 @@ import {
   Loader2
 } from 'lucide-react';
 
-import { Book } from '@/api/entities';
 import { useAuth } from '../auth/Auth';
 import { UploadFile } from '@/api/integrations';
 import { detectLanguageFromFile, getLanguageMetadata, isSameLanguage } from '@/utils/languageDetection';
 import { buildSupabasePath } from '@/utils/storagePaths';
+import { createBook } from '../utils/supabase';
 
 const GENRES = [
   { value: 'fiction', label: 'Художественная литература', emoji: '📚' },
@@ -389,7 +389,7 @@ export default function BookUploadForm({ onUploadSuccess }) {
         status: 'pending'
       };
 
-      const createdBook = await Book.create(bookData);
+      const createdBook = await createBook(bookData);
       setUploadProgress(75);
 
       if (selectedLanguages.length > 0) {
@@ -414,7 +414,14 @@ export default function BookUploadForm({ onUploadSuccess }) {
 
     } catch (error) {
       console.error('Upload error:', error);
-      toast.error('Ошибка при загрузке книги: ' + error.message, { id: 'upload' });
+
+      if (error instanceof Error && error.message.includes('Требуется аутентификация')) {
+        toast.error('Сессия истекла. Пожалуйста, войдите снова, чтобы продолжить загрузку книги.', {
+          id: 'upload'
+        });
+      } else {
+        toast.error('Ошибка при загрузке книги: ' + error.message, { id: 'upload' });
+      }
     } finally {
       setIsUploading(false);
       setUploadProgress(0);
