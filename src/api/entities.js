@@ -195,18 +195,24 @@ const createUserEntity = () => {
       handleQueryError(error, 'User.me');
       return profile ? { ...session.user, ...profile } : session.user;
     },
-    async login() {
+    async login(options = {}) {
       if (!isSupabaseConfigured) {
         throw new Error('Supabase не настроен. Укажите переменные окружения VITE_SUPABASE_URL и VITE_SUPABASE_ANON_KEY.');
       }
 
-      const provider = import.meta.env.VITE_SUPABASE_OAUTH_PROVIDER;
-      const redirectTo = import.meta.env.VITE_SUPABASE_AUTH_REDIRECT_URL || window.location.origin;
+      const provider = options.provider || import.meta.env.VITE_SUPABASE_OAUTH_PROVIDER;
+      const redirectTo = options.redirectTo || import.meta.env.VITE_SUPABASE_AUTH_REDIRECT_URL || window.location.origin;
 
       if (provider) {
-        const { error } = await supabase.auth.signInWithOAuth({ provider, options: { redirectTo } });
+        const { data, error } = await supabase.auth.signInWithOAuth({ provider, options: { redirectTo } });
         handleQueryError(error, 'User.login');
-        return { success: !error };
+
+        if (!error && data?.url && typeof window !== 'undefined') {
+          // Supabase может вернуть URL перенаправления без автоматического редиректа
+          window.location.href = data.url;
+        }
+
+        return { success: !error, data };
       }
 
       const email = typeof window !== 'undefined' ? window.prompt('Введите e-mail для входа') : null;
