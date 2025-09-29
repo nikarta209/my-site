@@ -70,6 +70,15 @@ export default function RegisterAuthor() {
     setIsSubmitting(false);
   };
 
+  const handleWalletLogin = async () => {
+    try {
+      await User.login();
+    } catch (error) {
+      console.error('Wallet login failed:', error);
+      toast.error('Сервис авторизации недоступен. Попробуйте еще раз позже.');
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -97,7 +106,7 @@ export default function RegisterAuthor() {
             </CardDescription>
           </CardHeader>
           <CardContent className="text-center">
-            <Button onClick={() => User.login()} className="author-gradient text-white">
+            <Button onClick={handleWalletLogin} className="author-gradient text-white">
               Войти через KAS кошелек
             </Button>
           </CardContent>

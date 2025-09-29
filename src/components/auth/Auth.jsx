@@ -338,7 +338,7 @@ export const useSubscription = () => {
 export function ProtectedRoute({ children, requireRole, requireSubscription, fallbackComponent }) {
   const { user, isAuthenticated, isLoading, hasFullAccess: isGodMode } = useAuth(); // Получаем флаг
   const subscription = useSubscription(); // Use the new hook for subscription data
-  
+
   // ИСПРАВЛЕНИЕ: Показываем загрузку только когда реально идет проверка
   if (isLoading) {
     return (
@@ -350,7 +350,16 @@ export function ProtectedRoute({ children, requireRole, requireSubscription, fal
       </div>
     );
   }
-  
+
+  const handleDirectLogin = async () => {
+    try {
+      await User.login();
+    } catch (error) {
+      console.error('Direct login failed:', error);
+      toast.error('Сервис авторизации недоступен. Попробуйте еще раз позже.');
+    }
+  };
+
   if (!isAuthenticated) {
     return fallbackComponent || (
       <div className="flex items-center justify-center min-h-screen">
@@ -358,7 +367,7 @@ export function ProtectedRoute({ children, requireRole, requireSubscription, fal
           <h2 className="text-2xl font-bold">Требуется авторизация</h2>
           <p className="text-muted-foreground">Для доступа к этой странице необходимо войти в систему</p>
           <button
-            onClick={() => User.login()}
+            onClick={handleDirectLogin}
             className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
           >
             Войти
