@@ -200,28 +200,135 @@ const createUserEntity = () => {
         throw new Error('Supabase не настроен. Укажите переменные окружения VITE_SUPABASE_URL и VITE_SUPABASE_ANON_KEY.');
       }
 
-      const provider = options.provider || import.meta.env.VITE_SUPABASE_OAUTH_PROVIDER;
-      const redirectTo = options.redirectTo || import.meta.env.VITE_SUPABASE_AUTH_REDIRECT_URL || window.location.origin;
+      const {
+        provider = import.meta.env.VITE_SUPABASE_OAUTH_PROVIDER,
+        redirectTo = import.meta.env.VITE_SUPABASE_AUTH_REDIRECT_URL || (typeof window !== 'undefined' ? window.location.origin : undefined),
+        email,
+        password,
+        isRegistration,
+        twoFactorCode,
+        phoneNumber,
+        enable2FA,
+        fullName,
+        role,
+        walletAddress,
+        ...rest
+      } = options;
+
+      const metadata = {
+        ...(fullName ? { full_name: fullName } : {}),
+        ...(role ? { role } : {}),
+        ...(walletAddress ? { wallet_address: walletAddress } : {}),
+        ...(phoneNumber ? { phone: phoneNumber } : {}),
+        ...rest?.metadata,
+      };
+
+      const handleError = (error, context) => {
+        if (!error) return null;
+        console.error(`[Supabase] ${context}:`, error);
+        if (typeof window !== 'undefined' && toast && error?.message) {
+          toast.error(error.message);
+        }
+        return { success: false, error: error.message || context };
+      };
+
+      if (twoFactorCode) {
+        const verifyPayload = phoneNumber
+          ? { type: 'sms', phone: phoneNumber, token: twoFactorCode }
+          : { type: 'email', email, token: twoFactorCode };
+
+        const { data, error } = await supabase.auth.verifyOtp(verifyPayload);
+        const errorResult = handleError(error, 'User.login.verifyOtp');
+        if (errorResult) {
+          return { ...errorResult, requires2FA: true };
+        }
+
+        return { success: true, user: data?.user || null };
+      }
+
+      if (isRegistration && email && password) {
+        const { data, error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            data: Object.keys(metadata).length ? metadata : undefined,
+            emailRedirectTo: redirectTo,
+            phone: phoneNumber || undefined
+          }
+        });
+
+        const errorResult = handleError(error, 'User.login.signUp');
+        if (errorResult) {
+          return errorResult;
+        }
+
+        if (enable2FA && phoneNumber) {
+          const { error: otpError } = await supabase.auth.signInWithOtp({
+            phone: phoneNumber,
+            options: { channel: 'sms' }
+          });
+          const otpResult = handleError(otpError, 'User.login.signUp.2FA');
+          if (otpResult) {
+            return otpResult;
+          }
+          return { success: false, requires2FA: true };
+        }
+
+        return { success: true, user: data?.user || null };
+      }
+
+      if (email && password) {
+        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+        const errorResult = handleError(error, 'User.login.signInWithPassword');
+        if (errorResult) {
+          return errorResult;
+        }
+
+        if (enable2FA && phoneNumber) {
+          const { error: otpError } = await supabase.auth.signInWithOtp({
+            phone: phoneNumber,
+            options: { channel: 'sms' }
+          });
+          const otpResult = handleError(otpError, 'User.login.signInWithPassword.2FA');
+          if (otpResult) {
+            return otpResult;
+          }
+          return { success: false, requires2FA: true, user: data?.user || null };
+        }
+
+        return { success: true, user: data?.user || null };
+      }
 
       if (provider) {
         const { data, error } = await supabase.auth.signInWithOAuth({ provider, options: { redirectTo } });
-        handleQueryError(error, 'User.login');
+        const errorResult = handleError(error, 'User.login.signInWithOAuth');
+        if (errorResult) {
+          return errorResult;
+        }
 
-        if (!error && data?.url && typeof window !== 'undefined') {
-          // Supabase может вернуть URL перенаправления без автоматического редиректа
+        if (data?.url && typeof window !== 'undefined') {
           window.location.href = data.url;
         }
 
-        return { success: !error, data };
+        return { success: true, data };
       }
 
-      const email = typeof window !== 'undefined' ? window.prompt('Введите e-mail для входа') : null;
-      if (!email) {
-        return { success: false, error: 'Login cancelled' };
+      if (email) {
+        const { data, error } = await supabase.auth.signInWithOtp({
+          email,
+          options: {
+            emailRedirectTo: redirectTo
+          }
+        });
+        const errorResult = handleError(error, 'User.login.signInWithOtp');
+        if (errorResult) {
+          return errorResult;
+        }
+
+        return { success: false, requires2FA: true, user: data?.user || null };
       }
-      const { error } = await supabase.auth.signInWithOtp({ email, options: { emailRedirectTo: redirectTo } });
-      handleQueryError(error, 'User.login');
-      return { success: !error };
+
+      return { success: false, error: 'Недостаточно данных для авторизации' };
     },
     async logout() {
       const { error } = await supabase.auth.signOut();

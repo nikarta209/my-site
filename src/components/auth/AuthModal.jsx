@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,6 +19,19 @@ export default function AuthModal({ isOpen, onClose }) {
   const [activeTab, setActiveTab] = useState('login');
   const [show2FAInput, setShow2FAInput] = useState(false);
   const [twoFactorCode, setTwoFactorCode] = useState('');
+  const [loginError, setLoginError] = useState(null);
+  const [registerError, setRegisterError] = useState(null);
+  const [loginStatus, setLoginStatus] = useState(null);
+  const [registerStatus, setRegisterStatus] = useState(null);
+
+  useEffect(() => {
+    setShow2FAInput(false);
+    setTwoFactorCode('');
+    setLoginError(null);
+    setLoginStatus(null);
+    setRegisterError(null);
+    setRegisterStatus(null);
+  }, [activeTab, isOpen]);
   
   // Состояние для форм
   const [loginForm, setLoginForm] = useState({
@@ -43,42 +56,69 @@ export default function AuthModal({ isOpen, onClose }) {
   const handleLogin = async (e) => {
     e.preventDefault();
     setIsLoading(true);
-    
+    setLoginError(null);
+    setLoginStatus(null);
+
     try {
       if (loginForm.email && loginForm.password) {
-        // Email/password login
-        const result = await login(loginForm, show2FAInput ? twoFactorCode : null);
-        
-        if (result.requires2FA && !show2FAInput) {
+        const payload = {
+          email: loginForm.email,
+          password: loginForm.password,
+          enable2FA: loginForm.enable2FA,
+          phoneNumber: loginForm.phoneNumber,
+          twoFactorCode: show2FAInput ? twoFactorCode.trim() : undefined,
+        };
+
+        const result = await login(payload);
+
+        if (result.requires2FA) {
           setShow2FAInput(true);
-          toast.info('Введите код подтверждения из SMS');
+          setLoginStatus('Введите код подтверждения, отправленный на указанный номер.');
+          if (!result.success && result.error) {
+            setLoginError(result.error);
+          }
           setIsLoading(false);
           return;
         }
-        
-        if (result.success) {
+
+        if (!result.success) {
+          if (result.error) {
+            setLoginError(result.error);
+          }
+        } else {
           toast.success('Успешный вход!');
+          setShow2FAInput(false);
+          setTwoFactorCode('');
+          setLoginStatus('Успешный вход выполнен.');
           onClose();
         }
       } else {
-        // Google OAuth fallback
         const result = await login({});
-        if (result.success) {
+        if (!result.success) {
+          if (result.error) {
+            setLoginError(result.error);
+          }
+        } else {
           toast.success('Успешный вход!');
+          setLoginStatus('Успешный вход выполнен.');
           onClose();
         }
       }
     } catch (error) {
       console.error('Login error:', error);
-      toast.error('Ошибка входа: ' + (error.message || 'Неизвестная ошибка'));
+      const message = error?.message || 'Неизвестная ошибка';
+      setLoginError(message);
+      toast.error('Ошибка входа: ' + message);
     }
-    
+
     setIsLoading(false);
   };
 
   const handleRegister = async (e) => {
     e.preventDefault();
     setIsLoading(true);
+    setRegisterError(null);
+    setRegisterStatus(null);
 
     try {
       // Валидация
@@ -113,25 +153,46 @@ export default function AuthModal({ isOpen, onClose }) {
       }
 
       // Попытка регистрации через Google OAuth (fallback to platform auth)
-      const result = await login({
+      const payload = {
+        email: registerForm.email,
+        password: registerForm.password,
+        fullName: registerForm.fullName,
+        role: registerForm.role,
+        walletAddress: registerForm.walletAddress,
+        phoneNumber: registerForm.phoneNumber,
+        enable2FA: registerForm.enable2FA,
         isRegistration: true,
-        ...registerForm
-      }, show2FAInput ? twoFactorCode : null);
+        twoFactorCode: show2FAInput ? twoFactorCode.trim() : undefined,
+      };
 
-      if (result.requires2FA && !show2FAInput) {
+      const result = await login(payload);
+
+      if (result.requires2FA) {
         setShow2FAInput(true);
-        toast.info('Введите код подтверждения из SMS');
+        setRegisterStatus('Введите код подтверждения, отправленный на указанный номер.');
+        if (!result.success && result.error) {
+          setRegisterError(result.error);
+        }
         setIsLoading(false);
         return;
       }
 
-      if (result.success) {
+      if (!result.success) {
+        if (result.error) {
+          setRegisterError(result.error);
+        }
+      } else {
         toast.success(`Добро пожаловать, ${registerForm.fullName}!`);
+        setShow2FAInput(false);
+        setTwoFactorCode('');
+        setRegisterStatus('Регистрация успешно завершена.');
         onClose();
       }
     } catch (error) {
       console.error('Registration error:', error);
-      toast.error('Ошибка регистрации: ' + (error.message || 'Неизвестная ошибка'));
+      const message = error?.message || 'Неизвестная ошибка';
+      setRegisterError(message);
+      toast.error('Ошибка регистрации: ' + message);
     }
 
     setIsLoading(false);
@@ -140,12 +201,18 @@ export default function AuthModal({ isOpen, onClose }) {
   const handleGoogleAuth = async (isRegistration = false) => {
     setIsLoading(true);
     try {
-      const data = isRegistration ? { isRegistration: true, ...registerForm } : {};
+      const data = isRegistration ? { isRegistration: true } : {};
       const result = await login(data);
-      
+
       if (result.success) {
         toast.success(isRegistration ? 'Регистрация завершена!' : 'Успешный вход!');
         onClose();
+      } else if (result.error) {
+        if (isRegistration) {
+          setRegisterError(result.error);
+        } else {
+          setLoginError(result.error);
+        }
       }
     } catch (error) {
       toast.error((isRegistration ? 'Ошибка регистрации: ' : 'Ошибка входа: ') + error.message);
@@ -244,6 +311,20 @@ export default function AuthModal({ isOpen, onClose }) {
                     Введите код, отправленный на {loginForm.phoneNumber}
                   </p>
                 </div>
+              )}
+
+              {loginError && (
+                <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>{loginError}</AlertDescription>
+                </Alert>
+              )}
+
+              {loginStatus && (
+                <Alert>
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>{loginStatus}</AlertDescription>
+                </Alert>
               )}
 
               <Button
@@ -431,9 +512,23 @@ export default function AuthModal({ isOpen, onClose }) {
                 </div>
               )}
 
+              {registerError && (
+                <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>{registerError}</AlertDescription>
+                </Alert>
+              )}
+
+              {registerStatus && (
+                <Alert>
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>{registerStatus}</AlertDescription>
+                </Alert>
+              )}
+
               <div className="flex items-center space-x-2">
-                <Checkbox 
-                  id="terms" 
+                <Checkbox
+                  id="terms"
                   checked={registerForm.agreeToTerms}
                   onCheckedChange={(checked) => setRegisterForm({...registerForm, agreeToTerms: checked})}
                 />

@@ -237,12 +237,25 @@ export function AuthProvider({ children }) {
     return () => clearInterval(interval);
   }, [user, isInitialized, syncToLocalStorage]);
 
-  const login = useCallback(async (options = {}) => {
+  const login = useCallback(async ({ email, password, isRegistration, twoFactorCode, ...options } = {}) => {
     setIsLoading(true);
     try {
-      const result = await User.login(options);
+      const result = await User.login({
+        email,
+        password,
+        isRegistration,
+        twoFactorCode,
+        ...options
+      });
 
-      if (result?.user) {
+      if (result?.success) {
+        const profile = await User.me();
+        if (profile) {
+          setUser(profile);
+          syncToLocalStorage(profile);
+        }
+      } else if (result?.user) {
+        // Fallback для сценариев, когда Supabase уже вернул пользователя
         setUser(result.user);
         syncToLocalStorage(result.user);
       }
