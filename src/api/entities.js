@@ -197,14 +197,24 @@ const createUserEntity = () => {
       })
     });
 
-    const { data, error } = await supabase
-      .from(TABLES.User)
-      .upsert(profilePayload, { onConflict: 'id' })
-      .select()
-      .maybeSingle();
+    try {
+      const { data, error } = await supabase
+        .from(TABLES.User)
+        .upsert(profilePayload, { onConflict: 'id' })
+        .select()
+        .maybeSingle();
 
-    handleQueryError(error, 'User.ensureProfile');
-    return data;
+      if (error?.code === '23503') {
+        console.warn('[Supabase] User.ensureProfile: upsert skipped due to missing references', error);
+        return null;
+      }
+
+      handleQueryError(error, 'User.ensureProfile');
+      return data;
+    } catch (err) {
+      handleQueryError(err, 'User.ensureProfile');
+      throw err;
+    }
   };
 
   return {
