@@ -16,7 +16,7 @@ import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 
 export default function Profile() {
-  const { user, loading } = useAuth();
+  const { user, isLoading } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
   const [showAISettings, setShowAISettings] = useState(false);
   const [aiPreferences, setAIPreferences] = useState(null);
@@ -53,7 +53,7 @@ export default function Profile() {
   };
 
   // ИСПРАВЛЕНО: Условные return'ы после всех хуков
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="flex justify-center items-center h-screen bg-gray-50 dark:bg-slate-950">
         <div className="animate-spin rounded-full h-32 w-32 border-t-2 border-b-2 border-green-500"></div>
