@@ -333,11 +333,51 @@ export const moderateBookStatus = ({ bookId, status, moderatorEmail, rejectionIn
     if (!status) throw new Error('Не указан статус модерации');
     if (!moderatorEmail) throw new Error('Не указан email модератора');
 
-    const response = await fetch(`/api/moderation/books/${bookId}/status`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status, moderatorEmail, rejectionInfo })
-    });
+    const normalizedStatus = status.toLowerCase();
+
+    const buildUpdatePayload = () => {
+      const payload = {
+        status: normalizedStatus,
+        moderator_email: moderatorEmail
+      };
+
+      if (normalizedStatus === 'approved') {
+        payload.rejection_info = null;
+      } else if (normalizedStatus === 'rejected') {
+        payload.rejection_info = rejectionInfo || null;
+      }
+
+      return payload;
+    };
+
+    const attemptFallbackUpdate = async () => {
+      try {
+        const updatedBook = await Book.update(bookId, buildUpdatePayload());
+        if (!updatedBook) {
+          throw new Error('Пустой ответ Supabase');
+        }
+        invalidateCache();
+        toast.warning(
+          'Использован резервный путь обновления через Supabase. Проверьте конфигурацию серверной модерации.'
+        );
+        return updatedBook;
+      } catch (fallbackError) {
+        console.error('[moderation] fallback update failed', fallbackError);
+        throw fallbackError;
+      }
+    };
+
+    let response;
+    try {
+      response = await fetch(`/api/moderation/books/${bookId}/status`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: normalizedStatus, moderatorEmail, rejectionInfo })
+      });
+    } catch (networkError) {
+      console.warn('[moderation] server request failed, attempting fallback', networkError);
+      return attemptFallbackUpdate();
+    }
 
     let payload = null;
     try {
@@ -346,11 +386,22 @@ export const moderateBookStatus = ({ bookId, status, moderatorEmail, rejectionIn
       console.warn('Не удалось разобрать ответ сервера модерации', error);
     }
 
-    if (!response.ok || !payload?.success) {
-      const errorMessage = payload?.error || 'Не удалось обновить статус книги';
-      throw new Error(errorMessage);
+    if (response.ok && payload?.success) {
+      invalidateCache();
+      return payload.data;
     }
 
-    invalidateCache();
-    return payload.data;
+    const errorMessage = payload?.error || `Не удалось обновить статус книги (код ${response.status})`;
+    const shouldFallback =
+      response.status === 404 ||
+      response.status === 503 ||
+      (response.status === 500 &&
+        (errorMessage.toLowerCase().includes('не настроен') || errorMessage.toLowerCase().includes('not configured')));
+
+    if (shouldFallback) {
+      console.warn('[moderation] server returned fallback-eligible error:', errorMessage);
+      return attemptFallbackUpdate();
+    }
+
+    throw new Error(errorMessage);
   }, 3, 'moderateBookStatus');
