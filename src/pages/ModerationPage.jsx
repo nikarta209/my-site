@@ -25,6 +25,7 @@ import { Book } from '@/api/entities';
 import { toast } from 'sonner';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
+import { invalidateCache } from '@/components/utils/supabase';
 
 export default function ModerationPage() {
   const { user, isAuthenticated } = useAuth();
@@ -97,16 +98,18 @@ export default function ModerationPage() {
       }
 
       await Book.update(bookId, updateData);
-      
+
+      invalidateCache();
+
       toast.success(
-        action === 'approved' ? 'Книга одобрена!' : 
-        action === 'rejected' ? 'Книга отклонена' : 
+        action === 'approved' ? 'Книга одобрена!' :
+        action === 'rejected' ? 'Книга отклонена' :
         'Статус книги обновлен'
       );
-      
+
       // Перезагружаем список книг
-      loadBooks();
-      
+      await loadBooks();
+
     } catch (error) {
       console.error('Ошибка обновления книги:', error);
       toast.error('Не удалось обновить статус книги');
