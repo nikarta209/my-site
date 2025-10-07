@@ -4,7 +4,21 @@ import { createServer } from 'node:http';
 import { URL } from 'node:url';
 
 const nodeProcess = globalThis.process;
-nodeProcess?.loadEnvFile?.();
+
+try {
+  nodeProcess?.loadEnvFile?.();
+} catch (error) {
+  console.warn('[server] Failed to load .env via process.loadEnvFile()', error);
+}
+
+try {
+  await import('dotenv/config');
+} catch (error) {
+  if (error?.code !== 'ERR_MODULE_NOT_FOUND') {
+    console.warn('[server] Failed to load dotenv/config', error);
+  }
+}
+
 const env = nodeProcess?.env ?? {};
 
 const resolveEnvValue = (...keys) => {
