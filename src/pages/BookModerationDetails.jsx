@@ -9,20 +9,21 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
-import { 
-  ArrowLeft, 
-  Check, 
-  X, 
-  Download, 
-  Copy, 
-  Shield, 
+import {
+  ArrowLeft,
+  Check,
+  X,
+  Download,
+  Copy,
+  Shield,
   User,
   Calendar,
   FileText,
   Tag,
   DollarSign,
   AlertCircle,
-  ImageIcon
+  ImageIcon,
+  Eye
 } from 'lucide-react';
 import { createPageUrl } from '@/utils';
 import { invalidateCache } from '@/components/utils/supabase';
@@ -180,15 +181,21 @@ export default function BookModerationDetails() {
 
   // Получаем ID книги из URL
   const urlParams = new URLSearchParams(window.location.search);
-  const bookId = urlParams.get('id');
+  const bookId = urlParams.get('bookId') || urlParams.get('id');
 
   const fetchBookDetails = useCallback(async () => {
+    if (!bookId) {
+      setError('Идентификатор книги не указан.');
+      setIsLoading(false);
+      return;
+    }
+
     setIsLoading(true);
     setError(null);
     try {
       // ИСПРАВЛЕНИЕ: Используем прямой вызов Book.get вместо устаревшего API
       const data = await Book.get(bookId);
-      if (!data) throw new Error("Книга с таким ID не найдена.");
+      if (!data) throw new Error('Книга с таким ID не найдена.');
       setBook(data);
     } catch (err) {
       setError(err.message);
@@ -201,6 +208,9 @@ export default function BookModerationDetails() {
   useEffect(() => {
     if (bookId) {
       fetchBookDetails();
+    } else {
+      setError('Идентификатор книги не указан.');
+      setIsLoading(false);
     }
   }, [bookId, fetchBookDetails]); // fetchBookDetails is now a stable dependency
 
@@ -232,8 +242,12 @@ export default function BookModerationDetails() {
   const handleApprove = async () => {
     setIsProcessing(true);
     try {
+      if (!book?.id) {
+        throw new Error('Данные книги недоступны.');
+      }
       // ИСПРАВЛЕНИЕ: Используем прямой вызов Book.update
-      await Book.update(book.id, { status: 'approved', moderator_email: user.email });
+      const updated = await Book.update(book.id, { status: 'approved', moderator_email: user.email });
+      setBook(prev => ({ ...(prev || {}), ...(updated || { status: 'approved', moderator_email: user.email }) }));
       invalidateCache();
       toast.success('Книга успешно одобрена!');
       window.history.back();
@@ -247,12 +261,22 @@ export default function BookModerationDetails() {
   const handleReject = async (rejectionData) => {
     setIsProcessing(true);
     try {
+      if (!book?.id) {
+        throw new Error('Данные книги недоступны.');
+      }
       // ИСПРАВЛЕНИЕ: Используем прямой вызов Book.update
-      await Book.update(book.id, {
+      const updated = await Book.update(book.id, {
         status: 'rejected',
         rejection_info: rejectionData,
         moderator_email: user.email
       });
+      setBook(prev => ({
+        ...(prev || {}),
+        ...(updated || {}),
+        status: updated?.status || 'rejected',
+        moderator_email: updated?.moderator_email || user.email,
+        rejection_info: updated?.rejection_info || rejectionData
+      }));
       invalidateCache();
       toast.success('Книга отклонена.');
       setRejectionDialogOpen(false);
@@ -421,6 +445,49 @@ export default function BookModerationDetails() {
 
             {/* НОВЫЙ БЛОК: Галерея обложек */}
             <CoverGallery coverImages={book.cover_images} />
+
+            {/* Предпросмотр книги */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Eye className="w-5 h-5" />
+                  Предпросмотр книги
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <Button
+                    asChild
+                    variant="outline"
+                    className="flex-1"
+                  >
+                    <Link
+                      to={createPageUrl(`BookDetails?id=${book.id}&preview=true`)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      Страница книги
+                    </Link>
+                  </Button>
+                  <Button
+                    asChild
+                    variant="secondary"
+                    className="flex-1"
+                  >
+                    <Link
+                      to={createPageUrl(`Reader?bookId=${book.id}&preview=true`)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      Открыть в ридере
+                    </Link>
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground mt-3">
+                  Ссылки откроются в новых вкладках и доступны даже для книг на модерации.
+                </p>
+              </CardContent>
+            </Card>
 
             {/* Файлы для скачивания */}
             <Card>
