@@ -36,8 +36,27 @@ import { getBookContent } from '@/api/functions';
 export default function Reader() {
   const { user, isAuthenticated } = useAuth();
   const [searchParams] = useSearchParams();
-  const bookId = searchParams.get('id'); // Changed from 'bookId' to 'id'
-  const isPreview = searchParams.get('preview') === 'true'; // Changed from 'isPreviewMode' to 'isPreview'
+
+  const getParam = useCallback(
+    (...keys) => {
+      for (const key of keys) {
+        const value = searchParams.get(key);
+        if (value) return value;
+      }
+      for (const key of keys) {
+        const value = searchParams.get(key.toLowerCase());
+        if (value) return value;
+      }
+      return null;
+    },
+    [searchParams]
+  );
+
+  const bookId = getParam('id', 'bookId');
+  const isPreview = ['preview', 'isPreview', 'isPreviewMode'].some((key) => {
+    const value = getParam(key);
+    return value === 'true';
+  });
 
   const [book, setBook] = useState(null);
   const [userBookData, setUserBookData] = useState(null);
@@ -90,7 +109,11 @@ export default function Reader() {
 
   // Load book and user data
   const loadData = useCallback(async () => {
-    if (!bookId) return;
+    if (!bookId) {
+      setError('Идентификатор книги не передан');
+      setIsLoading(false);
+      return;
+    }
 
     setIsLoading(true);
     setError(null);
