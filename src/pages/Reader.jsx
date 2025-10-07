@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { Book } from '@/api/entities';
 import { Purchase } from '@/api/entities';
@@ -37,25 +37,44 @@ export default function Reader() {
   const { user, isAuthenticated } = useAuth();
   const [searchParams] = useSearchParams();
 
+  const normalizedParams = useMemo(() => {
+    const map = new Map();
+    searchParams.forEach((value, key) => {
+      if (!map.has(key)) {
+        map.set(key, value);
+      }
+      const lowerKey = key.toLowerCase();
+      if (!map.has(lowerKey)) {
+        map.set(lowerKey, value);
+      }
+    });
+    return map;
+  }, [searchParams]);
+
   const getParam = useCallback(
     (...keys) => {
-      for (const key of keys) {
-        const value = searchParams.get(key);
-        if (value) return value;
-      }
-      for (const key of keys) {
-        const value = searchParams.get(key.toLowerCase());
-        if (value) return value;
+      for (const rawKey of keys) {
+        if (!rawKey) continue;
+        if (normalizedParams.has(rawKey)) {
+          return normalizedParams.get(rawKey);
+        }
+        const lowerKey = rawKey.toLowerCase();
+        if (normalizedParams.has(lowerKey)) {
+          return normalizedParams.get(lowerKey);
+        }
       }
       return null;
     },
-    [searchParams]
+    [normalizedParams]
   );
 
-  const bookId = getParam('id', 'bookId');
+  const rawBookId = getParam('id', 'bookId');
+  const bookId = typeof rawBookId === 'string' ? rawBookId.trim() : rawBookId;
   const isPreview = ['preview', 'isPreview', 'isPreviewMode'].some((key) => {
     const value = getParam(key);
-    return value === 'true';
+    if (typeof value !== 'string') return false;
+    const normalizedValue = value.trim().toLowerCase();
+    return normalizedValue === 'true' || normalizedValue === '1';
   });
 
   const [book, setBook] = useState(null);
