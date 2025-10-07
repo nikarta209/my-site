@@ -25,6 +25,7 @@ import {
   ImageIcon
 } from 'lucide-react';
 import { createPageUrl } from '@/utils';
+import { moderateBookStatus } from '@/components/utils/supabase';
 import { Link } from 'react-router-dom';
 import { Book } from '@/api/entities'; // ИСПРАВЛЕНИЕ: Прямой импорт сущности
 
@@ -231,8 +232,12 @@ export default function BookModerationDetails() {
   const handleApprove = async () => {
     setIsProcessing(true);
     try {
-      // ИСПРАВЛЕНИЕ: Используем прямой вызов Book.update
-      await Book.update(book.id, { status: 'approved', moderator_email: user.email });
+      const updatedBook = await moderateBookStatus({
+        bookId: book.id,
+        status: 'approved',
+        moderatorEmail: user.email
+      });
+      setBook(updatedBook);
       toast.success('Книга успешно одобрена!');
       window.history.back();
     } catch (err) {
@@ -245,12 +250,13 @@ export default function BookModerationDetails() {
   const handleReject = async (rejectionData) => {
     setIsProcessing(true);
     try {
-      // ИСПРАВЛЕНИЕ: Используем прямой вызов Book.update
-      await Book.update(book.id, { 
-          status: 'rejected', 
-          rejection_info: rejectionData, 
-          moderator_email: user.email 
+      const updatedBook = await moderateBookStatus({
+        bookId: book.id,
+        status: 'rejected',
+        moderatorEmail: user.email,
+        rejectionInfo: rejectionData
       });
+      setBook(updatedBook);
       toast.success('Книга отклонена.');
       setRejectionDialogOpen(false);
       window.history.back();

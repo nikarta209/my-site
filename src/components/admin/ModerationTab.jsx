@@ -19,6 +19,7 @@ import { Review } from '@/api/entities';
 import { useAuth } from '../auth/Auth';
 import { toast } from 'sonner';
 import { Input } from '@/components/ui/input';
+import { moderateBookStatus } from '@/components/utils/supabase';
 
 export default function ModerationTab() {
   const { user } = useAuth();
@@ -51,20 +52,25 @@ export default function ModerationTab() {
 
   const handleBookAction = async (bookId, action, reason = '') => {
     try {
-      const updateData = { status: action };
-      if (action === 'rejected') {
-        updateData.rejection_reason = reason;
-        updateData.moderator_email = user.email;
-      } else if (action === 'approved') {
-        updateData.moderator_email = user.email;
-      }
+      const updatedBook = await moderateBookStatus({
+        bookId,
+        status: action,
+        moderatorEmail: user.email,
+        rejectionInfo: action === 'rejected' && reason ? { reason } : null
+      });
 
-      await BookEntity.update(bookId, updateData);
+      setBooks(prevBooks => {
+        const exists = prevBooks.some(book => book.id === updatedBook.id);
+        if (!exists) {
+          return [...prevBooks, updatedBook];
+        }
+        return prevBooks.map(book => (book.id === updatedBook.id ? updatedBook : book));
+      });
+
       toast.success(`Книга ${action === 'approved' ? 'одобрена' : 'отклонена'}`);
-      loadModerationData();
     } catch (error) {
       console.error('Ошибка обновления книги:', error);
-      toast.error('Не удалось обновить статус книги');
+      toast.error(error.message || 'Не удалось обновить статус книги');
     }
   };
 

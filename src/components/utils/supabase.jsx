@@ -323,3 +323,34 @@ export const invalidateCache = (pattern = null) => {
     cache.clear();
   }
 };
+
+/**
+ * Безопасно обновляет статус книги через сервер с использованием сервисного ключа Supabase.
+ */
+export const moderateBookStatus = ({ bookId, status, moderatorEmail, rejectionInfo = null }) =>
+  withRetry(async () => {
+    if (!bookId) throw new Error('Не указан идентификатор книги');
+    if (!status) throw new Error('Не указан статус модерации');
+    if (!moderatorEmail) throw new Error('Не указан email модератора');
+
+    const response = await fetch(`/api/moderation/books/${bookId}/status`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status, moderatorEmail, rejectionInfo })
+    });
+
+    let payload = null;
+    try {
+      payload = await response.json();
+    } catch (error) {
+      console.warn('Не удалось разобрать ответ сервера модерации', error);
+    }
+
+    if (!response.ok || !payload?.success) {
+      const errorMessage = payload?.error || 'Не удалось обновить статус книги';
+      throw new Error(errorMessage);
+    }
+
+    invalidateCache();
+    return payload.data;
+  }, 3, 'moderateBookStatus');

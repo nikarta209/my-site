@@ -2,6 +2,7 @@
 
 import { createServer } from 'node:http';
 import { URL } from 'node:url';
+import { createClient } from '@supabase/supabase-js';
 
 const nodeProcess = globalThis.process;
 nodeProcess?.loadEnvFile?.();
@@ -44,6 +45,24 @@ const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
   'Access-Control-Allow-Methods': 'GET,POST,OPTIONS'
+};
+
+const SUPABASE_URL = resolveEnvValue('SUPABASE_URL', 'VITE_SUPABASE_URL');
+const SUPABASE_SERVICE_ROLE_KEY = resolveEnvValue('SUPABASE_SERVICE_ROLE_KEY', 'SERVICE_ROLE_KEY');
+
+let adminSupabase = null;
+
+const getAdminSupabase = () => {
+  if (adminSupabase) return adminSupabase;
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+    console.error('[moderation] Supabase admin client is not configured.');
+    return null;
+  }
+
+  adminSupabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+    auth: { persistSession: false, autoRefreshToken: false }
+  });
+  return adminSupabase;
 };
 
 const encoder = new TextEncoder();
@@ -198,6 +217,77 @@ const handleCoinGeckoProxy = async (req, res) => {
   }
 };
 
+const normalizeStatus = (status) => {
+  if (typeof status !== 'string') return null;
+  const value = status.toLowerCase();
+  if (['approved', 'rejected', 'pending'].includes(value)) {
+    return value;
+  }
+  return null;
+};
+
+const handleModerationUpdate = async (req, res, bookId) => {
+  const adminClient = getAdminSupabase();
+  if (!adminClient) {
+    sendJson(res, 500, { success: false, error: 'Supabase admin client is not configured' });
+    return;
+  }
+
+  const body = await readRequestBody(req);
+  if (!body) {
+    sendJson(res, 400, { success: false, error: 'Request body is required' });
+    return;
+  }
+
+  const status = normalizeStatus(body.status);
+  if (!status) {
+    sendJson(res, 400, { success: false, error: 'Invalid status value' });
+    return;
+  }
+
+  if (!body.moderatorEmail || typeof body.moderatorEmail !== 'string') {
+    sendJson(res, 400, { success: false, error: 'Moderator email is required' });
+    return;
+  }
+
+  const updatePayload = {
+    status,
+    moderator_email: body.moderatorEmail
+  };
+
+  if (status === 'approved') {
+    updatePayload.rejection_info = null;
+  } else if (status === 'rejected') {
+    updatePayload.rejection_info = body.rejectionInfo || null;
+  }
+
+  try {
+    const { data, error } = await adminClient
+      .from('books')
+      .update(updatePayload)
+      .eq('id', bookId)
+      .select()
+      .maybeSingle();
+
+    if (error) {
+      console.error('[moderation] Failed to update book', bookId, error);
+      const statusCode = Number(error.code) || 400;
+      sendJson(res, statusCode, { success: false, error: error.message || 'Failed to update book' });
+      return;
+    }
+
+    if (!data) {
+      sendJson(res, 404, { success: false, error: 'Book not found' });
+      return;
+    }
+
+    sendJson(res, 200, { success: true, data });
+  } catch (error) {
+    console.error('[moderation] Unexpected error', error);
+    sendJson(res, 500, { success: false, error: 'Unexpected server error' });
+  }
+};
+
 const server = createServer(async (req, res) => {
   const method = req.method || 'GET';
 
@@ -216,6 +306,13 @@ const server = createServer(async (req, res) => {
 
   if (method === 'POST' && requestUrl.pathname === '/api/coingecko') {
     await handleCoinGeckoProxy(req, res);
+    return;
+  }
+
+  const moderationMatch = requestUrl.pathname.match(/^\/api\/moderation\/books\/(.+?)\/status$/);
+  if (method === 'POST' && moderationMatch) {
+    const [, bookId] = moderationMatch;
+    await handleModerationUpdate(req, res, bookId);
     return;
   }
 
