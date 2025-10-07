@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { Book } from '@/api/entities';
 import { Purchase } from '@/api/entities';
@@ -36,8 +36,23 @@ import { getBookContent } from '@/api/functions';
 export default function Reader() {
   const { user, isAuthenticated } = useAuth();
   const [searchParams] = useSearchParams();
-  const bookId = searchParams.get('id'); // Changed from 'bookId' to 'id'
-  const isPreview = searchParams.get('preview') === 'true'; // Changed from 'isPreviewMode' to 'isPreview'
+
+  const normalizedParams = useMemo(() => {
+    const map = {};
+    for (const [key, value] of searchParams.entries()) {
+      map[key.toLowerCase()] = value;
+    }
+    return map;
+  }, [searchParams]);
+
+  const bookId = normalizedParams['id'] || normalizedParams['bookid'];
+  const previewParam =
+    normalizedParams['preview'] ||
+    normalizedParams['ispreview'] ||
+    normalizedParams['ispreviewmode'] ||
+    normalizedParams['previewmode'];
+
+  const isPreview = ['true', '1', 'yes', 'on'].includes((previewParam || '').toLowerCase());
 
   const [book, setBook] = useState(null);
   const [userBookData, setUserBookData] = useState(null);
@@ -90,7 +105,11 @@ export default function Reader() {
 
   // Load book and user data
   const loadData = useCallback(async () => {
-    if (!bookId) return;
+    if (!bookId) {
+      setError('Идентификатор книги не передан');
+      setIsLoading(false);
+      return;
+    }
 
     setIsLoading(true);
     setError(null);
@@ -170,7 +189,7 @@ export default function Reader() {
     } finally {
       setIsLoading(false);
     }
-  }, [bookId, user, isAuthenticated]); // Changed dependencies: removed `isPreview`
+  }, [bookId, user, isAuthenticated, isPreview]);
 
   useEffect(() => {
     loadData();
