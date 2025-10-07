@@ -13,15 +13,6 @@ VITE_SUPABASE_ANON_KEY=your-anon-key
 
 Optional variables allow configuring OAuth login, storage buckets, and external webhooks.
 
-If you enable the CoinMarketCap proxy (`/api/coinmarketcap/kas-rate` or `/api/coingecko`),
-set `COINMARKETCAP_API_KEY` in the runtime environment for production. Locally you can
-define the same secret inside `.env`; the Node server now loads `.env` automatically and
-falls back to `VITE_COINMARKETCAP_API_KEY` when `COINMARKETCAP_API_KEY` is not provided.
-The React app now calls the proxy endpoints directly, so the browser never talks to
-`pro-api.coinmarketcap.com` and CORS errors are avoided even when the API key is only
-available on the server. Optionally set `KAS_LOGO_URL` if you want the proxy to return
-a custom Kaspa logo URL alongside the rate data.
-
 ## Install dependencies
 
 ```bash
@@ -43,3 +34,12 @@ npm run build
 ```
 
 For questions about the Supabase schema or deployment workflow, review the guides inside the `src/components/setup` directory.
+
+## CoinMarketCap proxy configuration
+
+The backend proxy exposes `/api/coinmarketcap/kas-rate` and `/api/coingecko` endpoints.
+Provide the CoinMarketCap key through the runtime environment (for example `COINMARKETCAP_API_KEY`)
+in production; locally you can define the same secret in `.env`. The server loads `.env` automatically
+and falls back to `VITE_COINMARKETCAP_API_KEY` if the non-Vite variable is missing. The React application
+always queries the proxy, so the browser never talks to `pro-api.coinmarketcap.com` directly and avoids CORS errors.
+Optionally set `KAS_LOGO_URL` to override the logo returned with the rate response.
