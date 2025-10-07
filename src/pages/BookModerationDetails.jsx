@@ -180,7 +180,7 @@ export default function BookModerationDetails() {
 
   // Получаем ID книги из URL
   const urlParams = new URLSearchParams(window.location.search);
-  const bookId = urlParams.get('id');
+  const bookId = urlParams.get('id') || urlParams.get('bookId');
 
   const fetchBookDetails = useCallback(async () => {
     setIsLoading(true);
@@ -199,9 +199,11 @@ export default function BookModerationDetails() {
   }, [bookId]); // bookId is a dependency for useCallback
 
   useEffect(() => {
-    if (bookId) {
-      fetchBookDetails();
+    if (!bookId) {
+      setIsLoading(false);
+      return;
     }
+    fetchBookDetails();
   }, [bookId, fetchBookDetails]); // fetchBookDetails is now a stable dependency
 
   const handleCopyPrompt = async () => {
@@ -263,6 +265,25 @@ export default function BookModerationDetails() {
       setIsProcessing(false);
     }
   };
+
+  if (!bookId) {
+    return (
+      <ProtectedRoute requireRole="moderator">
+        <div className="container mx-auto px-4 py-8">
+          <div className="text-center py-12">
+            <AlertCircle className="w-16 h-16 mx-auto text-red-500 mb-4" />
+            <h2 className="text-2xl font-bold text-red-600 mb-2">Не удалось открыть страницу</h2>
+            <p className="text-muted-foreground mb-4">
+              Идентификатор книги не был передан. Вернитесь к списку модерации и выберите книгу заново.
+            </p>
+            <Button asChild>
+              <Link to={createPageUrl('ModerationPage')}>Вернуться к модерации</Link>
+            </Button>
+          </div>
+        </div>
+      </ProtectedRoute>
+    );
+  }
 
   if (isLoading) {
     return (

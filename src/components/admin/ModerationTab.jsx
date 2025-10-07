@@ -20,6 +20,8 @@ import { useAuth } from '../auth/Auth';
 import { toast } from 'sonner';
 import { Input } from '@/components/ui/input';
 import { invalidateCache } from '@/components/utils/supabase';
+import { Link } from 'react-router-dom';
+import { createPageUrl } from '@/utils';
 
 export default function ModerationTab() {
   const { user } = useAuth();
@@ -291,11 +293,15 @@ const BookTable = ({ books, onAction, status }) => {
                               </>
                             )}
                             <Button
+                              asChild
                               variant="ghost"
                               size="icon"
                               className="text-muted-foreground hover:text-foreground"
                             >
-                              <Eye className="w-4 h-4" />
+                              <Link to={createPageUrl(`BookModerationDetails?id=${book.id}`)}>
+                                <Eye className="w-4 h-4" />
+                                <span className="sr-only">Просмотреть книгу</span>
+                              </Link>
                             </Button>
                           </div>
                         </td>
@@ -337,30 +343,43 @@ const BookTable = ({ books, onAction, status }) => {
                       </div>
                     </div>
                   </div>
-                  {status === 'pending' && (
-                    <div className="flex gap-2 mt-4">
-                      <Button
-                        size="sm"
-                        onClick={() => onAction(book.id, 'approved')}
-                        className="flex-1 bg-green-600 hover:bg-green-700 text-white"
-                      >
-                        <CheckCircle className="w-4 h-4 mr-2" />
-                        Одобрить
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          const reason = prompt('Причина отклонения:');
-                          if (reason) onAction(book.id, 'rejected', reason);
-                        }}
-                        className="flex-1 border-red-200 text-red-600 hover:bg-red-50"
-                      >
-                        <XCircle className="w-4 h-4 mr-2" />
-                        Отклонить
-                      </Button>
-                    </div>
-                  )}
+                  <div className="flex flex-wrap gap-2 mt-4">
+                    <Button
+                      asChild
+                      variant="outline"
+                      size="sm"
+                      className="flex-1 min-w-[140px]"
+                    >
+                      <Link to={createPageUrl(`BookModerationDetails?id=${book.id}`)}>
+                        <Eye className="w-4 h-4 mr-2" />
+                        Просмотр
+                      </Link>
+                    </Button>
+                    {status === 'pending' && (
+                      <>
+                        <Button
+                          size="sm"
+                          onClick={() => onAction(book.id, 'approved')}
+                          className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+                        >
+                          <CheckCircle className="w-4 h-4 mr-2" />
+                          Одобрить
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            const reason = prompt('Причина отклонения:');
+                            if (reason) onAction(book.id, 'rejected', reason);
+                          }}
+                          className="flex-1 border-red-200 text-red-600 hover:bg-red-50"
+                        >
+                          <XCircle className="w-4 h-4 mr-2" />
+                          Отклонить
+                        </Button>
+                      </>
+                    )}
+                  </div>
                 </CardContent>
               </Card>
             </motion.div>

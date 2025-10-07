@@ -318,7 +318,7 @@ export default function ModerationPage() {
                                 </div>
                                 <div className="flex gap-2">
                                   <Button asChild variant="outline" size="sm">
-                                    <Link to={createPageUrl(`BookModerationDetails?bookId=${book.id}`)}>
+                                    <Link to={createPageUrl(`BookModerationDetails?id=${book.id}`)}>
                                       <Eye className="w-4 h-4 mr-2" />
                                       Подробнее
                                     </Link>
