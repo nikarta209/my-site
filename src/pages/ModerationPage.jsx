@@ -25,6 +25,7 @@ import { Book } from '@/api/entities';
 import { toast } from 'sonner';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
+import { invalidateCache } from '@/components/utils/supabase';
 
 export default function ModerationPage() {
   const { user, isAuthenticated } = useAuth();
@@ -97,16 +98,18 @@ export default function ModerationPage() {
       }
 
       await Book.update(bookId, updateData);
-      
+
+      invalidateCache();
+
       toast.success(
-        action === 'approved' ? 'Книга одобрена!' : 
-        action === 'rejected' ? 'Книга отклонена' : 
+        action === 'approved' ? 'Книга одобрена!' :
+        action === 'rejected' ? 'Книга отклонена' :
         'Статус книги обновлен'
       );
-      
+
       // Перезагружаем список книг
-      loadBooks();
-      
+      await loadBooks();
+
     } catch (error) {
       console.error('Ошибка обновления книги:', error);
       toast.error('Не удалось обновить статус книги');
@@ -265,87 +268,95 @@ export default function ModerationPage() {
                   ) : (
                     <div className="space-y-4">
                       <AnimatePresence>
-                        {filteredBooks.map((book) => (
-                          <motion.div
-                            key={book.id}
-                            initial={{ opacity: 0, y: 20 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: -20 }}
-                            className="border rounded-lg p-6 bg-background hover:shadow-md transition-shadow"
-                          >
-                            <div className="flex items-start justify-between">
-                              <div className="flex gap-4">
-                                <img
-                                  src={book.cover_url || `https://picsum.photos/80/120?random=${book.id}`}
-                                  alt={book.title}
-                                  className="w-20 h-28 object-cover rounded"
-                                  onError={(e) => {
-                                    e.target.src = `https://picsum.photos/80/120?random=${book.id}`;
-                                  }}
-                                />
-                                <div>
-                                  <h3 className="text-xl font-semibold text-foreground">
-                                    {book.title}
-                                  </h3>
-                                  <p className="text-muted-foreground">
-                                    Автор: {book.author}
-                                  </p>
-                                  <p className="text-sm text-muted-foreground">
-                                    Email: {book.author_email}
-                                  </p>
-                                  <div className="flex gap-2 mt-2">
-                                    <Badge variant="secondary">
-                                      {book.genre}
-                                    </Badge>
-                                    <Badge variant="outline">
-                                      {book.price_kas} KAS
-                                    </Badge>
+                        {filteredBooks.map((book) => {
+                          const fallbackCover = `https://picsum.photos/80/120?random=${book.id}`;
+                          const coverUrl =
+                            book.cover_images?.default ||
+                            book.cover_url ||
+                            fallbackCover;
+
+                          return (
+                            <motion.div
+                              key={book.id}
+                              initial={{ opacity: 0, y: 20 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              exit={{ opacity: 0, y: -20 }}
+                              className="border rounded-lg p-6 bg-background hover:shadow-md transition-shadow"
+                            >
+                              <div className="flex items-start justify-between">
+                                <div className="flex gap-4">
+                                  <img
+                                    src={coverUrl}
+                                    alt={book.title}
+                                    className="w-20 h-28 object-cover rounded"
+                                    onError={(e) => {
+                                      e.target.src = fallbackCover;
+                                    }}
+                                  />
+                                  <div>
+                                    <h3 className="text-xl font-semibold text-foreground">
+                                      {book.title}
+                                    </h3>
+                                    <p className="text-muted-foreground">
+                                      Автор: {book.author}
+                                    </p>
+                                    <p className="text-sm text-muted-foreground">
+                                      Email: {book.author_email}
+                                    </p>
+                                    <div className="flex gap-2 mt-2">
+                                      <Badge variant="secondary">
+                                        {book.genre}
+                                      </Badge>
+                                      <Badge variant="outline">
+                                        {book.price_kas} KAS
+                                      </Badge>
+                                    </div>
+                                    <p className="text-sm text-muted-foreground mt-2 max-w-2xl">
+                                      {book.description?.substring(0, 200)}...
+                                    </p>
                                   </div>
-                                  <p className="text-sm text-muted-foreground mt-2 max-w-2xl">
-                                    {book.description?.substring(0, 200)}...
-                                  </p>
+                                </div>
+                                <div className="flex gap-2">
+                                  <Button asChild variant="outline" size="sm">
+                                    <Link to={createPageUrl(`BookModerationDetails?bookId=${book.id}`)}>
+                                      <Eye className="w-4 h-4 mr-2" />
+                                      Подробнее
+                                    </Link>
+                                  </Button>
+                                  {book.status === 'pending' && (
+                                    <>
+                                      <Button
+                                        size="sm"
+                                        className="bg-green-600 hover:bg-green-700 text-white"
+                                        onClick={() => handleBookAction(book.id, 'approved')}
+                                      >
+                                        <CheckCircle className="w-4 h-4 mr-2" />
+                                        Одобрить
+                                      </Button>
+                                      <Button
+                                        size="sm"
+                                        variant="destructive"
+                                        onClick={() => {
+                                          const reason = prompt('Причина отклонения:');
+                                          const comment = prompt('Комментарий (необязательно):');
+                                          if (reason) {
+                                            handleBookAction(book.id, 'rejected', {
+                                              reason,
+                                              comment: comment || ''
+                                            });
+                                          }
+                                        }}
+                                      >
+                                        <XCircle className="w-4 h-4 mr-2" />
+                                        Отклонить
+                                      </Button>
+                                    </>
+                                  )}
                                 </div>
                               </div>
-                              <div className="flex gap-2">
-                                <Button asChild variant="outline" size="sm">
-                                  <Link to={createPageUrl(`BookModerationDetails?bookId=${book.id}`)}>
-                                    <Eye className="w-4 h-4 mr-2" />
-                                    Подробнее
-                                  </Link>
-                                </Button>
-                                {book.status === 'pending' && (
-                                  <>
-                                    <Button
-                                      size="sm"
-                                      className="bg-green-600 hover:bg-green-700 text-white"
-                                      onClick={() => handleBookAction(book.id, 'approved')}
-                                    >
-                                      <CheckCircle className="w-4 h-4 mr-2" />
-                                      Одобрить
-                                    </Button>
-                                    <Button
-                                      size="sm"
-                                      variant="destructive"
-                                      onClick={() => {
-                                        const reason = prompt('Причина отклонения:');
-                                        const comment = prompt('Комментарий (необязательно):');
-                                        if (reason) {
-                                          handleBookAction(book.id, 'rejected', {
-                                            reason,
-                                            comment: comment || ''
-                                          });
-                                        }
-                                      }}
-                                    >
-                                      <XCircle className="w-4 h-4 mr-2" />
-                                      Отклонить
-                                    </Button>
-                                  </>
-                                )}
-                              </div>
-                            </div>
-                          </motion.div>
-                        ))}
+                            </motion.div>
+                          );
+                        })}
                       </AnimatePresence>
                     </div>
                   )}

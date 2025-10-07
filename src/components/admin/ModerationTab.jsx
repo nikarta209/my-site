@@ -19,6 +19,7 @@ import { Review } from '@/api/entities';
 import { useAuth } from '../auth/Auth';
 import { toast } from 'sonner';
 import { Input } from '@/components/ui/input';
+import { invalidateCache } from '@/components/utils/supabase';
 
 export default function ModerationTab() {
   const { user } = useAuth();
@@ -60,6 +61,7 @@ export default function ModerationTab() {
       }
 
       await BookEntity.update(bookId, updateData);
+      invalidateCache();
       toast.success(`Книга ${action === 'approved' ? 'одобрена' : 'отклонена'}`);
       loadModerationData();
     } catch (error) {
