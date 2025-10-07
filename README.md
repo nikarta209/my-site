@@ -13,6 +13,15 @@ VITE_SUPABASE_ANON_KEY=your-anon-key
 
 Optional variables allow configuring OAuth login, storage buckets, and external webhooks.
 
+If you enable the CoinMarketCap proxy (`/api/coinmarketcap/kas-rate` or `/api/coingecko`),
+set `COINMARKETCAP_API_KEY` in the runtime environment for production. Locally you can
+define the same secret inside `.env`; the Node server now loads `.env` automatically and
+falls back to `VITE_COINMARKETCAP_API_KEY` when `COINMARKETCAP_API_KEY` is not provided.
+The React app now calls the proxy endpoints directly, so the browser never talks to
+`pro-api.coinmarketcap.com` and CORS errors are avoided even when the API key is only
+available on the server. Optionally set `KAS_LOGO_URL` if you want the proxy to return
+a custom Kaspa logo URL alongside the rate data.
+
 ## Install dependencies
 
 ```bash
