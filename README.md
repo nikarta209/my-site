@@ -13,6 +13,11 @@ VITE_SUPABASE_ANON_KEY=your-anon-key
 
 Optional variables allow configuring OAuth login, storage buckets, and external webhooks.
 
+If you enable the CoinMarketCap proxy (`/api/coinmarketcap/kas-rate` or `/api/coingecko`),
+set `COINMARKETCAP_API_KEY` in the runtime environment for production. Locally you can
+define the same secret inside `.env`; the Node server now loads `.env` automatically and
+falls back to `VITE_COINMARKETCAP_API_KEY` when `COINMARKETCAP_API_KEY` is not provided.
+
 ## Install dependencies
 
 ```bash
