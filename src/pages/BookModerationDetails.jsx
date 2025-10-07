@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth, ProtectedRoute } from '../components/auth/Auth';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -26,7 +26,7 @@ import {
 } from 'lucide-react';
 import { createPageUrl } from '@/utils';
 import { invalidateCache } from '@/components/utils/supabase';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Book } from '@/api/entities'; // ИСПРАВЛЕНИЕ: Прямой импорт сущности
 
 const GROK_PROMPT = `Анализируй предоставленный текст книжного произведения по следующим критериям. Будь объективен, цитируй фрагменты для обоснования выводов и предоставь их для ручного анализа человеком. Если текст подозрительный по какому-либо критерию, укажи точные цитаты и страницы (если доступны). Выводы делай четкими: "соответствует" или "не соответствует" с объяснением. Основная цель - выявить потенциально вредоносный контент, который может нанести физический вред читателю.
@@ -170,25 +170,41 @@ const CoverGallery = ({ coverImages }) => {
 };
 
 
+const STATUS_META = {
+  pending: { label: 'На модерации', className: 'bg-yellow-100 text-yellow-800' },
+  approved: { label: 'Одобрено', className: 'bg-green-100 text-green-800' },
+  rejected: { label: 'Отклонено', className: 'bg-red-100 text-red-800' }
+};
+
+
 export default function BookModerationDetails() {
   const { user } = useAuth();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [book, setBook] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [rejectionDialogOpen, setRejectionDialogOpen] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // Получаем ID книги из URL
-  const urlParams = new URLSearchParams(window.location.search);
-  const bookId = urlParams.get('id');
+  const bookId = useMemo(() => {
+    const rawId = searchParams.get('bookId') || searchParams.get('id');
+    if (!rawId) {
+      return null;
+    }
+    return rawId.trim();
+  }, [searchParams]);
 
   const fetchBookDetails = useCallback(async () => {
+    if (!bookId) {
+      return;
+    }
+
     setIsLoading(true);
     setError(null);
     try {
-      // ИСПРАВЛЕНИЕ: Используем прямой вызов Book.get вместо устаревшего API
       const data = await Book.get(bookId);
-      if (!data) throw new Error("Книга с таким ID не найдена.");
+      if (!data) throw new Error('Книга с таким ID не найдена.');
       setBook(data);
     } catch (err) {
       setError(err.message);
@@ -196,13 +212,37 @@ export default function BookModerationDetails() {
     } finally {
       setIsLoading(false);
     }
-  }, [bookId]); // bookId is a dependency for useCallback
+  }, [bookId]);
 
   useEffect(() => {
-    if (bookId) {
-      fetchBookDetails();
+    if (!bookId) {
+      setError('Не указан идентификатор книги.');
+      setIsLoading(false);
+      return;
     }
-  }, [bookId, fetchBookDetails]); // fetchBookDetails is now a stable dependency
+
+    fetchBookDetails();
+  }, [bookId, fetchBookDetails]);
+
+  const languageEntries = useMemo(() => {
+    if (!book) return [];
+
+    if (Array.isArray(book.languages) && book.languages.length > 0) {
+      return book.languages;
+    }
+
+    if (Array.isArray(book.translations) && book.translations.length > 0) {
+      return book.translations;
+    }
+
+    if (book.translations && typeof book.translations === 'object') {
+      return Object.entries(book.translations)
+        .filter(([, value]) => value)
+        .map(([lang, value]) => ({ lang, ...(value || {}) }));
+    }
+
+    return [];
+  }, [book]);
 
   const handleCopyPrompt = async () => {
     try {
@@ -232,11 +272,13 @@ export default function BookModerationDetails() {
   const handleApprove = async () => {
     setIsProcessing(true);
     try {
-      // ИСПРАВЛЕНИЕ: Используем прямой вызов Book.update
-      await Book.update(book.id, { status: 'approved', moderator_email: user.email });
+      const updated = await Book.update(book.id, { status: 'approved', moderator_email: user.email });
       invalidateCache();
+      if (updated) {
+        setBook(updated);
+      }
       toast.success('Книга успешно одобрена!');
-      window.history.back();
+      navigate(-1);
     } catch (err) {
       toast.error('Ошибка при одобрении: ' + err.message);
     } finally {
@@ -247,16 +289,18 @@ export default function BookModerationDetails() {
   const handleReject = async (rejectionData) => {
     setIsProcessing(true);
     try {
-      // ИСПРАВЛЕНИЕ: Используем прямой вызов Book.update
-      await Book.update(book.id, {
+      const updated = await Book.update(book.id, {
         status: 'rejected',
         rejection_info: rejectionData,
         moderator_email: user.email
       });
       invalidateCache();
+      if (updated) {
+        setBook(updated);
+      }
       toast.success('Книга отклонена.');
       setRejectionDialogOpen(false);
-      window.history.back();
+      navigate(-1);
     } catch (err) {
       toast.error('Ошибка при отклонении: ' + err.message);
     } finally {
@@ -372,8 +416,13 @@ export default function BookModerationDetails() {
           <div className="lg:col-span-2 space-y-6">
             {/* Основная информация (Title and Description for the main book) */}
             <Card>
-              <CardHeader>
+              <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <CardTitle className="text-xl">{book.title || 'Без названия'}</CardTitle>
+                {book.status && (
+                  <Badge className={`${STATUS_META[book.status]?.className || 'bg-muted text-foreground'} capitalize`}>
+                    {STATUS_META[book.status]?.label || book.status}
+                  </Badge>
+                )}
               </CardHeader>
               <CardContent>
                 <p className="text-muted-foreground mb-4">
@@ -389,7 +438,7 @@ export default function BookModerationDetails() {
             </Card>
 
             {/* Языковые версии - названия и описания */}
-            {book.languages && book.languages.length > 0 && (
+            {languageEntries.length > 0 && (
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
@@ -399,7 +448,7 @@ export default function BookModerationDetails() {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    {book.languages.map((lang, index) => (
+                    {languageEntries.map((lang, index) => (
                       <div key={index} className="p-4 border rounded-lg">
                         <div className="flex items-center gap-2 mb-3">
                           <Badge variant="outline" className="text-sm font-medium">
@@ -451,9 +500,9 @@ export default function BookModerationDetails() {
                   )}
 
                   {/* Файлы языковых версий */}
-                  {book.languages && book.languages.map((lang, index) => {
+                  {languageEntries.map((lang, index) => {
                     if (!lang.file_url) return null; // Only render if file_url exists
-                    
+
                     return (
                       <div key={index} className="flex justify-between items-center p-3 border rounded-lg">
                         <div>
@@ -479,7 +528,7 @@ export default function BookModerationDetails() {
                     );
                   })}
 
-                  {!book.file_url && (!book.languages || book.languages.filter(l => l.file_url).length === 0) && (
+                  {!book.file_url && languageEntries.filter(l => l.file_url).length === 0 && (
                     <p className="text-muted-foreground text-center py-4">
                       Файлы для скачивания отсутствуют
                     </p>
