@@ -1,5 +1,5 @@
 import React from 'react';
-import { useExchangeRate } from '../utils/ExchangeRateContext';
+import { useExchangeRate, DEFAULT_KAS_LOGO } from '../utils/ExchangeRateContext';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AlertCircle, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -8,16 +8,17 @@ import { formatDistanceToNow } from 'date-fns';
 import { ru } from 'date-fns/locale';
 
 // Иконка Kaspa
-const KaspaIcon = ({ className = "h-4 w-4" }) => (
-  <img 
-    src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/400006eb0_15301661.png"
+const KaspaIcon = ({ src = DEFAULT_KAS_LOGO, className = "h-4 w-4" }) => (
+  <img
+    src={src}
     alt="Kaspa"
     className={className}
+    loading="lazy"
   />
 );
 
 export default function ExchangeRateWidget() {
-  const { kasRate, isLoading, error, lastUpdated, fetchRate } = useExchangeRate();
+  const { kasRate, kasLogo, isLoading, error, lastUpdated, fetchRate } = useExchangeRate();
 
   if (isLoading) {
     return (
@@ -54,7 +55,7 @@ export default function ExchangeRateWidget() {
             {error ? (
               <AlertCircle className="h-4 w-4 text-destructive" />
             ) : (
-              <KaspaIcon className="h-4 w-4" />
+              <KaspaIcon className="h-4 w-4" src={kasLogo} />
             )}
             <span className="font-mono">
               {error ? 'N/A' : `$${kasRate.toFixed(6)}`}

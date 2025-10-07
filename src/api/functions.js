@@ -1,6 +1,20 @@
 import supabase, { isSupabaseConfigured } from './supabaseClient';
 import { Book, Purchase, User, UserAIPreferences } from './entities';
 
+const importMetaEnv = typeof import.meta !== 'undefined' ? import.meta.env : undefined;
+
+const getEnvValue = (...keys) => {
+  for (const key of keys) {
+    if (importMetaEnv && importMetaEnv[key] !== undefined) {
+      return importMetaEnv[key];
+    }
+    if (typeof process !== 'undefined' && process.env && process.env[key] !== undefined) {
+      return process.env[key];
+    }
+  }
+  return undefined;
+};
+
 const safeUuid = () => {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) {
     return crypto.randomUUID();
@@ -10,6 +24,25 @@ const safeUuid = () => {
 
 const ok = (data) => ({ data, error: null });
 const fail = (error) => ({ data: null, error: error?.message || error });
+
+const COINMARKETCAP_API_KEY = getEnvValue(
+  'VITE_COINMARKETCAP_API_KEY',
+  'COINMARKETCAP_API_KEY',
+  'VITE_CMC_API_KEY'
+);
+const COINMARKETCAP_PROXY_URL = getEnvValue('VITE_COINMARKETCAP_PROXY_URL', 'COINMARKETCAP_PROXY_URL');
+const COINMARKETCAP_BASE_URL = 'https://pro-api.coinmarketcap.com';
+const COINMARKETCAP_TIMEOUT = 7000;
+
+const getCoinMarketCapProxyEndpoint = () => {
+  if (COINMARKETCAP_PROXY_URL) {
+    return COINMARKETCAP_PROXY_URL;
+  }
+  if (typeof window !== 'undefined') {
+    return '/api/coinmarketcap/kas-rate';
+  }
+  return null;
+};
 
 const toISODate = (value) => {
   if (!value) return null;
@@ -86,29 +119,153 @@ export const nowpayments = async (payload = {}) => {
 
 export const nowpaymentsIPN = async () => ok({ success: true });
 
+const fetchWithTimeout = async (url, options = {}, timeout = COINMARKETCAP_TIMEOUT) => {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeout);
+
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal
+    });
+    return response;
+  } finally {
+    clearTimeout(id);
+  }
+};
+
+const coinMarketCapHeaders = () => ({
+  Accept: 'application/json',
+  'X-CMC_PRO_API_KEY': COINMARKETCAP_API_KEY
+});
+
+const fetchLatestKasRateFromSupabase = async () => {
+  const { data, error } = await supabase
+    .from('exchange_rates')
+    .select('*')
+    .eq('currency_pair', 'KAS_USD')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) throw error;
+
+  const rate = data?.rate ? Number(data.rate) : null;
+  if (!rate) {
+    return ok({ success: false, error: 'Rate not found' });
+  }
+
+  return ok({
+    success: true,
+    rate,
+    lastUpdated: data?.created_at || null,
+    logo: null,
+    source: 'supabase'
+  });
+};
+
+const fetchCoinLogo = async (symbol) => {
+  if (!COINMARKETCAP_API_KEY) return null;
+
+  try {
+    const params = new URLSearchParams({ symbol });
+    const response = await fetchWithTimeout(
+      `${COINMARKETCAP_BASE_URL}/v2/cryptocurrency/info?${params.toString()}`,
+      { headers: coinMarketCapHeaders() }
+    );
+    const payload = await response.json().catch(() => null);
+
+    if (!response.ok) {
+      const errorMessage = payload?.status?.error_message || `Failed to load ${symbol} logo`;
+      throw new Error(errorMessage);
+    }
+
+    return payload?.data?.[symbol]?.logo || null;
+  } catch (error) {
+    console.warn('[coinMarketCap] Unable to fetch logo for', symbol, error);
+    return null;
+  }
+};
+
 export const coinMarketCap = async ({ action } = {}) => {
   try {
     if (action !== 'getCurrentKasRate') {
       return ok({ success: false, error: 'Unsupported action' });
     }
 
-    const { data, error } = await supabase
-      .from('exchange_rates')
-      .select('*')
-      .eq('currency_pair', 'KAS_USD')
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    if (error) throw error;
-
-    const rate = data?.rate ? Number(data.rate) : null;
-    if (!rate) {
-      return ok({ success: false, error: 'Rate not found' });
+    if (!COINMARKETCAP_API_KEY) {
+      return fetchLatestKasRateFromSupabase();
     }
 
-    return ok({ success: true, rate });
+    const proxyEndpoint = getCoinMarketCapProxyEndpoint();
+
+    if (proxyEndpoint) {
+      const response = await fetchWithTimeout(proxyEndpoint, { headers: { Accept: 'application/json' } });
+      const payload = await response.json().catch(() => null);
+
+      if (!response.ok || !payload?.success) {
+        const errorMessage = payload?.error || `Failed to load KAS rate (status ${response.status})`;
+        throw new Error(errorMessage);
+      }
+
+      return ok({
+        success: true,
+        rate: payload.rate,
+        lastUpdated: payload.lastUpdated,
+        logo: payload.logo || null,
+        symbol: payload.symbol || 'KAS',
+        name: payload.name || 'Kaspa',
+        source: payload.source || 'coinmarketcap'
+      });
+    }
+
+    const params = new URLSearchParams({ symbol: 'KAS', convert: 'USD' });
+    const response = await fetchWithTimeout(
+      `${COINMARKETCAP_BASE_URL}/v1/cryptocurrency/quotes/latest?${params.toString()}`,
+      { headers: coinMarketCapHeaders() },
+      COINMARKETCAP_TIMEOUT
+    );
+    const payload = await response.json().catch(() => null);
+
+    if (!response.ok) {
+      const errorMessage = payload?.status?.error_message || `Failed to fetch KAS rate (status ${response.status})`;
+      throw new Error(errorMessage);
+    }
+
+    const kasData = payload?.data?.KAS;
+    const usdQuote = kasData?.quote?.USD;
+    const rate = usdQuote?.price ? Number(usdQuote.price) : null;
+
+    if (!rate) {
+      throw new Error('KAS rate not found in CoinMarketCap response');
+    }
+
+    let logo = kasData?.logo || null;
+    if (!logo) {
+      logo = await fetchCoinLogo('KAS');
+    }
+
+    return ok({
+      success: true,
+      rate,
+      lastUpdated: usdQuote?.last_updated || Date.now(),
+      logo,
+      symbol: kasData?.symbol || 'KAS',
+      name: kasData?.name || 'Kaspa',
+      source: 'coinmarketcap'
+    });
   } catch (error) {
     console.error('[coinMarketCap] error', error);
+
+    try {
+      const fallback = await fetchLatestKasRateFromSupabase();
+      if (fallback?.data?.rate) {
+        return fallback;
+      }
+    } catch (fallbackError) {
+      console.warn('[coinMarketCap] fallback error', fallbackError);
+    }
+
     return fail(error);
   }
 };
