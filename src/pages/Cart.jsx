@@ -70,6 +70,26 @@ export default function CartPage() {
   const { user, isAuthenticated } = useAuth();
   const { kasRate } = useExchangeRate();
   const { t } = useTranslation();
+
+  const getBookCoverUrl = React.useCallback((item) => {
+    if (!item) return '/api/placeholder/80/112';
+
+    const coverImages = item.cover_images || item.coverImages;
+    const coverFromImages =
+      coverImages?.default ||
+      coverImages?.portrait_large ||
+      coverImages?.portrait ||
+      coverImages?.landscape;
+
+    const directCover =
+      item.cover_url ||
+      item.coverUrl ||
+      item.cover_image_url ||
+      item.coverImageUrl ||
+      item.cover;
+
+    return coverFromImages || directCover || `/api/placeholder/80/112`;
+  }, []);
   
   const [isPaymentModalOpen, setIsPaymentModalOpen] = React.useState(false);
   const [paymentMethod, setPaymentMethod] = React.useState(null);
@@ -326,8 +346,8 @@ export default function CartPage() {
                           <CardContent className="p-0">
                             <div className="flex items-center">
                               <div className="w-20 h-28 bg-muted flex-shrink-0 relative overflow-hidden">
-                                <img 
-                                  src={item.cover_url || '/api/placeholder/80/112'} 
+                                <img
+                                  src={getBookCoverUrl(item)}
                                   alt={item.title}
                                   className="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
                                   loading="lazy"
