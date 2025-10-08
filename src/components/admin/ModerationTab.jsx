@@ -20,6 +20,7 @@ import { useAuth } from '../auth/Auth';
 import { toast } from 'sonner';
 import { Input } from '@/components/ui/input';
 import { invalidateCache } from '@/components/utils/supabase';
+import { moderateBook } from '@/api/moderation';
 
 export default function ModerationTab() {
   const { user } = useAuth();
@@ -55,12 +56,22 @@ export default function ModerationTab() {
       const updateData = { status: action };
       if (action === 'rejected') {
         updateData.rejection_reason = reason;
+        updateData.rejection_info = reason ? { reason } : null;
         updateData.moderator_email = user.email;
       } else if (action === 'approved') {
         updateData.moderator_email = user.email;
       }
 
-      await BookEntity.update(bookId, updateData);
+      try {
+        await moderateBook(bookId, {
+          action,
+          rejectionReason: action === 'rejected' ? reason || null : null,
+          rejectionInfo: action === 'rejected' && reason ? { reason } : null
+        });
+      } catch (moderationError) {
+        console.warn('[AdminModeration] Fallback to direct Supabase update:', moderationError);
+        await BookEntity.update(bookId, updateData);
+      }
       invalidateCache();
       toast.success(`Книга ${action === 'approved' ? 'одобрена' : 'отклонена'}`);
       loadModerationData();
