@@ -22,6 +22,7 @@ import {
   Filter
 } from 'lucide-react';
 import { Book } from '@/api/entities';
+import { moderateBook } from '@/api/moderation';
 import { toast } from 'sonner';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
@@ -89,15 +90,27 @@ export default function ModerationPage() {
   const handleBookAction = async (bookId, action, rejectionData = null) => {
     try {
       const updateData = { status: action };
-      
+
       if (action === 'rejected' && rejectionData) {
         updateData.rejection_info = rejectionData;
+        if (rejectionData.reason) {
+          updateData.rejection_reason = rejectionData.reason;
+        }
         updateData.moderator_email = user.email;
       } else if (action === 'approved') {
         updateData.moderator_email = user.email;
       }
 
-      await Book.update(bookId, updateData);
+      try {
+        await moderateBook(bookId, {
+          action,
+          rejectionInfo: action === 'rejected' ? rejectionData : null,
+          rejectionReason: action === 'rejected' ? rejectionData?.reason ?? null : null
+        });
+      } catch (moderationError) {
+        console.warn('[Moderation] Fallback to direct Supabase update:', moderationError);
+        await Book.update(bookId, updateData);
+      }
 
       invalidateCache();
 

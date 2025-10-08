@@ -29,6 +29,7 @@ import { createPageUrl } from '@/utils';
 import { invalidateCache } from '@/components/utils/supabase';
 import { Link } from 'react-router-dom';
 import { Book } from '@/api/entities'; // ИСПРАВЛЕНИЕ: Прямой импорт сущности
+import { moderateBook } from '@/api/moderation';
 
 const GROK_PROMPT = `Анализируй предоставленный текст книжного произведения по следующим критериям. Будь объективен, цитируй фрагменты для обоснования выводов и предоставь их для ручного анализа человеком. Если текст подозрительный по какому-либо критерию, укажи точные цитаты и страницы (если доступны). Выводы делай четкими: "соответствует" или "не соответствует" с объяснением. Основная цель - выявить потенциально вредоносный контент, который может нанести физический вред читателю.
 
@@ -245,8 +246,13 @@ export default function BookModerationDetails() {
       if (!book?.id) {
         throw new Error('Данные книги недоступны.');
       }
-      // ИСПРАВЛЕНИЕ: Используем прямой вызов Book.update
-      const updated = await Book.update(book.id, { status: 'approved', moderator_email: user.email });
+      let updated = null;
+      try {
+        updated = await moderateBook(book.id, { action: 'approved' });
+      } catch (moderationError) {
+        console.warn('[ModerationDetails] Fallback to direct Supabase update:', moderationError);
+        updated = await Book.update(book.id, { status: 'approved', moderator_email: user.email });
+      }
       setBook(prev => ({ ...(prev || {}), ...(updated || { status: 'approved', moderator_email: user.email }) }));
       invalidateCache();
       toast.success('Книга успешно одобрена!');
@@ -264,12 +270,22 @@ export default function BookModerationDetails() {
       if (!book?.id) {
         throw new Error('Данные книги недоступны.');
       }
-      // ИСПРАВЛЕНИЕ: Используем прямой вызов Book.update
-      const updated = await Book.update(book.id, {
-        status: 'rejected',
-        rejection_info: rejectionData,
-        moderator_email: user.email
-      });
+      let updated = null;
+      try {
+        updated = await moderateBook(book.id, {
+          action: 'rejected',
+          rejectionInfo: rejectionData,
+          rejectionReason: rejectionData?.reason ?? null
+        });
+      } catch (moderationError) {
+        console.warn('[ModerationDetails] Fallback to direct Supabase update:', moderationError);
+        updated = await Book.update(book.id, {
+          status: 'rejected',
+          rejection_info: rejectionData,
+          rejection_reason: rejectionData?.reason,
+          moderator_email: user.email
+        });
+      }
       setBook(prev => ({
         ...(prev || {}),
         ...(updated || {}),
