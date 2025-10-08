@@ -15,9 +15,9 @@ import AuthorAnalytics from '../components/admin/AuthorAnalytics';
 import SiteAnalytics from '../components/admin/SiteAnalytics';
 
 export default function AdminDashboard() {
-  const { user, isAuthenticated, isLoading } = useAuth();
-  
-  const isAllowed = user?.role === 'admin';
+  const { user, isAuthenticated, isLoading, hasRole } = useAuth();
+
+  const isAllowed = hasRole('admin');
 
   if (isLoading) {
     return (

@@ -16,12 +16,12 @@ import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 
 export default function Profile() {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, hasRole } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
   const [showAISettings, setShowAISettings] = useState(false);
   const [aiPreferences, setAIPreferences] = useState(null);
 
-  const isModerator = user?.role === 'moderator' || user?.role === 'admin';
+  const isModerator = hasRole('admin') || hasRole('moderator');
 
   // ИСПРАВЛЕНО: Переместил хуки до условных return'ов
   // Загрузка AI предпочтений

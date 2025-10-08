@@ -843,7 +843,7 @@ const UploadActions = ({ onSubmit, isUploading, coverFile, bookFile, selectedLan
 );
 
 // Новый компонент для управления загрузкой обложек
-const CoverUploadManager = ({ user, authorStats, isLoadingStats, coverFiles, setCoverFile, isGodMode }) => {
+const CoverUploadManager = ({ user, authorStats, isLoadingStats, coverFiles, setCoverFile, isGodMode, hasRole }) => {
     
     const SALES_THRESHOLDS = {
         DEFAULT: 0,
@@ -859,9 +859,9 @@ const CoverUploadManager = ({ user, authorStats, isLoadingStats, coverFiles, set
     const hasAccess = useCallback((level) => {
         if (isGodMode) return true;
         if (isLoadingStats) return false;
-        if (user?.role === 'admin') return true; // Администраторы имеют доступ ко всему
+        if (hasRole?.('admin')) return true; // Администраторы имеют доступ ко всему
         return authorStats.monthlySales >= level;
-    }, [authorStats.monthlySales, isLoadingStats, user, isGodMode]);
+    }, [authorStats.monthlySales, hasRole, isLoadingStats, isGodMode]);
     
     const coverTiers = [
         {
@@ -1002,7 +1002,7 @@ const CoverUploadManager = ({ user, authorStats, isLoadingStats, coverFiles, set
 
 
 export default function UploadTab() {
-  const { user, hasFullAccess: isGodMode } = useAuth(); // Получаем флаг полного доступа
+  const { user, hasFullAccess: isGodMode, hasRole } = useAuth(); // Получаем флаг полного доступа
   const { kasRate } = useExchangeRate();
   const { kasPrice } = useCoinGecko();
 
@@ -1202,11 +1202,11 @@ export default function UploadTab() {
   // New: Helper function to check access based on monthly sales
   const hasAccess = useCallback((level) => {
       // ИСПРАВЛЕНО: Проверка на полный доступ
-      if (isGodMode) return true; 
+      if (isGodMode) return true;
       if (isLoadingStats) return false;
-      if (user?.role === 'admin') return true;
+      if (hasRole?.('admin')) return true;
       return authorStats.monthlySales >= level;
-  }, [authorStats.monthlySales, isLoadingStats, user, isGodMode]);
+  }, [authorStats.monthlySales, hasRole, isLoadingStats, isGodMode]);
 
   const setCoverFile = (size, file) => {
       setCoverFiles(prev => ({ ...prev, [size]: file }));
@@ -1631,13 +1631,14 @@ export default function UploadTab() {
         return (
           <div className="space-y-8">
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-              <CoverUploadManager 
+              <CoverUploadManager
                 user={user}
                 authorStats={authorStats}
                 isLoadingStats={isLoadingStats}
                 coverFiles={coverFiles}
                 setCoverFile={setCoverFile}
                 isGodMode={isGodMode}
+                hasRole={hasRole}
               />
             </motion.div>
 

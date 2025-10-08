@@ -28,7 +28,7 @@ import { createPageUrl } from '@/utils';
 import { invalidateCache } from '@/components/utils/supabase';
 
 export default function ModerationPage() {
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, hasRole } = useAuth();
   const [books, setBooks] = useState([]);
   const [filteredBooks, setFilteredBooks] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -37,7 +37,7 @@ export default function ModerationPage() {
   const [activeTab, setActiveTab] = useState('pending');
 
   // Проверка прав доступа
-  const isModerator = user?.role === 'admin' || user?.role === 'moderator';
+  const isModerator = hasRole('admin') || hasRole('moderator');
 
   useEffect(() => {
     if (isAuthenticated && isModerator) {

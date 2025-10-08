@@ -109,7 +109,7 @@ function MobileBottomNav({ currentPageName, user, isAuthenticated, cartItems }) 
 }
 
 export default function Header({ currentPageName, onLoginClick }) {
-  const { user, isAuthenticated, login, logout, isLoading: isAuthLoading } = useAuth();
+  const { user, isAuthenticated, login, logout, isLoading: isAuthLoading, hasRole, access } = useAuth();
   const { cartItems } = useCart();
   const { theme, toggleTheme, isMobile } = useTheme();
   const { kasRateFormatted, isLoading: isRateLoading } = useExchangeRate();
@@ -118,8 +118,13 @@ export default function Header({ currentPageName, onLoginClick }) {
   const [searchQuery, setSearchQuery] = useState('');
   const location = useLocation();
 
-  const isAuthor = user?.role === 'author';
-  const isAdmin = user?.role === 'admin';
+  const isAdmin = hasRole ? hasRole('admin') : false;
+  const isModerator = hasRole ? hasRole('moderator') : false;
+  const isAuthor = hasRole ? hasRole('author') : false;
+
+  const canAccessAuthorPanel = access?.canAccessAuthorPanel ?? (isAdmin || isModerator || isAuthor);
+  const canAccessModeration = access?.canAccessModeration ?? (isAdmin || isModerator);
+  const canAccessAdminPanel = access?.canAccessAdmin ?? !!isAdmin;
 
   const handleLoginClick = () => {
     if (onLoginClick) {
@@ -313,7 +318,7 @@ export default function Header({ currentPageName, onLoginClick }) {
                     </Link>
                   </DropdownMenuItem>
                   
-                  {!isAuthor && !isAdmin && (
+                  {!canAccessAuthorPanel && (
                     <DropdownMenuItem asChild>
                       <Link
                         to={createPageUrl('RegisterAuthor')}
@@ -325,7 +330,7 @@ export default function Header({ currentPageName, onLoginClick }) {
                     </DropdownMenuItem>
                   )}
                   
-                  {(isAuthor || isAdmin) && (
+                  {canAccessAuthorPanel && (
                     <DropdownMenuItem asChild>
                       <Link to={createPageUrl('AuthorPanel')} className="flex items-center text-foreground hover:text-primary text-sm">
                         <Crown className="w-3 h-3 mr-2 text-purple-600" />
@@ -334,7 +339,7 @@ export default function Header({ currentPageName, onLoginClick }) {
                     </DropdownMenuItem>
                   )}
 
-                  {(isAuthor || isAdmin) && (
+                  {canAccessModeration && (
                     <DropdownMenuItem asChild>
                       <Link to={createPageUrl('ModerationPage')} className="flex items-center text-foreground hover:text-primary text-sm">
                         <Shield className="w-3 h-3 mr-2" />
@@ -343,7 +348,7 @@ export default function Header({ currentPageName, onLoginClick }) {
                     </DropdownMenuItem>
                   )}
 
-                  {isAdmin && (
+                  {canAccessAdminPanel && (
                     <DropdownMenuItem asChild>
                       <Link to={createPageUrl('AdminDashboard')} className="flex items-center text-foreground hover:text-primary text-sm">
                         <Shield className="w-3 h-3 mr-2 text-primary" />
