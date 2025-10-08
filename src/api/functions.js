@@ -1,4 +1,4 @@
-import supabase, { isSupabaseConfigured } from './supabaseClient';
+import supabase, { isSupabaseConfigured, supabaseStorageBucket } from './supabaseClient';
 import { Book, Purchase, User, UserAIPreferences } from './entities';
 
 const importMetaEnv = typeof import.meta !== 'undefined' ? import.meta.env : undefined;
@@ -24,6 +24,188 @@ const safeUuid = () => {
 
 const ok = (data) => ({ data, error: null });
 const fail = (error) => ({ data: null, error: error?.message || error });
+
+const SUPABASE_SIGNED_URL_TTL = 60 * 60; // 1 hour
+
+const maybeDecodeArrayBuffer = (buffer) => {
+  try {
+    if (!buffer) return null;
+    const decoder = new TextDecoder('utf-8', { fatal: false });
+    return decoder.decode(buffer);
+  } catch (error) {
+    console.warn('[getBookContent] Failed to decode array buffer', error);
+    return null;
+  }
+};
+
+const blobToText = async (blob) => {
+  if (!blob) return null;
+  try {
+    if (typeof blob.text === 'function') {
+      const text = await blob.text();
+      if (text && text.trim().length > 0) {
+        return text;
+      }
+    }
+  } catch (error) {
+    console.warn('[getBookContent] blob.text() failed, falling back to arrayBuffer', error);
+  }
+
+  try {
+    if (typeof blob.arrayBuffer === 'function') {
+      const buffer = await blob.arrayBuffer();
+      return maybeDecodeArrayBuffer(buffer);
+    }
+  } catch (error) {
+    console.warn('[getBookContent] blob.arrayBuffer() failed', error);
+  }
+
+  return null;
+};
+
+const parseSupabaseStorageReference = (value) => {
+  if (!value || typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+
+  const isHttp = /^https?:\/\//i.test(trimmed);
+  if (!isHttp) {
+    return {
+      bucket: supabaseStorageBucket || null,
+      path: trimmed.replace(/^\/+/, '')
+    };
+  }
+
+  try {
+    const url = new URL(trimmed);
+    if (!url.pathname.startsWith('/storage/v1/object')) {
+      return null;
+    }
+
+    const pathSegments = url.pathname.replace(/^\/storage\/v1\/object\/?/, '').split('/');
+    if (pathSegments.length < 3) {
+      return null;
+    }
+
+    // Structure: /storage/v1/object/<access>/<bucket>/<objectPath>
+    const bucket = pathSegments[1];
+    const objectPath = pathSegments.slice(2).join('/');
+    return {
+      bucket,
+      path: objectPath
+    };
+  } catch (error) {
+    console.warn('[getBookContent] Failed to parse storage URL', error);
+    return null;
+  }
+};
+
+const createSignedDownloadUrl = async ({ bucket, path }) => {
+  if (!isSupabaseConfigured || !bucket || !path) return null;
+
+  try {
+    const { data, error } = await supabase.storage.from(bucket).createSignedUrl(path, SUPABASE_SIGNED_URL_TTL);
+    if (error) {
+      console.warn('[getBookContent] createSignedUrl error', error);
+      return null;
+    }
+    return data?.signedUrl || null;
+  } catch (error) {
+    console.warn('[getBookContent] createSignedUrl threw', error);
+    return null;
+  }
+};
+
+const downloadTextFromSupabase = async ({ bucket, path }) => {
+  if (!isSupabaseConfigured || !bucket || !path) return null;
+
+  try {
+    const { data, error } = await supabase.storage.from(bucket).download(path);
+    if (error) {
+      console.warn('[getBookContent] download error', error);
+      return null;
+    }
+    return await blobToText(data);
+  } catch (error) {
+    console.warn('[getBookContent] download threw', error);
+    return null;
+  }
+};
+
+const ensurePublicUrl = async ({ bucket, path }) => {
+  if (!bucket || !path) return null;
+  if (!isSupabaseConfigured) return null;
+
+  try {
+    const { data } = supabase.storage.from(bucket).getPublicUrl(path);
+    return data?.publicUrl || null;
+  } catch (error) {
+    console.warn('[getBookContent] getPublicUrl threw', error);
+    return null;
+  }
+};
+
+const fetchTextWithFallback = async (url) => {
+  if (!url) return null;
+  const trimmedUrl = typeof url === 'string' ? url.trim() : '';
+  if (!trimmedUrl) return null;
+  if (!/^https?:\/\//i.test(trimmedUrl)) {
+    return null;
+  }
+
+  try {
+    const response = await fetch(trimmedUrl);
+    if (!response.ok) {
+      console.warn('[getBookContent] Direct fetch failed', trimmedUrl, response.status, response.statusText);
+      return null;
+    }
+
+    const contentType = (response.headers.get('content-type') || '').toLowerCase();
+    const isLikelyText = /text|json|xml|csv|markdown|yaml|javascript|typescript/.test(contentType);
+
+    if (isLikelyText || !contentType) {
+      const text = await response.text();
+      if (text && text.trim().length > 0) {
+        return text;
+      }
+    }
+
+    // Fallback for octet-stream or unknown types
+    const buffer = await response.arrayBuffer();
+    return maybeDecodeArrayBuffer(buffer);
+  } catch (error) {
+    console.warn('[getBookContent] fetchTextWithFallback error', error);
+    return null;
+  }
+};
+
+const collectBookFileCandidates = (book) => {
+  const candidates = [];
+  const seen = new Set();
+
+  const pushValue = (value, origin) => {
+    if (!value || typeof value !== 'string') return;
+    const trimmed = value.trim();
+    if (!trimmed || seen.has(trimmed)) return;
+    seen.add(trimmed);
+    candidates.push({ value: trimmed, origin });
+  };
+
+  pushValue(book.file_url, 'book.file_url');
+  pushValue(book.storage_path, 'book.storage_path');
+
+  if (Array.isArray(book.languages)) {
+    book.languages.forEach((lang, index) => {
+      if (!lang || typeof lang !== 'object') return;
+      pushValue(lang.file_url, `book.languages[${index}].file_url`);
+      pushValue(lang.signed_url, `book.languages[${index}].signed_url`);
+      pushValue(lang.storage_path, `book.languages[${index}].storage_path`);
+      pushValue(lang.path, `book.languages[${index}].path`);
+    });
+  }
+
+  return candidates;
+};
 
 const COINMARKETCAP_API_KEY = getEnvValue(
   'VITE_COINMARKETCAP_API_KEY',
@@ -533,28 +715,45 @@ export const getBookContent = async ({ bookId, isPreview } = {}) => {
     const book = await Book.get(bookId);
     if (!book) throw new Error('Книга не найдена');
 
-    const urls = [];
-    if (book.file_url) urls.push(book.file_url);
-    if (Array.isArray(book.languages)) {
-      book.languages.forEach((lang) => {
-        if (lang && typeof lang === 'object' && lang.file_url) {
-          urls.push(lang.file_url);
-        }
-      });
-    }
+    const sources = collectBookFileCandidates(book);
 
     let content = null;
-    for (const url of urls) {
-      try {
-        const response = await fetch(url);
-        if (!response.ok) continue;
-        const text = await response.text();
-        if (text) {
-          content = text;
+    for (const source of sources) {
+      const { value, origin } = source;
+      const storageRef = parseSupabaseStorageReference(value);
+
+      if (storageRef) {
+        const downloadedText = await downloadTextFromSupabase(storageRef);
+        if (downloadedText && downloadedText.trim().length > 0) {
+          console.info('[getBookContent] Loaded book content via storage download from', origin);
+          content = downloadedText;
           break;
         }
-      } catch (err) {
-        console.warn('Failed to fetch book content from', url, err);
+      }
+
+      const directText = await fetchTextWithFallback(value);
+      if (directText && directText.trim().length > 0) {
+        console.info('[getBookContent] Loaded book content via direct fetch from', origin);
+        content = directText;
+        break;
+      }
+
+      if (storageRef) {
+        const signedUrl = await createSignedDownloadUrl(storageRef);
+        const signedText = await fetchTextWithFallback(signedUrl);
+        if (signedText && signedText.trim().length > 0) {
+          console.info('[getBookContent] Loaded book content via signed URL from', origin);
+          content = signedText;
+          break;
+        }
+
+        const publicUrl = await ensurePublicUrl(storageRef);
+        const publicText = await fetchTextWithFallback(publicUrl);
+        if (publicText && publicText.trim().length > 0) {
+          console.info('[getBookContent] Loaded book content via public URL from', origin);
+          content = publicText;
+          break;
+        }
       }
     }
 
