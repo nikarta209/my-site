@@ -2,6 +2,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { User } from '@/api/entities';
 import { toast } from 'sonner';
+import { createPageUrl } from '@/utils';
 
 // Placeholder for UI components and routing utilities.
 // Adjust import paths based on your project's specific setup (e.g., Next.js, React Router, shadcn/ui).
@@ -12,14 +13,6 @@ import { toast } from 'sonner';
 
 // If '@/components/ui/button' is not correct, you might need to adjust or create a simple <button>
 import { Button } from '@/components/ui/button';
-
-// Dummy createPageUrl function, replace with your actual routing utility
-const createPageUrl = (pageName) => {
-  if (pageName === 'SubscriptionPage') {
-    return '/subscription'; // Example path for subscription page
-  }
-  return `/${pageName.toLowerCase()}`;
-};
 
 // ИСПРАВЛЕНИЕ: Функция для проверки полного доступа с правильным email
 const hasFullAccess = (user) => {
