@@ -1,5 +1,5 @@
 
-import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { User } from '@/api/entities';
 import { toast } from 'sonner';
 import { createPageUrl } from '@/utils';
@@ -19,6 +19,77 @@ const hasFullAccess = (user) => {
   return user?.email === 'nikatrta2003@gmail.com';
 };
 
+const normalizeRoleValue = (role) => {
+  if (!role || typeof role !== 'string') return null;
+  const normalized = role.trim().toLowerCase();
+  return normalized || null;
+};
+
+const collectUserRoles = (user) => {
+  const roles = new Set();
+
+  const addRole = (value) => {
+    const normalized = normalizeRoleValue(value);
+    if (normalized) {
+      roles.add(normalized);
+    }
+  };
+
+  if (!user) return roles;
+
+  addRole(user.role);
+  addRole(user.user_type);
+  addRole(user.user_metadata?.role);
+
+  if (Array.isArray(user.roles)) {
+    user.roles.forEach(addRole);
+  }
+
+  if (Array.isArray(user.user_metadata?.roles)) {
+    user.user_metadata.roles.forEach(addRole);
+  }
+
+  if (user.is_admin) addRole('admin');
+  if (user.is_moderator) addRole('moderator');
+  if (user.is_author) addRole('author');
+
+  return roles;
+};
+
+const determinePrimaryRole = (roles) => {
+  if (roles.has('admin')) return 'admin';
+  if (roles.has('moderator')) return 'moderator';
+  if (roles.has('author')) return 'author';
+  if (roles.has('reader')) return 'reader';
+
+  const [firstRole] = roles;
+  return firstRole || null;
+};
+
+const enhanceUserWithRoles = (user) => {
+  if (!user) return null;
+
+  const roles = collectUserRoles(user);
+  const primaryRole = determinePrimaryRole(roles) || normalizeRoleValue(user.role) || null;
+
+  return {
+    ...user,
+    role: primaryRole || user.role,
+    roles: Array.from(roles.size > 0 ? roles : primaryRole ? [primaryRole] : []),
+    permissions: {
+      canAccessAdmin: roles.has('admin') || primaryRole === 'admin',
+      canAccessModeration: roles.has('admin') || roles.has('moderator') || primaryRole === 'admin' || primaryRole === 'moderator',
+      canAccessAuthorPanel:
+        roles.has('admin') ||
+        roles.has('moderator') ||
+        roles.has('author') ||
+        primaryRole === 'admin' ||
+        primaryRole === 'moderator' ||
+        primaryRole === 'author'
+    }
+  };
+};
+
 const AuthContext = createContext({
   user: null,
   isAuthenticated: false,
@@ -32,20 +103,29 @@ const AuthContext = createContext({
     translationCredits: 0
   },
   hasFullAccess: false, // Добавляем флаг полного доступа
+  role: null,
+  roles: [],
+  hasRole: () => false,
+  access: {
+    canAccessAdmin: false,
+    canAccessModeration: false,
+    canAccessAuthorPanel: false
+  }
 });
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isInitialized, setIsInitialized] = useState(false);
-  
+
   // ИСПРАВЛЕНИЕ: Предотвращаем множественные одновременные запросы
   const initializePromiseRef = useRef(null);
   
   const syncToLocalStorage = useCallback((userData) => {
     try {
       if (userData) {
-        localStorage.setItem('kasbook_user', JSON.stringify(userData));
+        const enhanced = enhanceUserWithRoles(userData);
+        localStorage.setItem('kasbook_user', JSON.stringify(enhanced));
         localStorage.setItem('kasbook_user_timestamp', Date.now().toString());
       } else {
         localStorage.removeItem('kasbook_user');
@@ -56,6 +136,19 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
+  const setAndPersistUser = useCallback((userData) => {
+      if (!userData) {
+        setUser(null);
+        syncToLocalStorage(null);
+        return null;
+      }
+
+      const enhancedUser = enhanceUserWithRoles(userData);
+      setUser(enhancedUser);
+      syncToLocalStorage(enhancedUser);
+      return enhancedUser;
+  }, [syncToLocalStorage]);
+
   const getStoredUser = useCallback(() => {
     try {
       const storedUser = localStorage.getItem('kasbook_user');
@@ -65,7 +158,7 @@ export function AuthProvider({ children }) {
         // Проверяем, не устарели ли данные (15 минут)
         const age = Date.now() - parseInt(timestamp);
         if (age < 15 * 60 * 1000) { // 15 минут
-          return JSON.parse(storedUser);
+          return enhanceUserWithRoles(JSON.parse(storedUser));
         } else {
           // Данные устарели, очищаем их
           localStorage.removeItem('kasbook_user');
@@ -107,8 +200,7 @@ export function AuthProvider({ children }) {
           
           if (Object.keys(updateData).length > 0) {
             const updatedUser = await User.updateMyUserData(updateData);
-            setUser(updatedUser);
-            syncToLocalStorage(updatedUser);
+            setAndPersistUser(updatedUser);
           }
           
           localStorage.removeItem('kasbook_pending_registration');
@@ -125,7 +217,7 @@ export function AuthProvider({ children }) {
         // Сначала пробуем загрузить из localStorage для быстрого старта
         const storedUser = getStoredUser(); // Get the initial stored user once
         if (storedUser) {
-          setUser(storedUser);
+          setAndPersistUser(storedUser);
           setIsLoading(false); // Быстро убираем загрузку
         }
 
@@ -139,41 +231,39 @@ export function AuthProvider({ children }) {
             // Подписка истекла, обновляем на сервере
             console.log('Subscription expired, updating status...');
             const updatedUser = await User.updateMyUserData({ subscription_status: 'inactive' });
-            setUser(updatedUser);
-            syncToLocalStorage(updatedUser);
-            await handlePendingRegistration(updatedUser); // Pass the updated user for registration processing
+            const normalized = setAndPersistUser(updatedUser);
+            await handlePendingRegistration(normalized); // Pass the updated user for registration processing
             toast.info('Ваша подписка истекла и была деактивирована.');
           } else {
             // Обновляем только если данные отличаются
             // Compare against the initially retrieved storedUser to avoid re-reading local storage
             if (JSON.stringify(currentUser) !== JSON.stringify(storedUser)) {
-              setUser(currentUser);
-              syncToLocalStorage(currentUser);
+              const normalized = setAndPersistUser(currentUser);
+              await handlePendingRegistration(normalized); // Pass the original currentUser for registration processing
+            } else {
+              await handlePendingRegistration(storedUser); // Use stored normalized user
             }
-            await handlePendingRegistration(currentUser); // Pass the original currentUser for registration processing
           }
-          
+
         } else {
           // Пользователь не авторизован
           if (storedUser) { // If there was a cached user, clear it
-            setUser(null);
-            syncToLocalStorage(null);
+            setAndPersistUser(null);
           }
         }
-        
+
       } catch (error) {
         console.warn('Auth initialization error:', error);
         
         // ИСПРАВЛЕНИЕ: Различаем типы ошибок
         if (error.message?.includes('Invalid token') || error.message?.includes('401')) {
           // Токен недействителен, очищаем данные
-          setUser(null);
-          syncToLocalStorage(null);
+          setAndPersistUser(null);
         } else {
           // Сетевая ошибка, оставляем кэшированные данные если есть
           const storedUserOnError = getStoredUser(); // Re-read in case the initial attempt failed to set
           if (storedUserOnError && !user) { // Only set if we have stored data and user state is currently null
-            setUser(storedUserOnError);
+            setAndPersistUser(storedUserOnError);
           }
         }
       } finally {
@@ -184,7 +274,7 @@ export function AuthProvider({ children }) {
     })();
     
     return initializePromiseRef.current;
-  }, [getStoredUser, syncToLocalStorage, user]); // user is in dependency array to ensure handlePendingRegistration has latest user if needed
+  }, [getStoredUser, setAndPersistUser, user]); // user is in dependency array to ensure handlePendingRegistration has latest user if needed
 
   // ИСПРАВЛЕНИЕ: Инициализация только один раз при монтировании
   useEffect(() => {
@@ -202,8 +292,7 @@ export function AuthProvider({ children }) {
         const currentUser = await User.me();
         if (!currentUser) {
           // Токен истек
-          setUser(null);
-          syncToLocalStorage(null);
+          setAndPersistUser(null);
           toast.info('Сессия истекла, необходимо войти заново');
         } else {
           // Check for expired subscription during periodic check
@@ -211,14 +300,12 @@ export function AuthProvider({ children }) {
             console.log('Periodic check: Subscription expired, updating status...');
             const updatedUser = await User.updateMyUserData({ subscription_status: 'inactive' });
             if (JSON.stringify(updatedUser) !== JSON.stringify(user)) { // Compare against current state user
-                setUser(updatedUser);
-                syncToLocalStorage(updatedUser);
+                setAndPersistUser(updatedUser);
                 toast.info('Ваша подписка истекла и была деактивирована.');
             }
           } else if (JSON.stringify(currentUser) !== JSON.stringify(user)) {
             // Данные обновились (and subscription is not expired, or was already inactive)
-            setUser(currentUser);
-            syncToLocalStorage(currentUser);
+            setAndPersistUser(currentUser);
           }
         }
       } catch (error) {
@@ -228,7 +315,7 @@ export function AuthProvider({ children }) {
     }, 5 * 60 * 1000); // Каждые 5 минут
 
     return () => clearInterval(interval);
-  }, [user, isInitialized, syncToLocalStorage]);
+  }, [user, isInitialized, setAndPersistUser]);
 
   const login = useCallback(async ({ email, password, isRegistration, twoFactorCode, ...options } = {}) => {
     setIsLoading(true);
@@ -244,13 +331,11 @@ export function AuthProvider({ children }) {
       if (result?.success) {
         const profile = await User.me();
         if (profile) {
-          setUser(profile);
-          syncToLocalStorage(profile);
+          setAndPersistUser(profile);
         }
       } else if (result?.user) {
         // Fallback для сценариев, когда Supabase уже вернул пользователя
-        setUser(result.user);
-        syncToLocalStorage(result.user);
+        setAndPersistUser(result.user);
       }
 
       return result;
@@ -260,20 +345,18 @@ export function AuthProvider({ children }) {
     } finally {
       setIsLoading(false);
     }
-  }, [syncToLocalStorage]);
+  }, [setAndPersistUser]);
 
   const logout = useCallback(async () => {
     try {
       setIsLoading(true);
       await User.logout();
-      setUser(null);
-      syncToLocalStorage(null);
+      setAndPersistUser(null);
       toast.success('Вы успешно вышли из системы');
     } catch (error) {
       console.error('Logout error:', error);
       // Даже при ошибке очищаем локальные данные
-      setUser(null);
-      syncToLocalStorage(null);
+      setAndPersistUser(null);
     } finally {
       setIsLoading(false);
     }
@@ -283,19 +366,17 @@ export function AuthProvider({ children }) {
   const updateUser = useCallback(async () => {
     try {
       const updatedUser = await User.me(); // Refresh user data from server
-      setUser(updatedUser);
-      syncToLocalStorage(updatedUser);
-      return updatedUser;
+      return setAndPersistUser(updatedUser);
     } catch (error) {
       console.error('Update user error:', error);
       // As per outline, return the current user state on error
       return user;
     }
-  }, [syncToLocalStorage, user]);
+  }, [setAndPersistUser, user]);
 
   // ИСПРАВЛЕНО: Создаем объект подписки с учетом полного доступа
   const isGodMode = hasFullAccess(user);
-  const subscription = isGodMode 
+  const subscription = isGodMode
     ? {
         isActive: true,
         expiresAt: 'never',
@@ -307,6 +388,71 @@ export function AuthProvider({ children }) {
         translationCredits: user?.translation_credits || 0,
       };
 
+  const roleList = useMemo(() => {
+    const roles = collectUserRoles(user);
+
+    if (user?.permissions?.canAccessAdmin) {
+      roles.add('admin');
+    }
+
+    if (user?.permissions?.canAccessModeration) {
+      roles.add('moderator');
+    }
+
+    if (user?.permissions?.canAccessAuthorPanel) {
+      roles.add('author');
+    }
+
+    return Array.from(roles);
+  }, [user]);
+  const primaryRole = useMemo(() => {
+    if (user?.role) {
+      const normalized = normalizeRoleValue(user.role);
+      if (normalized) {
+        return normalized;
+      }
+    }
+
+    return determinePrimaryRole(new Set(roleList)) || null;
+  }, [roleList, user?.role]);
+
+  const hasRole = useCallback((roleToCheck) => {
+    const normalized = normalizeRoleValue(roleToCheck);
+    if (!normalized) return false;
+
+    if (roleList.some(role => role === normalized)) {
+      return true;
+    }
+
+    if (user?.role && normalizeRoleValue(user.role) === normalized) {
+      return true;
+    }
+
+    if (user?.user_type && normalizeRoleValue(user.user_type) === normalized) {
+      return true;
+    }
+
+    if (normalized === 'admin' && user?.permissions?.canAccessAdmin) {
+      return true;
+    }
+
+    if (normalized === 'moderator' && user?.permissions?.canAccessModeration) {
+      return true;
+    }
+
+    if (normalized === 'author' && user?.permissions?.canAccessAuthorPanel) {
+      return true;
+    }
+
+    return false;
+  }, [roleList, user?.permissions, user?.role, user?.user_type]);
+
+  const access = {
+    canAccessAdmin: user?.permissions?.canAccessAdmin || hasRole('admin'),
+    canAccessModeration: user?.permissions?.canAccessModeration || hasRole('admin') || hasRole('moderator'),
+    canAccessAuthorPanel: user?.permissions?.canAccessAuthorPanel || hasRole('admin') || hasRole('moderator') || hasRole('author')
+  };
+
   const value = {
     user,
     isAuthenticated: !!user,
@@ -315,7 +461,11 @@ export function AuthProvider({ children }) {
     logout,
     updateUser,
     subscription, // Передаем объект подписки
-    hasFullAccess: isGodMode // Передаем флаг полного доступа
+    hasFullAccess: isGodMode, // Передаем флаг полного доступа
+    role: primaryRole,
+    roles: roleList,
+    hasRole,
+    access
   };
 
   return (
@@ -342,7 +492,7 @@ export const useSubscription = () => {
 
 // ИСПРАВЛЕНИЕ: Улучшенный ProtectedRoute с лучшим UX
 export function ProtectedRoute({ children, requireRole, requireSubscription, fallbackComponent }) {
-  const { user, isAuthenticated, isLoading, hasFullAccess: isGodMode } = useAuth(); // Получаем флаг
+  const { user, isAuthenticated, isLoading, hasFullAccess: isGodMode, hasRole } = useAuth(); // Получаем флаг
   const subscription = useSubscription(); // Use the new hook for subscription data
 
   // ИСПРАВЛЕНИЕ: Показываем загрузку только когда реально идет проверка
@@ -384,7 +534,7 @@ export function ProtectedRoute({ children, requireRole, requireSubscription, fal
   }
   
   // ИСПРАВЛЕНО: Пропускаем, если есть полный доступ
-  if (requireRole && !isGodMode && user?.role !== requireRole && user?.role !== 'admin') {
+  if (requireRole && !isGodMode && !hasRole(requireRole) && !hasRole('admin')) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center space-y-4 max-w-md p-6">
