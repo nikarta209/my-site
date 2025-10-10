@@ -23,11 +23,6 @@ const MENU_ITEMS = [
     icon: Archive
   },
   {
-    key: 'subscription',
-    label: 'По подписке',
-    icon: Crown
-  },
-  {
     key: 'previews',
     label: 'Превью',
     icon: Download
@@ -36,7 +31,12 @@ const MENU_ITEMS = [
     key: 'notes',
     label: 'Мои заметки',
     icon: StickyNote,
-    path: createPageUrl('library/notes?scope=private')
+    path: createPageUrl('library/notes')
+  },
+  {
+    key: 'subscription',
+    label: 'По подписке',
+    icon: Crown
   }
 ];
 

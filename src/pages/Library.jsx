@@ -4,8 +4,6 @@ import { useAuth, useSubscription } from '../components/auth/Auth';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { motion, AnimatePresence } from 'framer-motion';
 import { 
   BookOpen, 
   Search, 
@@ -41,6 +39,7 @@ import {
 import LibraryMenu from '@/components/library/LibraryMenu';
 
 const LIBRARY_SECTIONS = new Set(['dashboard', 'owned', 'subscription', 'previews']);
+const LIBRARY_TAB_RENDER_ORDER = ['dashboard', 'owned', 'previews', 'subscription'];
 
 export default function Library() {
   const { user, isAuthenticated } = useAuth();
@@ -66,6 +65,27 @@ export default function Library() {
   const [currentRecentIndex, setCurrentRecentIndex] = useState(0);
   const [subscriptionBooks, setSubscriptionBooks] = useState([]); // Новое состояние для книг по подписке
   const [loadError, setLoadError] = useState(null);
+  const [mountedTabs, setMountedTabs] = useState(() => [activeTab]);
+
+  const orderedMountedTabs = useMemo(() => {
+    const uniqueTabs = Array.from(new Set(mountedTabs));
+    return uniqueTabs.sort((a, b) => {
+      const indexA = LIBRARY_TAB_RENDER_ORDER.indexOf(a);
+      const indexB = LIBRARY_TAB_RENDER_ORDER.indexOf(b);
+      const safeA = indexA === -1 ? LIBRARY_TAB_RENDER_ORDER.length : indexA;
+      const safeB = indexB === -1 ? LIBRARY_TAB_RENDER_ORDER.length : indexB;
+      return safeA - safeB;
+    });
+  }, [mountedTabs]);
+
+  useEffect(() => {
+    setMountedTabs((prev) => {
+      if (prev.includes(activeTab)) {
+        return prev;
+      }
+      return [...prev, activeTab];
+    });
+  }, [activeTab]);
 
   useEffect(() => {
     const nextTab = sectionParam && LIBRARY_SECTIONS.has(sectionParam) ? sectionParam : 'dashboard';
@@ -223,46 +243,54 @@ export default function Library() {
         />
 
         {/* Content */}
-        <AnimatePresence mode="wait">
-          {activeTab === 'dashboard' && (
-            <DashboardContent
-              recentBooks={recentBooks}
-              currentIndex={currentRecentIndex}
-              setCurrentIndex={setCurrentRecentIndex}
-              isLoading={isLoading}
-              loadError={loadError}
-              onRetry={loadLibraryData}
-              user={user}
-            />
-          )}
-          
-          {activeTab === 'owned' && (
-            <LibraryGrid 
-              books={ownedBooks} 
-              isLoading={isLoading}
-              compact={true}
-              linkToReader={true}
-            />
-          )}
+        <div className="space-y-0">
+          {orderedMountedTabs.map((tab) => (
+            <div
+              key={tab}
+              hidden={tab !== activeTab}
+              aria-hidden={tab !== activeTab}
+            >
+              {tab === 'dashboard' && (
+                <DashboardContent
+                  recentBooks={recentBooks}
+                  currentIndex={currentRecentIndex}
+                  setCurrentIndex={setCurrentRecentIndex}
+                  isLoading={isLoading}
+                  loadError={loadError}
+                  onRetry={loadLibraryData}
+                  user={user}
+                />
+              )}
 
-          {activeTab === 'subscription' && (
-            <LibraryGrid 
-              books={subscriptionBooks} 
-              isLoading={isLoading}
-              compact={true}
-              linkToReader={true}
-            />
-          )}
-          
-          {activeTab === 'previews' && (
-            <LibraryGrid 
-              books={previewBooks} 
-              isLoading={isLoading}
-              compact={true}
-              linkToReader={true}
-            />
-          )}
-        </AnimatePresence>
+              {tab === 'owned' && (
+                <LibraryGrid
+                  books={ownedBooks}
+                  isLoading={isLoading}
+                  compact={true}
+                  linkToReader={true}
+                />
+              )}
+
+              {tab === 'subscription' && (
+                <LibraryGrid
+                  books={subscriptionBooks}
+                  isLoading={isLoading}
+                  compact={true}
+                  linkToReader={true}
+                />
+              )}
+
+              {tab === 'previews' && (
+                <LibraryGrid
+                  books={previewBooks}
+                  isLoading={isLoading}
+                  compact={true}
+                  linkToReader={true}
+                />
+              )}
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );

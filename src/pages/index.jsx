@@ -70,7 +70,7 @@ import SubscriptionManagement from "./SubscriptionManagement";
 
 import SubscriptionPage from "./SubscriptionPage";
 
-import { BrowserRouter as Router, Route, Routes, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Route, Routes, useLocation, Navigate } from 'react-router-dom';
 
 const PAGES = {
     
@@ -226,8 +226,8 @@ function PagesContent() {
                 <Route path="/NoteFeed" element={<NoteFeed />} />
                 
                 <Route path="/NotesFeed" element={<NotesFeed />} />
-                <Route path="/Notes" element={<MyNotes />} />
-                <Route path="/notes" element={<MyNotes />} />
+                <Route path="/Notes" element={<Navigate to="/library/notes" replace />} />
+                <Route path="/notes" element={<Navigate to="/library/notes" replace />} />
                 
                 <Route path="/AuthorPanelRedesign" element={<AuthorPanelRedesign />} />
                 
