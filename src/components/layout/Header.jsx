@@ -24,8 +24,7 @@ import {
   Home,
   Brain,
   Library,
-  Users,
-  StickyNote
+  Users
 } from 'lucide-react';
 import { useAuth } from '../auth/Auth';
 import { useCart } from '../cart/CartContext';
@@ -42,7 +41,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 // Mobile Bottom Navigation Component
-function MobileBottomNav({ currentPageName, user, isAuthenticated, cartItems }) {
+function MobileBottomNav({ currentPageName, isAuthenticated, cartItems }) {
   const navigationItems = [
     {
       name: 'Главная',
@@ -59,17 +58,11 @@ function MobileBottomNav({ currentPageName, user, isAuthenticated, cartItems }) 
       path: 'Library',
       icon: BookText
     },
-    isAuthenticated
-      ? {
-          name: 'Мои заметки',
-          path: 'Notes',
-          icon: StickyNote
-        }
-      : {
-          name: 'Лента',
-          path: 'NotesFeed',
-          icon: BookOpen
-        },
+    {
+      name: 'Лента',
+      path: 'NotesFeed',
+      icon: BookOpen
+    },
     {
       name: 'Профиль',
       path: 'Profile',
@@ -200,9 +193,8 @@ export default function Header({ currentPageName, onLoginClick }) {
         </header>
 
         {/* Mobile Bottom Navigation */}
-        <MobileBottomNav 
+        <MobileBottomNav
           currentPageName={currentPageName}
-          user={user}
           isAuthenticated={isAuthenticated}
           cartItems={cartItems}
         />
@@ -253,17 +245,6 @@ export default function Header({ currentPageName, onLoginClick }) {
                 }`}
               >
                 <Library className="w-3 h-3" /> Библиотека
-              </Link>
-            )}
-
-            {isAuthenticated && (
-              <Link
-                to={createPageUrl('Notes')}
-                className={`flex items-center gap-1 text-xs font-medium transition-colors hover:text-primary px-2 py-1 ${
-                  currentPageName === 'Notes' ? 'text-primary' : 'text-foreground'
-                }`}
-              >
-                <StickyNote className="w-3 h-3" /> Мои заметки
               </Link>
             )}
 
