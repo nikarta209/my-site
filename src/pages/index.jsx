@@ -60,6 +60,8 @@ import AuthorPanelRedesign from "./AuthorPanelRedesign";
 
 import AIRecommendations from "./AIRecommendations";
 
+import MyNotes from "./MyNotes.jsx";
+
 import Novelties from "./Novelties";
 
 import ReferralDashboard from "./ReferralDashboard";
@@ -127,6 +129,7 @@ const PAGES = {
     NoteFeed: NoteFeed,
     
     NotesFeed: NotesFeed,
+    Notes: MyNotes,
     
     AuthorPanelRedesign: AuthorPanelRedesign,
     
@@ -222,6 +225,8 @@ function PagesContent() {
                 <Route path="/NoteFeed" element={<NoteFeed />} />
                 
                 <Route path="/NotesFeed" element={<NotesFeed />} />
+                <Route path="/Notes" element={<MyNotes />} />
+                <Route path="/notes" element={<MyNotes />} />
                 
                 <Route path="/AuthorPanelRedesign" element={<AuthorPanelRedesign />} />
                 

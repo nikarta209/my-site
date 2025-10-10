@@ -24,7 +24,8 @@ import {
   Home,
   Brain,
   Library,
-  Users
+  Users,
+  StickyNote
 } from 'lucide-react';
 import { useAuth } from '../auth/Auth';
 import { useCart } from '../cart/CartContext';
@@ -43,29 +44,35 @@ import {
 // Mobile Bottom Navigation Component
 function MobileBottomNav({ currentPageName, user, isAuthenticated, cartItems }) {
   const navigationItems = [
-    { 
-      name: 'Главная', 
-      path: 'Home', 
+    {
+      name: 'Главная',
+      path: 'Home',
       icon: Home
     },
-    { 
-      name: 'Каталог', 
-      path: 'Catalog', 
+    {
+      name: 'Каталог',
+      path: 'Catalog',
       icon: Search
     },
-    { 
-      name: 'Читалка', 
-      path: 'Library', 
+    {
+      name: 'Читалка',
+      path: 'Library',
       icon: BookText
     },
-    { 
-      name: 'Заметки', 
-      path: 'NotesFeed', 
-      icon: BookOpen
-    },
-    { 
-      name: 'Профиль', 
-      path: 'Profile', 
+    isAuthenticated
+      ? {
+          name: 'Мои заметки',
+          path: 'Notes',
+          icon: StickyNote
+        }
+      : {
+          name: 'Лента',
+          path: 'NotesFeed',
+          icon: BookOpen
+        },
+    {
+      name: 'Профиль',
+      path: 'Profile',
       icon: User,
       showBadge: isAuthenticated && cartItems.length > 0
     }
@@ -246,6 +253,17 @@ export default function Header({ currentPageName, onLoginClick }) {
                 }`}
               >
                 <Library className="w-3 h-3" /> Библиотека
+              </Link>
+            )}
+
+            {isAuthenticated && (
+              <Link
+                to={createPageUrl('Notes')}
+                className={`flex items-center gap-1 text-xs font-medium transition-colors hover:text-primary px-2 py-1 ${
+                  currentPageName === 'Notes' ? 'text-primary' : 'text-foreground'
+                }`}
+              >
+                <StickyNote className="w-3 h-3" /> Мои заметки
               </Link>
             )}
 
