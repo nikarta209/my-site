@@ -83,6 +83,72 @@ const computeAccent = (identifier = '') => {
   return PERSONAL_GRADIENTS[hash % PERSONAL_GRADIENTS.length];
 };
 
+const formatPersonalNote = (record, rawNote, index, bookLookup, accentGradient) => {
+  const lookup = bookLookup || {};
+  const book = lookup[record.book_id] || {};
+  const createdAt = rawNote?.created_at || record?.created_at || null;
+  const updatedAt = rawNote?.updated_at || rawNote?.created_at || record?.updated_at || createdAt;
+  const noteText = rawNote?.note_text || rawNote?.text || '';
+  const selectedText = rawNote?.selected_text || rawNote?.highlight_text || '';
+  const rawTitle =
+    rawNote?.title ||
+    noteText?.split('\n')[0] ||
+    selectedText?.slice(0, 80) ||
+    `Заметка ${index + 1}`;
+
+  return {
+    id: rawNote?.id || `${record.id}:${index}`,
+    originalNoteId: rawNote?.id || null,
+    noteIndex: index,
+    userBookDataId: record.id,
+    bookId: record.book_id,
+    bookTitle: rawNote?.book_title || book?.title || 'Без названия',
+    bookAuthor: rawNote?.book_author || book?.author || '',
+    coverUrl: resolveCoverImage(rawNote, book),
+    pageNumber: rawNote?.page_number || rawNote?.page || null,
+    createdAt,
+    updatedAt,
+    noteText,
+    selectedText,
+    highlightColor: rawNote?.highlight_color || 'amber',
+    tags: rawNote?.tags || [],
+    accentColor: accentGradient,
+    allowComments: rawNote?.allow_comments ?? true,
+    isDraft: rawNote?.is_draft ?? rawNote?.status === 'draft',
+    title: rawTitle?.slice(0, 90)
+  };
+};
+
+const formatPublishedNote = (rawNote, bookLookup) => {
+  const lookup = bookLookup || {};
+  const book = lookup[rawNote.book_id] || {};
+  const noteText = rawNote?.note_text || '';
+  const selectedText = rawNote?.selected_text || '';
+  const rawTitle =
+    rawNote?.title ||
+    noteText?.split('\n')[0] ||
+    selectedText?.slice(0, 80) ||
+    'Опубликованная заметка';
+
+  return {
+    id: rawNote.id,
+    bookId: rawNote.book_id,
+    bookTitle: rawNote.book_title || book?.title || 'Без названия',
+    bookAuthor: rawNote.book_author || book?.author || '',
+    coverUrl: resolveCoverImage(rawNote, book),
+    pageNumber: rawNote.page_number || null,
+    createdAt: rawNote.created_at,
+    updatedAt: rawNote.updated_at,
+    noteText,
+    selectedText,
+    highlightColor: rawNote.highlight_color || 'amber',
+    tags: rawNote.tags || [],
+    likesCount: rawNote.likes_count ?? 0,
+    allowComments: rawNote.metadata?.allow_comments ?? rawNote.allow_comments ?? true,
+    title: rawTitle?.slice(0, 90)
+  };
+};
+
 const matchesPageFilter = (pageNumber, range) => {
   if (range === 'all') return true;
   if (range === 'no-page') {
@@ -251,6 +317,7 @@ const MyNotes = () => {
   const [activeTab, setActiveTabState] = useState(() =>
     searchParams.get('scope') === 'published' ? 'published' : 'personal'
   );
+  const [searchInput, setSearchInput] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedBook, setSelectedBook] = useState('all');
   const [dateRange, setDateRange] = useState('all');
@@ -278,6 +345,16 @@ const MyNotes = () => {
     unpublish: new Set()
   });
   const scopeParam = searchParams.get('scope');
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setSearchTerm((prev) => (prev === searchInput ? prev : searchInput));
+    }, 400);
+
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [searchInput]);
 
   useEffect(() => {
     const nextTab = scopeParam === 'published' ? 'published' : 'personal';
@@ -330,76 +407,6 @@ const MyNotes = () => {
     });
   }, []);
 
-  const transformPersonalNote = useCallback(
-    (record, rawNote, index) => {
-      const book = bookMap[record.book_id] || {};
-      const createdAt = rawNote?.created_at || record?.created_at || null;
-      const updatedAt = rawNote?.updated_at || rawNote?.created_at || record?.updated_at || createdAt;
-      const noteText = rawNote?.note_text || rawNote?.text || '';
-      const selectedText = rawNote?.selected_text || rawNote?.highlight_text || '';
-      const rawTitle =
-        rawNote?.title ||
-        noteText?.split('\n')[0] ||
-        selectedText?.slice(0, 80) ||
-        `Заметка ${index + 1}`;
-
-      return {
-        id: rawNote?.id || `${record.id}:${index}`,
-        originalNoteId: rawNote?.id || null,
-        noteIndex: index,
-        userBookDataId: record.id,
-        bookId: record.book_id,
-        bookTitle: rawNote?.book_title || book?.title || 'Без названия',
-        bookAuthor: rawNote?.book_author || book?.author || '',
-        coverUrl: resolveCoverImage(rawNote, book),
-        pageNumber: rawNote?.page_number || rawNote?.page || null,
-        createdAt,
-        updatedAt,
-        noteText,
-        selectedText,
-        highlightColor: rawNote?.highlight_color || 'amber',
-        tags: rawNote?.tags || [],
-        accentColor: accentGradient,
-        allowComments: rawNote?.allow_comments ?? true,
-        isDraft: rawNote?.is_draft ?? rawNote?.status === 'draft',
-        title: rawTitle?.slice(0, 90)
-      };
-    },
-    [bookMap, accentGradient]
-  );
-
-  const transformPublishedNote = useCallback(
-    (rawNote) => {
-      const book = bookMap[rawNote.book_id] || {};
-      const noteText = rawNote?.note_text || '';
-      const selectedText = rawNote?.selected_text || '';
-      const rawTitle =
-        rawNote?.title ||
-        noteText?.split('\n')[0] ||
-        selectedText?.slice(0, 80) ||
-        'Опубликованная заметка';
-
-      return {
-        id: rawNote.id,
-        bookId: rawNote.book_id,
-        bookTitle: rawNote.book_title || book?.title || 'Без названия',
-        bookAuthor: rawNote.book_author || book?.author || '',
-        coverUrl: resolveCoverImage(rawNote, book),
-        pageNumber: rawNote.page_number || null,
-        createdAt: rawNote.created_at,
-        updatedAt: rawNote.updated_at,
-        noteText,
-        selectedText,
-        highlightColor: rawNote.highlight_color || 'amber',
-        tags: rawNote.tags || [],
-        likesCount: rawNote.likes_count ?? 0,
-        allowComments: rawNote.metadata?.allow_comments ?? rawNote.allow_comments ?? true,
-        title: rawTitle?.slice(0, 90)
-      };
-    },
-    [bookMap]
-  );
-
   const loadNotes = useCallback(async () => {
     if (!user?.email) return;
 
@@ -440,14 +447,16 @@ const MyNotes = () => {
 
       const personal = userDataRecords.flatMap((record) => {
         const notesArray = Array.isArray(record?.notes) ? record.notes : [];
-        return notesArray.map((note, index) => transformPersonalNote(record, note, index));
+        return notesArray.map((note, index) =>
+          formatPersonalNote(record, note, index, fetchedBookMap, accentGradient)
+        );
       });
 
       personal.sort((a, b) => new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt));
 
       const published = sharedNotes
         .filter((note) => note?.is_public !== false)
-        .map((note) => transformPublishedNote(note));
+        .map((note) => formatPublishedNote(note, fetchedBookMap));
 
       setPersonalNotes(personal);
       setPublishedNotes(published);
@@ -475,7 +484,7 @@ const MyNotes = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [user, transformPersonalNote, transformPublishedNote]);
+  }, [user, accentGradient]);
 
   useEffect(() => {
     if (isAuthenticated && user?.email) {
@@ -651,14 +660,16 @@ const MyNotes = () => {
     return Array.from(tags).sort((a, b) => a.localeCompare(b, 'ru'));
   }, [personalNotes, publishedNotes]);
 
+  const totalNotesCount = personalNotes.length + publishedNotes.length;
   const notesMenuCounts = useMemo(
     () => ({
-      notes: personalNotes.length + publishedNotes.length
+      notes: totalNotesCount
     }),
-    [personalNotes.length, publishedNotes.length]
+    [totalNotesCount]
   );
 
   const resetFilters = () => {
+    setSearchInput('');
     setSearchTerm('');
     setSelectedBook('all');
     setDateRange('all');
@@ -812,11 +823,14 @@ const MyNotes = () => {
         };
       }
 
-      const mapped = transformPublishedNote({
-        ...createdNote,
-        tags: publishDialogNote.tags || [],
-        likes_count: createdNote?.likes_count ?? 0
-      });
+      const mapped = formatPublishedNote(
+        {
+          ...createdNote,
+          tags: publishDialogNote.tags || [],
+          likes_count: createdNote?.likes_count ?? 0
+        },
+        bookMap
+      );
 
       setPublishedNotes((prev) => [mapped, ...prev]);
       toast.success('Заметка опубликована');
@@ -1087,8 +1101,8 @@ const MyNotes = () => {
               <div className="relative flex-1 md:col-span-2 lg:col-span-2">
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
-                  value={searchTerm}
-                  onChange={(event) => setSearchTerm(event.target.value)}
+                  value={searchInput}
+                  onChange={(event) => setSearchInput(event.target.value)}
                   placeholder="Поиск по тексту и книгам"
                   className="pl-9"
                   aria-label="Поиск по заметкам"
