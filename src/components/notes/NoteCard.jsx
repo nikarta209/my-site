@@ -341,6 +341,7 @@ const NoteCard = ({
                 className="shadow-sm"
                 disabled={isPublishing}
                 onClick={() => onPublish(note)}
+                aria-label="Опубликовать заметку"
               >
                 <Upload className="mr-2 h-4 w-4" />
                 Опубликовать
@@ -351,6 +352,7 @@ const NoteCard = ({
                 variant="secondary"
                 disabled={isEditing}
                 onClick={() => onEdit(note)}
+                aria-label="Редактировать заметку"
               >
                 <Pencil className="mr-2 h-4 w-4" />
                 Редактировать
@@ -362,6 +364,7 @@ const NoteCard = ({
                 className={variant === 'personal' ? 'text-white/80 hover:bg-white/10 hover:text-white' : 'text-destructive'}
                 disabled={isDeleting}
                 onClick={() => onDelete(note)}
+                aria-label="Удалить заметку"
               >
                 <Trash2 className="mr-2 h-4 w-4" />
                 Удалить
@@ -378,6 +381,7 @@ const NoteCard = ({
                 onClick={() => onLikeToggle(note)}
                 aria-pressed={isLiked}
                 disabled={isLiking}
+                aria-label={isLiked ? 'Снять лайк с заметки' : 'Поставить лайк заметке'}
               >
                 <Heart className={cn('mr-2 h-4 w-4 transition-transform', isLiked ? 'fill-current' : 'fill-none')} />
                 {isLiked ? 'Снять лайк' : 'Лайк'}

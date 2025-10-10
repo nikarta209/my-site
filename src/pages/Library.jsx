@@ -4,7 +4,6 @@ import { useAuth, useSubscription } from '../components/auth/Auth';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -21,7 +20,6 @@ import {
   StickyNote,
   Calendar,
   Crown, // Добавим иконку Crown
-  Lock, // Добавим иконку Lock
   ImagePlus,
   Trash2
 } from 'lucide-react';
@@ -30,7 +28,7 @@ import { Book } from '@/api/entities'; // Добавим импорт Book
 import { useCart } from '../components/cart/CartContext';
 import { useTranslation } from '../components/i18n/SimpleI18n';
 import { createPageUrl } from '@/utils';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import {
   Dialog,
@@ -40,23 +38,60 @@ import {
   DialogHeader,
   DialogTitle
 } from '@/components/ui/dialog';
+import LibraryMenu from '@/components/library/LibraryMenu';
+
+const LIBRARY_SECTIONS = new Set(['dashboard', 'owned', 'subscription', 'previews']);
 
 export default function Library() {
   const { user, isAuthenticated } = useAuth();
   const subscription = useSubscription(); // Получаем статус подписки
   const { addToCart } = useCart();
   const { t } = useTranslation();
-  
+
+  const [searchParams, setSearchParams] = useSearchParams();
+  const sectionParam = searchParams.get('section');
+
   const [ownedBooks, setOwnedBooks] = useState([]);
   const [previewBooks, setPreviewBooks] = useState([]);
   const [recentBooks, setRecentBooks] = useState([]);
   const [userNotes, setUserNotes] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const [activeTab, setActiveTab] = useState(() => {
+    if (sectionParam && LIBRARY_SECTIONS.has(sectionParam)) {
+      return sectionParam;
+    }
+    return 'dashboard';
+  });
   const [currentRecentIndex, setCurrentRecentIndex] = useState(0);
   const [subscriptionBooks, setSubscriptionBooks] = useState([]); // Новое состояние для книг по подписке
   const [loadError, setLoadError] = useState(null);
+
+  useEffect(() => {
+    const nextTab = sectionParam && LIBRARY_SECTIONS.has(sectionParam) ? sectionParam : 'dashboard';
+    if (nextTab !== activeTab) {
+      setActiveTab(nextTab);
+    }
+  }, [sectionParam, activeTab]);
+
+  useEffect(() => {
+    const desiredParam = activeTab === 'dashboard' ? null : activeTab;
+    const currentParam = sectionParam && LIBRARY_SECTIONS.has(sectionParam) ? sectionParam : null;
+
+    if (desiredParam === currentParam) {
+      return;
+    }
+
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (desiredParam) {
+        next.set('section', desiredParam);
+      } else {
+        next.delete('section');
+      }
+      return next;
+    }, { replace: true });
+  }, [activeTab, sectionParam, setSearchParams]);
 
   const loadLibraryData = useCallback(async () => {
     setIsLoading(true);
@@ -145,33 +180,16 @@ export default function Library() {
     );
   }
 
-  const tabsData = [
-    { 
-      key: 'dashboard', 
-      label: 'Главная', 
-      icon: BookOpen, 
-      count: recentBooks.length
-    },
-    { 
-      key: 'owned', 
-      label: 'Мои книги', 
-      icon: Archive, 
-      count: ownedBooks.length
-    },
-    {
-      key: 'subscription',
-      label: 'По подписке',
-      icon: Crown,
-      count: subscriptionBooks.length,
-      isSubscription: true // Флаг для вкладки подписки
-    },
-    { 
-      key: 'previews', 
-      label: 'Превью', 
-      icon: Download, 
-      count: previewBooks.length
-    }
-  ];
+  const navigationCounts = useMemo(
+    () => ({
+      dashboard: recentBooks.length,
+      owned: ownedBooks.length,
+      subscription: subscriptionBooks.length,
+      previews: previewBooks.length,
+      notes: userNotes.length
+    }),
+    [recentBooks.length, ownedBooks.length, subscriptionBooks.length, previewBooks.length, userNotes.length]
+  );
 
   return (
     <div className="min-h-screen bg-background">
@@ -196,37 +214,13 @@ export default function Library() {
 
       <div className="container mx-auto px-4 py-4">
         {/* Tabs Navigation */}
-        <div className="flex items-center gap-1 mb-6 overflow-x-auto">
-          {tabsData.map((tab) => {
-            const Icon = tab.icon;
-            const isLocked = tab.isSubscription && !subscription.isActive;
-
-            // Не показывать неактивную вкладку, если там пусто
-            if (isLocked && tab.count === 0) return null; 
-
-            return (
-              <button
-                key={tab.key}
-                onClick={() => !isLocked && setActiveTab(tab.key)}
-                className={`flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg whitespace-nowrap transition-all duration-200 ${
-                  activeTab === tab.key && !isLocked // Только активная, если не заблокирована
-                    ? 'bg-primary text-primary-foreground shadow-md'
-                    : 'text-foreground/70 hover:text-primary hover:bg-muted/50'
-                } ${isLocked ? 'cursor-not-allowed opacity-60' : ''}`}
-              >
-                <Icon className={`w-3 h-3 ${tab.isSubscription ? 'text-yellow-500' : ''}`} />
-                {tab.label}
-                {isLocked ? (
-                  <Lock className="w-3 h-3 ml-1" /> // Показать иконку замка, если заблокировано
-                ) : tab.count > 0 && (
-                  <Badge variant="secondary" className="ml-1 text-xs">
-                    {tab.count}
-                  </Badge>
-                )}
-              </button>
-            );
-          })}
-        </div>
+        <LibraryMenu
+          activeKey={activeTab}
+          onSelect={setActiveTab}
+          counts={navigationCounts}
+          subscriptionActive={subscription.isActive}
+          className="mb-6"
+        />
 
         {/* Content */}
         <AnimatePresence mode="wait">

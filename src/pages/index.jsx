@@ -183,6 +183,7 @@ function PagesContent() {
                 <Route path="/Cart" element={<Cart />} />
                 
                 <Route path="/Library" element={<Library />} />
+                <Route path="/library/notes" element={<MyNotes />} />
                 
                 <Route path="/Reader" element={<Reader />} />
                 

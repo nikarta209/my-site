@@ -35,13 +35,24 @@ import {
   Sparkles
 } from 'lucide-react';
 import { useAuth } from '@/components/auth/Auth';
+import LibraryMenu from '@/components/library/LibraryMenu';
 import NoteCard from '@/components/notes/NoteCard';
 import { UserBookData, SharedNote, Book, NoteLike } from '@/api/entities';
 import { isSupabaseConfigured } from '@/api/supabaseClient';
 import { toast } from 'sonner';
 import { createPageUrl } from '@/utils';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 
 const PAGE_SIZE = 6;
+
+const PAGE_RANGE_OPTIONS = [
+  { value: 'all', label: 'Все страницы' },
+  { value: '1-50', label: 'Страницы 1–50' },
+  { value: '51-100', label: 'Страницы 51–100' },
+  { value: '101-200', label: 'Страницы 101–200' },
+  { value: '200+', label: 'Страницы 200+' },
+  { value: 'no-page', label: 'Без указания страницы' }
+];
 
 const PERSONAL_GRADIENTS = [
   'from-sky-500/80 via-cyan-500/70 to-emerald-400/70',
@@ -70,6 +81,29 @@ const computeAccent = (identifier = '') => {
   const normalized = identifier.toString();
   const hash = Array.from(normalized).reduce((acc, char) => acc + char.charCodeAt(0), 0);
   return PERSONAL_GRADIENTS[hash % PERSONAL_GRADIENTS.length];
+};
+
+const matchesPageFilter = (pageNumber, range) => {
+  if (range === 'all') return true;
+  if (range === 'no-page') {
+    return pageNumber == null || pageNumber === '';
+  }
+
+  if (pageNumber == null || pageNumber === '') {
+    return false;
+  }
+
+  const numeric = Number(pageNumber);
+  if (Number.isNaN(numeric)) {
+    return false;
+  }
+
+  if (range === '1-50') return numeric >= 1 && numeric <= 50;
+  if (range === '51-100') return numeric >= 51 && numeric <= 100;
+  if (range === '101-200') return numeric >= 101 && numeric <= 200;
+  if (range === '200+') return numeric >= 200;
+
+  return true;
 };
 
 const buildMockData = (user) => {
@@ -212,10 +246,16 @@ const buildMockData = (user) => {
 
 const MyNotes = () => {
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
-  const [activeTab, setActiveTab] = useState('personal');
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [activeTab, setActiveTabState] = useState(() =>
+    searchParams.get('scope') === 'published' ? 'published' : 'personal'
+  );
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedBook, setSelectedBook] = useState('all');
   const [dateRange, setDateRange] = useState('all');
+  const [pageRange, setPageRange] = useState('all');
+  const [selectedTag, setSelectedTag] = useState('all');
   const [sortBy, setSortBy] = useState({ personal: 'newest', published: 'newest' });
   const [pagination, setPagination] = useState({ personal: 1, published: 1 });
   const [personalNotes, setPersonalNotes] = useState([]);
@@ -237,6 +277,44 @@ const MyNotes = () => {
     like: new Set(),
     unpublish: new Set()
   });
+  const scopeParam = searchParams.get('scope');
+
+  useEffect(() => {
+    const nextTab = scopeParam === 'published' ? 'published' : 'personal';
+    if (nextTab !== activeTab) {
+      setActiveTabState(nextTab);
+    }
+  }, [scopeParam, activeTab]);
+
+  useEffect(() => {
+    const desiredScope = activeTab === 'published' ? 'published' : 'private';
+    if (scopeParam !== desiredScope) {
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev);
+        next.set('scope', desiredScope);
+        return next;
+      }, { replace: true });
+    }
+  }, [activeTab, scopeParam, setSearchParams]);
+
+  const handleTabChange = useCallback((value) => {
+    setActiveTabState(value === 'published' ? 'published' : 'personal');
+  }, []);
+
+  const handleLibraryMenuSelect = useCallback(
+    (key) => {
+      const basePath = createPageUrl('Library');
+      const params = new URLSearchParams();
+
+      if (key && key !== 'dashboard') {
+        params.set('section', key);
+      }
+
+      const target = params.toString() ? `${basePath}?${params.toString()}` : basePath;
+      navigate(target);
+    },
+    [navigate]
+  );
 
   const accentGradient = useMemo(() => computeAccent(user?.email || user?.id || ''), [user?.email, user?.id]);
 
@@ -407,7 +485,16 @@ const MyNotes = () => {
 
   useEffect(() => {
     setPagination((prev) => ({ ...prev, [activeTab]: 1 }));
-  }, [activeTab, searchTerm, selectedBook, dateRange, sortBy.personal, sortBy.published]);
+  }, [
+    activeTab,
+    searchTerm,
+    selectedBook,
+    dateRange,
+    pageRange,
+    selectedTag,
+    sortBy.personal,
+    sortBy.published
+  ]);
 
   const filteredPersonalNotes = useMemo(() => {
     const search = searchTerm.trim().toLowerCase();
@@ -435,6 +522,19 @@ const MyNotes = () => {
         }
       }
 
+      if (pageRange !== 'all') {
+        if (!matchesPageFilter(note.pageNumber, pageRange)) {
+          return false;
+        }
+      }
+
+      if (selectedTag !== 'all') {
+        const tags = Array.isArray(note.tags) ? note.tags : [];
+        if (!tags.some((tag) => tag?.toLowerCase() === selectedTag.toLowerCase())) {
+          return false;
+        }
+      }
+
       return true;
     });
 
@@ -454,7 +554,7 @@ const MyNotes = () => {
       }
       return 0;
     });
-  }, [personalNotes, searchTerm, selectedBook, dateRange, sortBy.personal]);
+  }, [personalNotes, searchTerm, selectedBook, dateRange, pageRange, selectedTag, sortBy.personal]);
 
   const filteredPublishedNotes = useMemo(() => {
     const search = searchTerm.trim().toLowerCase();
@@ -482,6 +582,19 @@ const MyNotes = () => {
         }
       }
 
+      if (pageRange !== 'all') {
+        if (!matchesPageFilter(note.pageNumber, pageRange)) {
+          return false;
+        }
+      }
+
+      if (selectedTag !== 'all') {
+        const tags = Array.isArray(note.tags) ? note.tags : [];
+        if (!tags.some((tag) => tag?.toLowerCase() === selectedTag.toLowerCase())) {
+          return false;
+        }
+      }
+
       return true;
     });
 
@@ -501,7 +614,7 @@ const MyNotes = () => {
       }
       return 0;
     });
-  }, [publishedNotes, searchTerm, selectedBook, dateRange, sortBy.published]);
+  }, [publishedNotes, searchTerm, selectedBook, dateRange, pageRange, selectedTag, sortBy.published]);
 
   const paginatedPersonalNotes = useMemo(() => {
     const start = (pagination.personal - 1) * PAGE_SIZE;
@@ -526,10 +639,31 @@ const MyNotes = () => {
     return Array.from(map.entries()).sort((a, b) => a[1].localeCompare(b[1], 'ru'));
   }, [personalNotes, publishedNotes]);
 
+  const availableTags = useMemo(() => {
+    const tags = new Set();
+    [...personalNotes, ...publishedNotes].forEach((note) => {
+      (note.tags || []).forEach((tag) => {
+        if (tag) {
+          tags.add(tag);
+        }
+      });
+    });
+    return Array.from(tags).sort((a, b) => a.localeCompare(b, 'ru'));
+  }, [personalNotes, publishedNotes]);
+
+  const notesMenuCounts = useMemo(
+    () => ({
+      notes: personalNotes.length + publishedNotes.length
+    }),
+    [personalNotes.length, publishedNotes.length]
+  );
+
   const resetFilters = () => {
     setSearchTerm('');
     setSelectedBook('all');
     setDateRange('all');
+    setPageRange('all');
+    setSelectedTag('all');
     setSortBy({ personal: 'newest', published: 'newest' });
     setPagination({ personal: 1, published: 1 });
   };
@@ -791,6 +925,9 @@ const MyNotes = () => {
             </div>
           </div>
         </div>
+        <div className="container mx-auto px-4 py-4">
+          <LibraryMenu activeKey="notes" counts={notesMenuCounts} onSelect={handleLibraryMenuSelect} />
+        </div>
         <div className="container mx-auto px-4 py-10">
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             {Array.from({ length: 6 }).map((_, index) => (
@@ -820,6 +957,9 @@ const MyNotes = () => {
               Собирайте мысли по книгам и делитесь ими с другими читателями.
             </p>
           </div>
+        </div>
+        <div className="container mx-auto px-4 py-4">
+          <LibraryMenu activeKey="notes" counts={notesMenuCounts} onSelect={handleLibraryMenuSelect} />
         </div>
         <div className="container mx-auto flex flex-col items-center gap-6 px-4 py-16 text-center">
           <Heart className="h-12 w-12 text-muted-foreground" />
@@ -917,8 +1057,16 @@ const MyNotes = () => {
         </div>
       </div>
 
+      <div className="container mx-auto px-4 py-4">
+        <LibraryMenu
+          activeKey="notes"
+          onSelect={handleLibraryMenuSelect}
+          counts={notesMenuCounts}
+        />
+      </div>
+
       <div className="container mx-auto px-4 py-8">
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
           <TabsList className="w-full max-w-xl justify-start bg-muted/40">
             <TabsTrigger value="personal" className="flex flex-1 items-center justify-center gap-2">
               <span className="font-semibold">Личные</span>
@@ -935,8 +1083,8 @@ const MyNotes = () => {
           </TabsList>
 
           <div className="mt-6 flex flex-col gap-4 rounded-xl border border-border/70 bg-card/60 p-4 shadow-sm backdrop-blur">
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-              <div className="relative flex-1 md:col-span-2">
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+              <div className="relative flex-1 md:col-span-2 lg:col-span-2">
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   value={searchTerm}
@@ -948,7 +1096,7 @@ const MyNotes = () => {
               </div>
 
               <Select value={selectedBook} onValueChange={setSelectedBook}>
-                <SelectTrigger className="w-full">
+                <SelectTrigger className="w-full" aria-label="Фильтр по книге">
                   <SelectValue placeholder="Все книги" />
                 </SelectTrigger>
                 <SelectContent>
@@ -962,7 +1110,7 @@ const MyNotes = () => {
               </Select>
 
               <Select value={dateRange} onValueChange={setDateRange}>
-                <SelectTrigger className="w-full">
+                <SelectTrigger className="w-full" aria-label="Фильтр по дате">
                   <SelectValue placeholder="За всё время" />
                 </SelectTrigger>
                 <SelectContent>
@@ -970,6 +1118,33 @@ const MyNotes = () => {
                   <SelectItem value="7">Последние 7 дней</SelectItem>
                   <SelectItem value="30">Последние 30 дней</SelectItem>
                   <SelectItem value="90">Последние 90 дней</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Select value={pageRange} onValueChange={setPageRange}>
+                <SelectTrigger className="w-full" aria-label="Фильтр по страницам">
+                  <SelectValue placeholder="Все страницы" />
+                </SelectTrigger>
+                <SelectContent>
+                  {PAGE_RANGE_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Select value={selectedTag} onValueChange={setSelectedTag}>
+                <SelectTrigger className="w-full" aria-label="Фильтр по тегам">
+                  <SelectValue placeholder="Все теги" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Все теги</SelectItem>
+                  {availableTags.map((tag) => (
+                    <SelectItem key={tag} value={tag}>
+                      {tag}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -984,7 +1159,7 @@ const MyNotes = () => {
                   </span>{' '}
                   заметок
                 </span>
-                {(searchTerm || selectedBook !== 'all' || dateRange !== 'all') && (
+                {(searchTerm || selectedBook !== 'all' || dateRange !== 'all' || pageRange !== 'all' || selectedTag !== 'all') && (
                   <Button variant="link" className="text-xs" onClick={resetFilters}>
                     Сбросить фильтры
                   </Button>
@@ -1020,10 +1195,10 @@ const MyNotes = () => {
                 <CardContent className="flex flex-col gap-3 p-6">
                   <div className="flex items-center gap-3 text-destructive">
                     <AlertCircle className="h-5 w-5" />
-                    <p className="font-semibold">Не удалось загрузить личные заметки</p>
+                    <p className="font-semibold">Не удалось загрузить заметки.</p>
                   </div>
                   <Button variant="outline" onClick={loadNotes} className="self-start">
-                    Повторить попытку
+                    Повторить
                   </Button>
                 </CardContent>
               </Card>
@@ -1034,13 +1209,13 @@ const MyNotes = () => {
                 <CardContent className="flex flex-col items-center gap-4 p-10 text-center">
                   <Sparkles className="h-10 w-10 text-muted-foreground" />
                   <div className="space-y-2">
-                    <h3 className="text-xl font-semibold text-foreground">Личных заметок пока нет</h3>
+                    <h3 className="text-xl font-semibold text-foreground">У вас пока нет заметок.</h3>
                     <p className="text-sm text-muted-foreground">
-                      Читайте книги в ридере и фиксируйте мысли — заметки останутся только у вас, пока вы не решите поделиться.
+                      Начните читать книгу и добавляйте мысли по ходу чтения.
                     </p>
                   </div>
                   <Button onClick={() => (window.location.href = createPageUrl('Library'))}>
-                    Открыть библиотеку
+                    Перейти в Мои книги
                   </Button>
                 </CardContent>
               </Card>
@@ -1073,12 +1248,12 @@ const MyNotes = () => {
                 <CardContent className="flex flex-col items-center gap-4 p-10 text-center">
                   <Sparkles className="h-10 w-10 text-muted-foreground" />
                   <div className="space-y-2">
-                    <h3 className="text-xl font-semibold text-foreground">Вы еще не публиковали заметки</h3>
+                    <h3 className="text-xl font-semibold text-foreground">Вы ещё не публиковали заметки</h3>
                     <p className="text-sm text-muted-foreground">
                       Публикуйте лучшие мысли — они появятся в общей ленте и смогут собрать лайки.
                     </p>
                   </div>
-                  <Button onClick={() => setActiveTab('personal')}>Перейти к личным заметкам</Button>
+                  <Button onClick={() => handleTabChange('personal')}>Открыть личные заметки</Button>
                 </CardContent>
               </Card>
             ) : (
