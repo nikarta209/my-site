@@ -52,7 +52,7 @@ export default function Layout({ children, currentPageName }) {
                 currentPageName={currentPageName}
                 onLoginClick={() => setAuthOpen(true)}
               />
-              <SubNavigation />
+              {currentPageName?.toLowerCase() === 'home' && <SubNavigation />}
               
               <main className="flex-1 mobile-safe-bottom">
                 <AnimatePresence mode="wait" initial={false}>

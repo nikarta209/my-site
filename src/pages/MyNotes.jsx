@@ -1203,7 +1203,7 @@ const MyNotes = () => {
             </div>
           </div>
 
-          <TabsContent value="personal" className="mt-6 space-y-8">
+          <TabsContent value="personal" forceMount className="mt-6 space-y-8">
             {loadError && (
               <Card className="border-destructive/40 bg-destructive/10">
                 <CardContent className="flex flex-col gap-3 p-6">
@@ -1256,7 +1256,7 @@ const MyNotes = () => {
             )}
           </TabsContent>
 
-          <TabsContent value="published" className="mt-6 space-y-8">
+          <TabsContent value="published" forceMount className="mt-6 space-y-8">
             {paginatedPublishedNotes.length === 0 && !isLoading ? (
               <Card className="border-dashed border-border/70 bg-card/70">
                 <CardContent className="flex flex-col items-center gap-4 p-10 text-center">
