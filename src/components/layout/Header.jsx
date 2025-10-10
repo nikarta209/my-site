@@ -24,7 +24,8 @@ import {
   Home,
   Brain,
   Library,
-  Users
+  Users,
+  NotebookPen
 } from 'lucide-react';
 import { useAuth } from '../auth/Auth';
 import { useCart } from '../cart/CartContext';
@@ -249,6 +250,17 @@ export default function Header({ currentPageName, onLoginClick }) {
               </Link>
             )}
 
+            {isAuthenticated && (
+              <Link
+                to={createPageUrl('MyNotes')}
+                className={`flex items-center gap-1 text-xs font-medium transition-colors hover:text-primary px-2 py-1 ${
+                  currentPageName === 'MyNotes' ? 'text-primary' : 'text-foreground'
+                }`}
+              >
+                <NotebookPen className="w-3 h-3" /> Мои заметки
+              </Link>
+            )}
+
             {/* Existing Notes Feed Link */}
             <Link
               to={createPageUrl('NotesFeed')}
@@ -310,7 +322,14 @@ export default function Header({ currentPageName, onLoginClick }) {
                       Мой профиль
                     </Link>
                   </DropdownMenuItem>
-                  
+
+                  <DropdownMenuItem asChild>
+                    <Link to={createPageUrl('MyNotes')} className="flex items-center text-foreground hover:text-primary text-sm">
+                      <NotebookPen className="w-3 h-3 mr-2" />
+                      Мои заметки
+                    </Link>
+                  </DropdownMenuItem>
+
                   <DropdownMenuItem asChild>
                     <Link to={createPageUrl('ReferralDashboard')} className="flex items-center text-foreground hover:text-primary text-sm">
                       <Users className="w-3 h-3 mr-2" />

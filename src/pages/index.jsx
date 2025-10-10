@@ -55,6 +55,7 @@ import PlatformCapabilities from "./PlatformCapabilities";
 import NoteFeed from "./NoteFeed";
 
 import NotesFeed from "./NotesFeed";
+import MyNotes from "./MyNotes";
 
 import AuthorPanelRedesign from "./AuthorPanelRedesign";
 
@@ -127,6 +128,7 @@ const PAGES = {
     NoteFeed: NoteFeed,
     
     NotesFeed: NotesFeed,
+    MyNotes: MyNotes,
     
     AuthorPanelRedesign: AuthorPanelRedesign,
     
@@ -222,6 +224,7 @@ function PagesContent() {
                 <Route path="/NoteFeed" element={<NoteFeed />} />
                 
                 <Route path="/NotesFeed" element={<NotesFeed />} />
+                <Route path="/MyNotes" element={<MyNotes />} />
                 
                 <Route path="/AuthorPanelRedesign" element={<AuthorPanelRedesign />} />
                 
