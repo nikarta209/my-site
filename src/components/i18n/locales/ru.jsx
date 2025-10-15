@@ -6,10 +6,18 @@ export const ru = {
     library: 'Библиотека',
     cart: 'Корзина',
     authorPanel: 'Панель автора',
+    moderationPanel: 'Панель модерации',
+    adminPanel: 'Панель администратора',
+    referralProgram: 'Реферальная программа',
+    becomeAuthor: 'Стать автором',
+    notesFeed: 'Лента заметок',
+    notifications: 'Уведомления',
+    themeToggle: 'Переключить тему',
     searchPlaceholder: 'Поиск книг, авторов...',
     login: 'Войти',
     logout: 'Выйти',
     profile: 'Профиль',
+    myProfile: 'Мой профиль',
     myAccount: 'Мой аккаунт'
   },
 
@@ -18,6 +26,8 @@ export const ru = {
     home: 'Главная',
     catalog: 'Каталог',
     library: 'Библиотека',
+    reader: 'Читалка',
+    feed: 'Лента заметок',
     cart: 'Корзина',
     profile: 'Профиль'
   },

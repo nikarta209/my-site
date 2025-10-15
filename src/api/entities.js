@@ -1,5 +1,6 @@
 import supabase, { isSupabaseConfigured } from './supabaseClient';
 import { toast } from 'sonner';
+import { translateBookCollection, translateBookRecord } from '@/lib/i18n/bookTranslation';
 
 const TABLES = {
   Book: 'books',
@@ -133,6 +134,22 @@ const createEntity = (tableName) => {
 
   const selectQuery = () => supabase.from(table).select('*');
 
+  const translateResult = async (data) => {
+    if (tableName !== 'Book') {
+      return data;
+    }
+
+    if (Array.isArray(data)) {
+      return translateBookCollection(data);
+    }
+
+    if (!data) {
+      return data;
+    }
+
+    return translateBookRecord(data);
+  };
+
   return {
     async list(orderBy = '-created_at', limit, offset) {
       let query = selectQuery();
@@ -140,7 +157,7 @@ const createEntity = (tableName) => {
       query = applyRange(query, limit, offset);
       const { data, error } = await query;
       handleQueryError(error, `${tableName}.list`);
-      return data || [];
+      return await translateResult(data || []);
     },
     async filter(filters = {}, orderBy = '-created_at', limit, offset) {
       let query = selectQuery();
@@ -149,22 +166,22 @@ const createEntity = (tableName) => {
       query = applyRange(query, limit, offset);
       const { data, error } = await query;
       handleQueryError(error, `${tableName}.filter`);
-      return data || [];
+      return await translateResult(data || []);
     },
     async get(id) {
       const { data, error } = await selectQuery().eq('id', id).maybeSingle();
       handleQueryError(error, `${tableName}.get`);
-      return data;
+      return await translateResult(data);
     },
     async create(payload) {
       const { data, error } = await supabase.from(table).insert(payload).select().maybeSingle();
       handleQueryError(error, `${tableName}.create`);
-      return data;
+      return await translateResult(data);
     },
     async update(id, payload) {
       const { data, error } = await supabase.from(table).update(payload).eq('id', id).select().maybeSingle();
       handleQueryError(error, `${tableName}.update`);
-      return data;
+      return await translateResult(data);
     },
     async delete(id) {
       const { error } = await supabase.from(table).delete().eq('id', id);

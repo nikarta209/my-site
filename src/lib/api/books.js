@@ -1,5 +1,6 @@
 import { supabase, isSupabaseConfigured } from '@/api/supabaseClient';
 import { logError } from '@/lib/logger';
+import { translateBookCollection } from '@/lib/i18n/bookTranslation';
 
 export const BOOK_FIELDS = [
   'id',
@@ -98,7 +99,8 @@ export const fetchBestsellers = async (limit = 12) => {
     if (error) throw error;
 
     const books = normalizeBooks(data);
-    return books.slice(0, limit);
+    const translated = await translateBookCollection(books);
+    return translated.slice(0, limit);
   } catch (error) {
     logError('books.fetchBestsellers', error);
   }
@@ -115,7 +117,8 @@ export const fetchBestsellers = async (limit = 12) => {
     if (fallbackError) throw fallbackError;
 
     const books = normalizeBooks(data);
-    return books.slice(0, limit);
+    const translated = await translateBookCollection(books);
+    return translated.slice(0, limit);
   } catch (fallbackError) {
     logError('books.fetchBestsellers.fallback', fallbackError);
     return [];
@@ -141,6 +144,8 @@ export const fetchHomeBooks = async () => {
       return [];
     }
 
+    const translatedBooks = await translateBookCollection(books);
+
     try {
       const { data: bestsellerStats, error: statsError } = await supabase
         .from('bestsellers_view')
@@ -151,7 +156,7 @@ export const fetchHomeBooks = async () => {
       if (Array.isArray(bestsellerStats) && bestsellerStats.length > 0) {
         const byId = new Map(bestsellerStats.map((entry) => [String(entry.id), entry]));
 
-        return books.map((book) => {
+        return translatedBooks.map((book) => {
           const stats = byId.get(book.id);
           if (!stats) return book;
 
@@ -169,7 +174,7 @@ export const fetchHomeBooks = async () => {
       logError('books.fetchHomeBooks.merge', mergeError);
     }
 
-    return books;
+    return translatedBooks;
   } catch (error) {
     logError('books.fetchHomeBooks', error);
     return [];
@@ -195,7 +200,8 @@ export const fetchBooksByIds = async (ids = []) => {
 
     if (error) throw error;
 
-    return normalizeBooks(data);
+    const books = normalizeBooks(data);
+    return translateBookCollection(books);
   } catch (error) {
     logError('books.fetchBooksByIds', error);
     return [];

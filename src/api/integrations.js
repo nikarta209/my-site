@@ -1,5 +1,4 @@
 import supabase, { supabaseStorageBucket } from './supabaseClient';
-import { Book } from './entities';
 
 const bucket = supabaseStorageBucket;
 
@@ -48,12 +47,26 @@ export const CreateFileSignedUrl = async ({ path, expiresIn = 3600 }) => {
   return { signedUrl: data?.signedUrl || null };
 };
 
+const loadBookEntity = async () => {
+  try {
+    const module = await import('./entities');
+    return module?.Book || null;
+  } catch (error) {
+    console.warn('[InvokeLLM] Failed to load Book entity', error);
+    return null;
+  }
+};
+
 export const InvokeLLM = async ({ prompt = '', bookId, context } = {}) => {
   const trimmedPrompt = prompt.trim();
   let book = null;
+
   if (bookId) {
     try {
-      book = await Book.get(bookId);
+      const Book = await loadBookEntity();
+      if (Book) {
+        book = await Book.get(bookId);
+      }
     } catch (error) {
       console.warn('[InvokeLLM] Failed to load book', bookId, error);
     }
@@ -64,15 +77,7 @@ export const InvokeLLM = async ({ prompt = '', bookId, context } = {}) => {
     ? `Вот краткое описание книги "${book.title}": ${summary}`
     : `AI-ответ: ${trimmedPrompt || 'запрос без текста'}.`;
 
-  return {
-    success: true,
-    result: responseText,
-    metadata: {
-      source: 'supabase-local-llm',
-      bookId: book?.id || null,
-      context
-    }
-  };
+  return responseText;
 };
 
 export const SendEmail = async ({ to, subject, body }) => {
