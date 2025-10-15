@@ -1,13 +1,14 @@
-'use client';
+"use client";
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import HeroSlide from './HeroSlide';
-import { HERO_TABS } from '@/lib/banners';
+import { HERO_TAB_ORDER, HERO_TABS } from '@/lib/banners';
 import { fetchBestsellers } from '@/lib/api/books';
 import { useTranslation } from '@/components/i18n/SimpleI18n';
+import { useCart } from '@/components/cart/CartContext';
 
-const AUTO_DELAY = 7000;
+const HERO_ROTATION_INTERVAL = 7000;
 
 const chunkArray = (items, chunkSize) => {
   if (!Array.isArray(items) || chunkSize <= 0) return [];
@@ -25,6 +26,7 @@ export default function HeroTabs() {
   const [isPaused, setIsPaused] = useState(false);
   const tabListRef = useRef(null);
   const touchStartX = useRef(null);
+  const { addToCart } = useCart();
 
   useEffect(() => {
     let mounted = true;
@@ -35,7 +37,9 @@ export default function HeroTabs() {
         }
       })
       .catch((error) => {
-        console.error('[HeroTabs] Failed to load bestsellers', error);
+        if (typeof console !== 'undefined') {
+          console.error('[HeroTabs] Failed to load bestsellers', error);
+        }
       });
     return () => {
       mounted = false;
@@ -44,28 +48,33 @@ export default function HeroTabs() {
 
   const bookChunks = useMemo(() => chunkArray(bestsellers, 3), [bestsellers]);
 
-  const slides = useMemo(
-    () =>
-      HERO_TABS.map((tab) =>
-        tab.type === 'books'
-          ? {
-              ...tab,
-              title: t(tab.titleKey),
-              books: bookChunks[tab.chunkIndex] || [],
-            }
-          : {
-              ...tab,
-              title: t(tab.titleKey),
-            }
-      ),
-    [bookChunks, t]
-  );
+  const slides = useMemo(() => {
+    const tabMap = new Map(HERO_TABS.map((tab) => [tab.id, tab]));
+
+    return HERO_TAB_ORDER.map((tabId) => {
+      const tab = tabMap.get(tabId);
+      if (!tab) return null;
+
+      if (tab.type === 'books') {
+        return {
+          ...tab,
+          title: t(tab.titleKey),
+          books: bookChunks[tab.chunkIndex] || [],
+        };
+      }
+
+      return {
+        ...tab,
+        title: t(tab.titleKey),
+      };
+    }).filter(Boolean);
+  }, [bookChunks, t]);
 
   useEffect(() => {
-    if (isPaused) return undefined;
+    if (isPaused || slides.length === 0) return undefined;
     const id = window.setInterval(() => {
       setActiveIndex((prev) => (prev + 1) % slides.length);
-    }, AUTO_DELAY);
+    }, HERO_ROTATION_INTERVAL);
     return () => window.clearInterval(id);
   }, [isPaused, slides.length]);
 
@@ -125,6 +134,13 @@ export default function HeroTabs() {
 
   const activeSlide = slides[activeIndex] ?? slides[0];
 
+  const handleAddToCart = useCallback(
+    (book) => {
+      addToCart(book);
+    },
+    [addToCart],
+  );
+
   return (
     <section
       className="relative mx-auto w-full max-w-6xl"
@@ -171,7 +187,7 @@ export default function HeroTabs() {
               aria-labelledby={`hero-tab-${activeSlide.id}`}
               className="focus:outline-none"
             >
-              <HeroSlide slide={activeSlide} />
+              <HeroSlide slide={activeSlide} onAddToCart={handleAddToCart} />
             </div>
           )}
         </AnimatePresence>

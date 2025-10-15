@@ -40,3 +40,5 @@ export const HERO_TABS = [
     chunkIndex: 2,
   },
 ];
+
+export const HERO_TAB_ORDER = HERO_TABS.map((tab) => tab.id);

@@ -1,11 +1,5 @@
 import { supabase, isSupabaseConfigured } from '@/api/supabaseClient';
 
-const logError = (scope, error) => {
-  if (typeof console !== 'undefined') {
-    console.error(`[booksApi] ${scope}`, error);
-  }
-};
-
 const BOOK_FIELDS = [
   'id',
   'title',
@@ -36,33 +30,59 @@ const BOOK_FIELDS = [
   'published_at',
   'released_at',
   'release_date',
-  'preview_available'
+  'preview_available',
 ]
   .filter(Boolean)
   .join(',');
 
-const ensureCover = (book) =>
-  book && (book.cover_url || (book.cover_images && Object.values(book.cover_images || {}).some(Boolean)));
+const logError = (scope, error) => {
+  if (typeof console !== 'undefined') {
+    console.error(`[booksApi] ${scope}`, error);
+  }
+};
 
-const pickTopWithCover = (data = []) => data.filter(ensureCover);
+const ensureArray = (value) => (Array.isArray(value) ? value : []);
 
-const normalizeBook = (book) => ({
-  ...book,
-  id: String(book.id),
-  genres: Array.isArray(book.genres)
+const hasCover = (book) => {
+  if (!book) return false;
+  if (book.cover_url) return true;
+  const coverImages = book.cover_images || book.coverImages;
+  return Boolean(coverImages && Object.values(coverImages).some(Boolean));
+};
+
+const normalizeBook = (book) => {
+  if (!book) return null;
+
+  const genres = Array.isArray(book.genres)
     ? book.genres
     : book.genre
       ? [book.genre]
-      : [],
-  languages: Array.isArray(book.languages) ? book.languages : [],
-  weekly_sales: typeof book.weekly_sales === 'number'
-    ? book.weekly_sales
-    : book.sales_count || 0,
-  total_sales: typeof book.total_sales === 'number'
-    ? book.total_sales
-    : book.sales_count || 0,
-  rating: typeof book.rating === 'number' ? book.rating : Number(book.rating) || 0,
-});
+      : [];
+
+  const languages = ensureArray(book.languages);
+
+  return {
+    ...book,
+    id: String(book.id),
+    genres,
+    languages,
+    weekly_sales:
+      typeof book.weekly_sales === 'number'
+        ? book.weekly_sales
+        : typeof book.sales_count === 'number'
+          ? book.sales_count
+          : 0,
+    total_sales:
+      typeof book.total_sales === 'number'
+        ? book.total_sales
+        : typeof book.sales_count === 'number'
+          ? book.sales_count
+          : 0,
+    rating: typeof book.rating === 'number' ? book.rating : Number(book.rating) || 0,
+  };
+};
+
+const normalizeBooks = (books) => ensureArray(books).map(normalizeBook).filter(hasCover);
 
 export const fetchBestsellers = async (limit = 12) => {
   if (!isSupabaseConfigured) {
@@ -72,14 +92,14 @@ export const fetchBestsellers = async (limit = 12) => {
   try {
     const { data, error } = await supabase
       .from('bestsellers_view')
-      .select('*')
-      .not('cover_url', 'is', null)
+      .select(BOOK_FIELDS)
       .order('weekly_sales', { ascending: false })
       .order('rating', { ascending: false })
-      .limit(limit);
+      .limit(limit * 2);
 
     if (error) throw error;
-    return pickTopWithCover((data || []).map(normalizeBook));
+
+    return normalizeBooks(data).slice(0, limit);
   } catch (error) {
     logError('fetchBestsellers', error);
 
@@ -90,10 +110,10 @@ export const fetchBestsellers = async (limit = 12) => {
         .eq('status', 'approved')
         .order('sales_count', { ascending: false })
         .order('rating', { ascending: false })
-        .limit(limit * 2);
+        .limit(limit * 3);
 
       if (booksError) throw booksError;
-      return pickTopWithCover((data || []).map(normalizeBook)).slice(0, limit);
+      return normalizeBooks(data).slice(0, limit);
     } catch (fallbackError) {
       logError('fetchBestsellers:fallback', fallbackError);
       return [];
@@ -107,14 +127,11 @@ export const fetchHomeBooks = async () => {
   }
 
   try {
-    const { data, error } = await supabase
-      .from('books')
-      .select(BOOK_FIELDS)
-      .eq('status', 'approved');
+    const { data, error } = await supabase.from('books').select(BOOK_FIELDS).eq('status', 'approved');
 
     if (error) throw error;
 
-    const books = (data || []).map(normalizeBook);
+    const books = normalizeBooks(data);
 
     try {
       const { data: bestsellerData, error: bestsellerError } = await supabase
@@ -122,14 +139,20 @@ export const fetchHomeBooks = async () => {
         .select('id, weekly_sales, total_sales, rating');
 
       if (!bestsellerError && Array.isArray(bestsellerData)) {
-        const byId = new Map(bestsellerData.map((entry) => [String(entry.id), entry]));
+        const statsById = new Map(bestsellerData.map((entry) => [String(entry.id), entry]));
+
         return books.map((book) => {
-          const stats = byId.get(book.id);
-          if (!stats) return book;
+          const stats = statsById.get(book.id);
+          if (!stats) {
+            return book;
+          }
+
           return {
             ...book,
-            weekly_sales: typeof stats.weekly_sales === 'number' ? stats.weekly_sales : book.weekly_sales,
-            total_sales: typeof stats.total_sales === 'number' ? stats.total_sales : book.total_sales,
+            weekly_sales:
+              typeof stats.weekly_sales === 'number' ? stats.weekly_sales : book.weekly_sales,
+            total_sales:
+              typeof stats.total_sales === 'number' ? stats.total_sales : book.total_sales,
             rating: typeof stats.rating === 'number' ? stats.rating : book.rating,
           };
         });
@@ -146,18 +169,18 @@ export const fetchHomeBooks = async () => {
 };
 
 export const fetchBooksByIds = async (ids = []) => {
-  if (!isSupabaseConfigured || !Array.isArray(ids) || ids.length === 0) {
+  const idsArray = ensureArray(ids).map((id) => String(id).trim()).filter(Boolean);
+
+  if (!isSupabaseConfigured || idsArray.length === 0) {
     return [];
   }
 
   try {
-    const { data, error } = await supabase
-      .from('books')
-      .select(BOOK_FIELDS)
-      .in('id', ids);
+    const { data, error } = await supabase.from('books').select(BOOK_FIELDS).in('id', idsArray);
 
     if (error) throw error;
-    return (data || []).map(normalizeBook);
+
+    return normalizeBooks(data);
   } catch (error) {
     logError('fetchBooksByIds', error);
     return [];

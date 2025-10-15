@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { Star, ShoppingBag, Flame, Crown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -53,20 +53,36 @@ const getCover = (book) => {
   );
 };
 
-export default function BookCard({ book, size = 's' }) {
+export default function BookCard({ book, size = 's', onAddToCart, onOpen }) {
   const { addToCart } = useCart();
   const { t } = useTranslation();
   const config = sizeClasses[size] || sizeClasses.s;
   const coverSrc = getCover(book) || `https://picsum.photos/seed/${book?.id || 'kasbook'}/400/600`;
   const detailHref = createPageUrl(`BookDetails?id=${book.id}`);
-  const readerHref = createPageUrl(`Reader?id=${book.id}`);
+  const readerHref = createPageUrl(`Reader?bookId=${book.id}`);
   const showCartButton = !book.is_free && !book.is_owned && !book.is_subscription_only;
+
+  const handleOpen = useCallback(() => {
+    if (typeof onOpen === 'function') {
+      onOpen(book);
+    }
+  }, [book, onOpen]);
+
+  const handleAddToCart = useCallback(() => {
+    if (typeof onAddToCart === 'function') {
+      onAddToCart(book);
+      return;
+    }
+
+    // NOTE: Fallback to the cart context to keep legacy behaviour when no handler is provided.
+    addToCart(book);
+  }, [addToCart, book, onAddToCart]);
 
   return (
     <article
       className={`${config.wrapper} group relative flex h-full flex-col overflow-hidden rounded-3xl border border-border/60 bg-gradient-to-br ${pickGradient(book)} p-3 shadow-sm transition hover:-translate-y-1 hover:shadow-lg`}
     >
-      <Link to={detailHref} className="relative block overflow-hidden rounded-2xl">
+      <Link to={detailHref} className="relative block overflow-hidden rounded-2xl" onClick={handleOpen}>
         <img
           src={coverSrc}
           alt={book.title}
@@ -116,7 +132,7 @@ export default function BookCard({ book, size = 's' }) {
               size="sm"
               variant="secondary"
               className="flex items-center gap-1"
-              onClick={() => addToCart(book)}
+              onClick={handleAddToCart}
             >
               <ShoppingBag className="h-4 w-4" />
               <span>{t('home.cards.addToCart')}</span>

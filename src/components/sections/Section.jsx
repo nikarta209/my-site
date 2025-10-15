@@ -4,21 +4,32 @@ import { ArrowRight } from 'lucide-react';
 import BooksMasonry from '@/components/books/BooksMasonry';
 import { createPageUrl } from '@/utils';
 import { useTranslation } from '@/components/i18n/SimpleI18n';
+import { cn } from '@/lib/utils';
 
-export default function Section({ title, description, viewAllHref, books, isLoading }) {
+export default function Section({
+  title,
+  description,
+  viewAllHref,
+  books = [],
+  isLoading = false,
+  children,
+  className,
+  onAddToCart,
+  onOpen,
+}) {
   const { t } = useTranslation();
+  const viewAllUrl = viewAllHref ? createPageUrl(viewAllHref) : null;
+
   return (
-    <section className="space-y-4 rounded-3xl bg-card/40 p-4 shadow-sm ring-1 ring-border/40">
+    <section className={cn('space-y-4 rounded-3xl bg-card/40 p-4 shadow-sm ring-1 ring-border/40', className)}>
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-xl font-semibold text-foreground md:text-2xl">{title}</h2>
-          {description && (
-            <p className="text-sm text-muted-foreground">{description}</p>
-          )}
+          {description && <p className="text-sm text-muted-foreground">{description}</p>}
         </div>
-        {viewAllHref && (
+        {viewAllUrl && (
           <Link
-            to={createPageUrl(viewAllHref)}
+            to={viewAllUrl}
             className="inline-flex items-center gap-2 text-sm font-medium text-primary transition hover:text-primary/80"
           >
             <span>{t('home.sections.viewAll')}</span>
@@ -26,7 +37,14 @@ export default function Section({ title, description, viewAllHref, books, isLoad
           </Link>
         )}
       </div>
-      <BooksMasonry books={books} isLoading={isLoading} />
+      {children ?? (
+        <BooksMasonry
+          books={books}
+          isLoading={isLoading}
+          onAddToCart={onAddToCart}
+          onOpen={onOpen}
+        />
+      )}
     </section>
   );
 }

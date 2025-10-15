@@ -9,18 +9,21 @@ const PATTERNS = [
   ['m', 's', 'l', 's', 'm', 's'],
 ];
 
-const skeletonCount = 8;
+const SKELETON_COUNT = 8;
 
-export default function BooksMasonry({ books = [], isLoading = false }) {
+export default function BooksMasonry({ books = [], isLoading = false, onAddToCart, onOpen }) {
   const { t } = useTranslation();
-  const pattern = useMemo(() => PATTERNS[Math.floor(Math.random() * PATTERNS.length)], [books.length]);
+  const pattern = useMemo(
+    () => PATTERNS[Math.floor(Math.random() * PATTERNS.length)],
+    [books.length],
+  );
 
   if (isLoading) {
     return (
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
-        {Array.from({ length: skeletonCount }).map((_, index) => (
+      <div className="grid auto-rows-[minmax(0,1fr)] grid-cols-2 gap-4 sm:grid-cols-2 md:grid-cols-4 xl:grid-cols-6">
+        {Array.from({ length: SKELETON_COUNT }).map((_, index) => (
           <div
-            key={index}
+            key={`books-masonry-skeleton-${index}`}
             className="col-span-1 h-64 animate-pulse rounded-3xl border border-dashed border-border/60 bg-muted/40"
           />
         ))}
@@ -37,10 +40,19 @@ export default function BooksMasonry({ books = [], isLoading = false }) {
   }
 
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
+    <div className="grid auto-rows-[minmax(0,1fr)] grid-cols-2 gap-4 sm:grid-cols-2 md:grid-cols-4 xl:grid-cols-6">
       {books.map((book, index) => {
         const size = pattern[index % pattern.length] || 's';
-        return <BookCard key={book.id || index} book={book} size={size} />;
+
+        return (
+          <BookCard
+            key={book.id ?? `book-${index}`}
+            book={book}
+            size={size}
+            onAddToCart={onAddToCart}
+            onOpen={onOpen}
+          />
+        );
       })}
     </div>
   );

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { createPageUrl } from '@/utils';
@@ -58,7 +58,7 @@ const HeroBook = ({ book, onAddToCart, t }) => {
   const canAddToCart = !book.is_free && !book.is_owned && !book.is_subscription_only;
 
   const detailHref = createPageUrl(`BookDetails?id=${book.id}`);
-  const readerHref = createPageUrl(`Reader?id=${book.id}`);
+  const readerHref = createPageUrl(`Reader?bookId=${book.id}`);
 
   return (
     <motion.article
@@ -103,12 +103,7 @@ const HeroBook = ({ book, onAddToCart, t }) => {
             <Link to={readerHref}>{primaryLabel}</Link>
           </Button>
           {canAddToCart && (
-            <Button
-              variant="secondary"
-              size="sm"
-              className="flex items-center gap-1"
-              onClick={() => onAddToCart(book)}
-            >
+            <Button variant="secondary" size="sm" className="flex items-center gap-1" onClick={() => onAddToCart(book)}>
               <ShoppingBag className="h-4 w-4" />
               <span>{secondaryLabel}</span>
             </Button>
@@ -119,9 +114,22 @@ const HeroBook = ({ book, onAddToCart, t }) => {
   );
 };
 
-export default function HeroSlide({ slide }) {
+const HeroSlideComponent = ({ slide, onAddToCart }) => {
   const { t } = useTranslation();
   const { addToCart } = useCart();
+
+  const handleAddToCart = useCallback(
+    (book) => {
+      if (typeof onAddToCart === 'function') {
+        onAddToCart(book);
+        return;
+      }
+
+      // NOTE: Keep direct cart integration so older entry points still work.
+      addToCart(book);
+    },
+    [addToCart, onAddToCart],
+  );
 
   if (slide.type === 'cta') {
     const Icon = ICON_MAP[slide.icon] || Rocket;
@@ -151,10 +159,10 @@ export default function HeroSlide({ slide }) {
             </p>
             <div className="flex flex-col gap-3 sm:flex-row">
               <Button asChild size="lg" className="shadow-lg shadow-black/20">
-                <Link to={slide.primaryCta.href}>{t(slide.primaryCta.labelKey)}</Link>
+                <Link to={createPageUrl(slide.primaryCta.href)}>{t(slide.primaryCta.labelKey)}</Link>
               </Button>
               <Button asChild variant="secondary" size="lg" className="bg-white/10 text-white hover:bg-white/20">
-                <Link to={slide.secondaryCta.href} className="inline-flex items-center gap-2">
+                <Link to={createPageUrl(slide.secondaryCta.href)} className="inline-flex items-center gap-2">
                   <span>{t(slide.secondaryCta.labelKey)}</span>
                   <ArrowUpRight className="h-4 w-4" aria-hidden="true" />
                 </Link>
@@ -197,11 +205,15 @@ export default function HeroSlide({ slide }) {
         ) : (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">
             {books.map((book) => (
-              <HeroBook key={book.id} book={book} onAddToCart={addToCart} t={t} />
+              <HeroBook key={book.id} book={book} onAddToCart={handleAddToCart} t={t} />
             ))}
           </div>
         )}
       </div>
     </motion.div>
   );
-}
+};
+
+export const HeroSlide = memo(HeroSlideComponent);
+
+export default HeroSlide;

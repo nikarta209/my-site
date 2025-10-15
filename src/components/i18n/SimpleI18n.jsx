@@ -1,10 +1,10 @@
 
 // Простая система интернационализации без внешних зависимомостей
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { translateText } from '../utils/translationService';
 
 // Complete translations with full coverage - adding French and Spanish
-const translations = {
+const translations = Object.freeze({
   en: {
     header: {
       catalog: "Catalog",
@@ -190,6 +190,7 @@ const translations = {
         description: "Analyze trends to create bestsellers",
         notFound: "Could not find similar books."
       },
+    },
     home: {
       hero: {
         tablistLabel: "Featured promotions",
@@ -289,6 +290,7 @@ const translations = {
       checkoutTitle: "Activate subscription",
       checkoutSubtitle: "30 days of full access.",
       priceLabel: "Price",
+      priceKas: "≈ {{value}} KAS",
       alreadyActive: "Subscription already active",
       subscribeCta: "Subscribe",
       loginCta: "Log in to subscribe"
@@ -480,6 +482,7 @@ const translations = {
         description: "Анализируйте тренды, чтобы создавать бестселлеры",
         notFound: "Не удалось найти похожие книги."
       },
+    },
     home: {
       hero: {
         tablistLabel: "Разделы главного баннера",
@@ -579,6 +582,7 @@ const translations = {
       checkoutTitle: "Активировать подписку",
       checkoutSubtitle: "30 дней полного доступа.",
       priceLabel: "Стоимость",
+      priceKas: "≈ {{value}} KAS",
       alreadyActive: "Подписка уже активна",
       subscribeCta: "Подписаться",
       loginCta: "Войдите, чтобы подписаться"
@@ -770,6 +774,7 @@ const translations = {
         description: "Analysieren Sie Trends, um Bestseller zu erstellen",
         notFound: "Ähnliche Bücher konnten nicht gefunden werden."
       },
+    },
     home: {
       hero: {
         tablistLabel: "Empfohlene Bereiche",
@@ -869,6 +874,7 @@ const translations = {
       checkoutTitle: "Abonnement aktivieren",
       checkoutSubtitle: "30 Tage voller Zugriff.",
       priceLabel: "Preis",
+      priceKas: "≈ {{value}} KAS",
       alreadyActive: "Abonnement bereits aktiv",
       subscribeCta: "Abonnieren",
       loginCta: "Anmelden zum Abonnieren"
@@ -1060,6 +1066,7 @@ const translations = {
         description: "Analysez les tendances pour créer des best-sellers",
         notFound: "Impossible de trouver des livres similaires."
       },
+    },
     home: {
       hero: {
         tablistLabel: "Sections en vedette",
@@ -1159,6 +1166,7 @@ const translations = {
       checkoutTitle: "Activer l'abonnement",
       checkoutSubtitle: "30 jours d'accès complet.",
       priceLabel: "Prix",
+      priceKas: "≈ {{value}} KAS",
       alreadyActive: "Abonnement déjà actif",
       subscribeCta: "S'abonner",
       loginCta: "Se connecter pour s'abonner"
@@ -1350,6 +1358,7 @@ const translations = {
         description: "Analice tendencias para crear best-sellers",
         notFound: "No se pudieron encontrar libros similares."
       },
+    },
     home: {
       hero: {
         tablistLabel: "Secciones destacadas",
@@ -1449,12 +1458,13 @@ const translations = {
       checkoutTitle: "Activar suscripción",
       checkoutSubtitle: "30 días de acceso completo.",
       priceLabel: "Precio",
+      priceKas: "≈ {{value}} KAS",
       alreadyActive: "Suscripción ya activa",
       subscribeCta: "Suscribirse",
       loginCta: "Inicia sesión para suscribirte"
     }
   }
-};
+});
 
 class SimpleI18n {
   constructor() {
@@ -1565,7 +1575,7 @@ export const i18n = new SimpleI18n();
 // React hook for use in components
 export const useTranslation = () => {
   const [language, setLanguage] = useState(i18n.language);
-  const [isReady, setIsReady] = useState(true); // Always ready since we have direct access
+  const isReady = true; // Always ready since we have direct access
 
   useEffect(() => {
     const unsubscribe = i18n.subscribe((newLang) => {
