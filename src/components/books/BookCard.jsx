@@ -1,23 +1,12 @@
-import { memo, useMemo, type ComponentType } from 'react';
+import { memo, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { Sparkles, Star, ShoppingCart, BadgeCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import type { Book } from '@/lib/api/books';
 import { ensureCoverUrl } from '@/lib/api/books';
 import { cn } from '@/lib/utils';
 import { useTranslation } from '@/components/i18n/SimpleI18n';
 
-export type BookCardSize = 's' | 'm' | 'l';
-
-export type BookCardProps = {
-  book: Book;
-  size?: BookCardSize;
-  className?: string;
-  onAddToCart?: (book: Book) => void;
-  onOpen?: (book: Book) => void;
-};
-
-const SIZE_STYLES: Record<BookCardSize, { image: string; layout: string; title: string }> = {
+const SIZE_STYLES = {
   s: {
     image: 'aspect-[2/3]',
     layout: 'gap-3 p-3',
@@ -35,7 +24,7 @@ const SIZE_STYLES: Record<BookCardSize, { image: string; layout: string; title: 
   },
 };
 
-const formatSales = (count?: number | null) => {
+const formatSales = (count) => {
   if (!count) return null;
   if (count > 999) {
     return `${(count / 1000).toFixed(1)}k`;
@@ -43,28 +32,28 @@ const formatSales = (count?: number | null) => {
   return String(count);
 };
 
-const BookCardComponent = ({ book, size = 'm', className, onAddToCart, onOpen }: BookCardProps) => {
+const BookCardComponent = ({ book, size = 'm', className, onAddToCart, onOpen }) => {
   const { t } = useTranslation();
   const cover = ensureCoverUrl(book);
-  const rating = book.rating ?? 0;
-  const hasBadge = book.is_exclusive || (book.weekly_sales ?? 0) > 20 || book.is_editors_pick;
+  const rating = book?.rating ?? 0;
+  const hasBadge = book?.is_exclusive || (book?.weekly_sales ?? 0) > 20 || book?.is_editors_pick;
   const styles = SIZE_STYLES[size] ?? SIZE_STYLES.m;
 
   const badges = useMemo(() => {
-    const list: { label: string; tone: string; icon: ComponentType<{ className?: string }> }[] = [];
-    if (book.is_exclusive) {
+    const list = [];
+    if (book?.is_exclusive) {
       list.push({ label: t('home.cards.exclusive'), tone: 'bg-amber-500/90 text-white', icon: Sparkles });
     }
-    if ((book.weekly_sales ?? 0) > 20) {
+    if ((book?.weekly_sales ?? 0) > 20) {
       list.push({ label: t('home.cards.bestseller'), tone: 'bg-emerald-500/90 text-white', icon: BadgeCheck });
     }
-    if (book.is_editors_pick) {
+    if (book?.is_editors_pick) {
       list.push({ label: t('home.cards.editorsPick'), tone: 'bg-indigo-500/90 text-white', icon: Sparkles });
     }
     return list;
-  }, [book.is_editors_pick, book.is_exclusive, book.weekly_sales, t]);
+  }, [book?.is_editors_pick, book?.is_exclusive, book?.weekly_sales, t]);
 
-  const salesLabel = formatSales(book.weekly_sales);
+  const salesLabel = formatSales(book?.weekly_sales);
 
   return (
     <article

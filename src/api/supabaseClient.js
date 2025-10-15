@@ -1,23 +1,11 @@
 import { createClient } from '@supabase/supabase-js';
 
-const importMetaEnv = typeof import.meta !== 'undefined' ? import.meta.env : undefined;
+const env = typeof import.meta !== 'undefined' ? import.meta.env : {};
 
-const getEnvValue = (...keys) => {
-  for (const key of keys) {
-    if (importMetaEnv && importMetaEnv[key] !== undefined) {
-      return importMetaEnv[key];
-    }
-    if (typeof process !== 'undefined' && process.env && process.env[key] !== undefined) {
-      return process.env[key];
-    }
-  }
-  return undefined;
-};
-
-const SUPABASE_URL = getEnvValue('VITE_SUPABASE_URL', 'NEXT_PUBLIC_SUPABASE_URL', 'SUPABASE_URL');
-const SUPABASE_ANON_KEY = getEnvValue('VITE_SUPABASE_ANON_KEY', 'NEXT_PUBLIC_SUPABASE_ANON_KEY', 'SUPABASE_ANON_KEY');
-const STORAGE_BUCKET = import.meta.env.VITE_SUPABASE_STORAGE_BUCKET || 'books';
-const EDGE_FUNCTION_URL = import.meta.env.VITE_SUPABASE_EDGE_FUNCTION_URL || null;
+const SUPABASE_URL = env?.VITE_SUPABASE_URL;
+const SUPABASE_ANON_KEY = env?.VITE_SUPABASE_ANON_KEY;
+const STORAGE_BUCKET = env?.VITE_SUPABASE_STORAGE_BUCKET || 'books';
+const EDGE_FUNCTION_URL = env?.VITE_SUPABASE_EDGE_FUNCTION_URL || null;
 
 const createNoopQueryBuilder = (error) => {
   const builder = {
@@ -53,7 +41,7 @@ const createNoopQueryBuilder = (error) => {
 };
 
 const createNoopClient = () => {
-  const error = new Error('Supabase environment variables are not configured. Set SUPABASE_URL and SUPABASE_ANON_KEY (or their VITE_ prefixed versions).');
+  const error = new Error('Supabase environment variables are not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.');
 
   return {
     auth: {
@@ -96,7 +84,7 @@ const createNoopClient = () => {
 const createSupabaseClient = () => {
   if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
     if (typeof console !== 'undefined') {
-      console.warn('[Supabase] Missing SUPABASE_URL or SUPABASE_ANON_KEY (including VITE_ variants). Falling back to a no-op client.');
+      console.warn('[Supabase] Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY. Falling back to a no-op client.');
     }
     return createNoopClient();
   }
@@ -116,13 +104,6 @@ export const isSupabaseConfigured = Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
 export const supabaseStorageBucket = STORAGE_BUCKET;
 export const supabaseEdgeFunctionUrl = EDGE_FUNCTION_URL;
 
-export const createSupabaseAdminClient = (serviceRoleKey) => {
-  if (!serviceRoleKey) return null;
-  if (!SUPABASE_URL) return null;
-
-  return createClient(SUPABASE_URL, serviceRoleKey, {
-    auth: { persistSession: false, autoRefreshToken: false }
-  });
-};
+export const createSupabaseAdminClient = () => null;
 
 export default supabase;

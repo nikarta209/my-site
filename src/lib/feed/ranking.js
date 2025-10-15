@@ -1,6 +1,6 @@
-import { ensureCoverUrl, getPrimaryGenre, inferGenres, inferLanguages, type Book } from '@/lib/api/books';
+import { ensureCoverUrl, getPrimaryGenre, inferGenres, inferLanguages } from '@/lib/api/books';
 
-const DEFAULT_GENRE_BONUSES: Record<string, number> = {
+const DEFAULT_GENRE_BONUSES = {
   fantasy: 0.25,
   'sci-fi': 0.25,
   science: 0.1,
@@ -9,47 +9,17 @@ const DEFAULT_GENRE_BONUSES: Record<string, number> = {
 
 const MS_IN_DAY = 86_400_000;
 
-export type ScoreWeights = {
-  ratingWeight?: number;
-  salesWeight?: number;
-  genreBonuses?: Record<string, number>;
-  editorsPickBonus?: number;
-  exclusiveBonus?: number;
-  aiPickBonus?: number;
-  languageBonuses?: Record<string, number>;
-  freshnessHalfLifeDays?: number;
-  freshnessMaxBoost?: number;
-  stalePenaltyAfterDays?: number;
-};
-
-export type RankingSampleOptions = {
-  size: number;
-  avoidIds?: Set<string>;
-  weights?: ScoreWeights;
-  allowedGenres?: string[];
-  preferredGenres?: string[];
-  requiredTags?: string[];
-  disallowedTags?: string[];
-  allowSubscriptionOnly?: boolean;
-  maxPerGenre?: number;
-  minScore?: number;
-  filter?: (book: Book) => boolean;
-  now?: Date;
-};
-
-type WeightedBook = { book: Book; score: number; genre: string };
-
-const parseDate = (value?: string | null): number | null => {
+const parseDate = (value) => {
   if (!value) return null;
   const timestamp = Date.parse(value);
   return Number.isFinite(timestamp) ? timestamp : null;
 };
 
-const getFreshnessBoost = (book: Book, weights: ScoreWeights = {}, now: Date) => {
-  const sources = [book.published_at, book.release_date, book.created_at, book.updated_at, book.last_sold_at];
+const getFreshnessBoost = (book, weights = {}, now) => {
+  const sources = [book?.published_at, book?.release_date, book?.created_at, book?.updated_at, book?.last_sold_at];
   const firstValid = sources
     .map(parseDate)
-    .find((timestamp): timestamp is number => timestamp !== null && Number.isFinite(timestamp));
+    .find((timestamp) => timestamp !== null && Number.isFinite(timestamp));
 
   if (!firstValid) return 0;
 
@@ -69,21 +39,21 @@ const getFreshnessBoost = (book: Book, weights: ScoreWeights = {}, now: Date) =>
   return boost;
 };
 
-const getGenreBonus = (genre: string, weights: ScoreWeights = {}) => {
+const getGenreBonus = (genre, weights = {}) => {
   const bonuses = { ...DEFAULT_GENRE_BONUSES, ...(weights.genreBonuses || {}) };
   return bonuses[genre] ?? 0;
 };
 
-const getLanguageBonus = (book: Book, weights: ScoreWeights = {}) => {
+const getLanguageBonus = (book, weights = {}) => {
   if (!weights.languageBonuses) return 0;
   const languages = inferLanguages(book);
   if (languages.length === 0) return 0;
   return languages.reduce((total, lang) => total + (weights.languageBonuses?.[lang] ?? 0), 0);
 };
 
-export function scoreBook(book: Book, weights: ScoreWeights = {}, now: Date = new Date()): number {
-  const rating = book.rating ?? 0;
-  const weeklySales = book.weekly_sales ?? 0;
+export function scoreBook(book, weights = {}, now = new Date()) {
+  const rating = book?.rating ?? 0;
+  const weeklySales = book?.weekly_sales ?? 0;
   const ratingWeight = weights.ratingWeight ?? 2;
   const salesWeight = weights.salesWeight ?? 1;
 
@@ -94,15 +64,15 @@ export function scoreBook(book: Book, weights: ScoreWeights = {}, now: Date = ne
   score += getFreshnessBoost(book, weights, now);
   score += getLanguageBonus(book, weights);
 
-  if (weights.editorsPickBonus && book.is_editors_pick) {
+  if (weights.editorsPickBonus && book?.is_editors_pick) {
     score += weights.editorsPickBonus;
   }
 
-  if (weights.exclusiveBonus && book.is_exclusive) {
+  if (weights.exclusiveBonus && book?.is_exclusive) {
     score += weights.exclusiveBonus;
   }
 
-  if (weights.aiPickBonus && Array.isArray(book.tags)) {
+  if (weights.aiPickBonus && Array.isArray(book?.tags)) {
     const hasAiTag = book.tags.some((tag) => typeof tag === 'string' && tag.toLowerCase().includes('ai'));
     if (hasAiTag) {
       score += weights.aiPickBonus;
@@ -112,7 +82,7 @@ export function scoreBook(book: Book, weights: ScoreWeights = {}, now: Date = ne
   return score;
 }
 
-const pickWeighted = (items: WeightedBook[]): WeightedBook | null => {
+const pickWeighted = (items) => {
   if (!items.length) return null;
   const total = items.reduce((acc, item) => acc + Math.max(0, item.score), 0);
   if (total <= 0) {
@@ -128,13 +98,13 @@ const pickWeighted = (items: WeightedBook[]): WeightedBook | null => {
   return items[items.length - 1];
 };
 
-const normalizeTag = (value: string) => value.trim().toLowerCase();
+const normalizeTag = (value) => value.trim().toLowerCase();
 
-const matchesTagFilters = (book: Book, required?: string[], disallowed?: string[]) => {
+const matchesTagFilters = (book, required, disallowed) => {
   if (!required && !disallowed) return true;
 
-  const tags = (book.tags || [])
-    .filter((tag): tag is string => typeof tag === 'string' && tag.trim().length > 0)
+  const tags = (book?.tags || [])
+    .filter((tag) => typeof tag === 'string' && tag.trim().length > 0)
     .map(normalizeTag);
 
   if (required && required.length > 0) {
@@ -152,9 +122,9 @@ const matchesTagFilters = (book: Book, required?: string[], disallowed?: string[
   return true;
 };
 
-const normalizeGenre = (value?: string | null) => (value ? value.toLowerCase() : 'other');
+const normalizeGenre = (value) => (value ? value.toLowerCase() : 'other');
 
-const shuffle = <T>(list: T[]): T[] => {
+const shuffle = (list) => {
   const copy = [...list];
   for (let i = copy.length - 1; i > 0; i -= 1) {
     const j = Math.floor(Math.random() * (i + 1));
@@ -163,10 +133,10 @@ const shuffle = <T>(list: T[]): T[] => {
   return copy;
 };
 
-export function rankAndSampleBooks(books: Book[], options: RankingSampleOptions): Book[] {
+export function rankAndSampleBooks(books, options) {
   const {
     size,
-    avoidIds = new Set<string>(),
+    avoidIds,
     weights,
     allowedGenres,
     preferredGenres,
@@ -179,18 +149,19 @@ export function rankAndSampleBooks(books: Book[], options: RankingSampleOptions)
     now = new Date(),
   } = options;
 
-  const safeSize = Math.max(0, size);
+  const safeSize = Math.max(0, size ?? 0);
   if (safeSize === 0) return [];
 
   const normalizedAllowedGenres = allowedGenres?.map(normalizeGenre);
   const normalizedPreferred = preferredGenres?.map(normalizeGenre) ?? [];
   const preferredSet = new Set(normalizedPreferred);
   const perGenreLimit = Math.max(1, maxPerGenre ?? Math.ceil(Math.max(1, safeSize) / 3));
+  const avoidSet = avoidIds instanceof Set ? avoidIds : new Set(Array.isArray(avoidIds) ? avoidIds : []);
 
-  const pool: WeightedBook[] = books
+  const pool = books
     .filter((book) => {
       if (!book || !book.id) return false;
-      if (avoidIds.has(book.id)) return false;
+      if (avoidSet.has(book.id)) return false;
       if (!ensureCoverUrl(book)) return false;
       if (filter && !filter(book)) return false;
       if (!allowSubscriptionOnly && book.is_in_subscription && !book.is_public_domain) {
@@ -216,18 +187,17 @@ export function rankAndSampleBooks(books: Book[], options: RankingSampleOptions)
     return [];
   }
 
-  const byGenre = new Map<string, WeightedBook[]>();
+  const byGenre = new Map();
   pool.forEach((entry) => {
     if (!byGenre.has(entry.genre)) {
       byGenre.set(entry.genre, []);
     }
-    byGenre.get(entry.genre)!.push(entry);
+    byGenre.get(entry.genre).push(entry);
   });
 
   byGenre.forEach((list, genre) => {
     list.sort((a, b) => b.score - a.score);
     if (preferredSet.size > 0 && preferredSet.has(genre)) {
-      // Slightly boost preferred genres by increasing top scores
       list.forEach((item, index) => {
         item.score += Math.max(0, (list.length - index) / list.length) * 0.2;
       });
@@ -235,8 +205,8 @@ export function rankAndSampleBooks(books: Book[], options: RankingSampleOptions)
   });
 
   const genreOrder = shuffle(Array.from(byGenre.keys()));
-  const picks: Book[] = [];
-  const perGenreCounts = new Map<string, number>();
+  const picks = [];
+  const perGenreCounts = new Map();
   let index = 0;
   let attempts = 0;
   const maxAttempts = pool.length * 6;
@@ -286,8 +256,8 @@ export function rankAndSampleBooks(books: Book[], options: RankingSampleOptions)
   return picks.slice(0, safeSize);
 }
 
-export const uniqueBooks = (books: Book[]) => {
-  const seen = new Set<string>();
+export const uniqueBooks = (books) => {
+  const seen = new Set();
   return books.filter((book) => {
     if (!book || !book.id) return false;
     if (seen.has(book.id)) return false;
@@ -296,4 +266,4 @@ export const uniqueBooks = (books: Book[]) => {
   });
 };
 
-export const expandGenre = (book: Book): string[] => inferGenres(book);
+export const expandGenre = (book) => inferGenres(book);

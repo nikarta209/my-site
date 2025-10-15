@@ -1,18 +1,10 @@
-import { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useTranslation } from '@/components/i18n/SimpleI18n';
 import { cn } from '@/lib/utils';
 
-export type SectionProps = {
-  titleKey: string;
-  viewAllHref: string;
-  children: ReactNode;
-  className?: string;
-};
-
-export default function Section({ titleKey, viewAllHref, children, className }: SectionProps) {
+export default function Section({ titleKey, viewAllHref, children, className }) {
   const { t } = useTranslation();
   return (
     <section className={cn('space-y-4', className)}>

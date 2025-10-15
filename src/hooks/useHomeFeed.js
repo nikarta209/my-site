@@ -1,29 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import type { Book } from '@/lib/api/books';
 import { fetchFeedBooks } from '@/lib/api/books';
-import { HOME_FEED_PRESETS, type FeedPreset } from '@/lib/feed/presets';
-import { rankAndSampleBooks, type RankingSampleOptions } from '@/lib/feed/ranking';
+import { HOME_FEED_PRESETS } from '@/lib/feed/presets';
+import { rankAndSampleBooks } from '@/lib/feed/ranking';
 import { loadRecentIds, saveRecentIds } from '@/lib/feed/storage';
 import { isSubscriptionEnabled } from '@/lib/config/flags';
 
-export type HomeSection = {
-  id: string;
-  titleKey: string;
-  viewAllHref: string;
-  books: Book[];
-  preset: FeedPreset;
-};
-
-export type HomeFeedState = {
-  sections: HomeSection[];
-  isLoading: boolean;
-  error: Error | null;
-  refresh: () => Promise<void>;
-};
-
-const applyPreset = (preset: FeedPreset, books: Book[], avoidIds: Set<string>, now: Date): Book[] => {
+const applyPreset = (preset, books, avoidIds, now) => {
   const localAvoid = new Set([...avoidIds]);
-  const baseOptions: RankingSampleOptions = {
+  const baseOptions = {
     size: preset.size,
     avoidIds: localAvoid,
     weights: preset.weights,
@@ -33,18 +17,18 @@ const applyPreset = (preset: FeedPreset, books: Book[], avoidIds: Set<string>, n
     disallowedTags: preset.disallowedTags,
     allowSubscriptionOnly: (preset.allowSubscriptionOnly ?? false) && isSubscriptionEnabled(),
     now,
-    filter: preset.filter ? (book) => preset.filter!(book, now) : undefined,
+    filter: preset.filter ? (book) => preset.filter(book, now) : undefined,
   };
 
-  const options = preset.applyOptions ? preset.applyOptions(baseOptions, now) : baseOptions;
+  const options = typeof preset.applyOptions === 'function' ? preset.applyOptions(baseOptions, now) : baseOptions;
   return rankAndSampleBooks(books, options);
 };
 
-export const useHomeFeed = (): HomeFeedState => {
+export const useHomeFeed = () => {
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
-  const [books, setBooks] = useState<Book[]>([]);
-  const [recentIds, setRecentIds] = useState<string[]>([]);
+  const [error, setError] = useState(null);
+  const [books, setBooks] = useState([]);
+  const [recentIds, setRecentIds] = useState([]);
 
   useEffect(() => {
     setRecentIds(loadRecentIds());
@@ -75,14 +59,14 @@ export const useHomeFeed = (): HomeFeedState => {
         id: preset.id,
         titleKey: preset.titleKey,
         viewAllHref: preset.viewAllHref,
-        books: [] as Book[],
+        books: [],
         preset,
       }));
     }
 
     const now = new Date();
     const avoid = new Set(recentIds);
-    const usedWithinPage = new Set<string>();
+    const usedWithinPage = new Set();
 
     return HOME_FEED_PRESETS.map((preset) => {
       const effectiveAvoid = new Set([...avoid, ...usedWithinPage]);
@@ -129,3 +113,5 @@ export const useHomeFeed = (): HomeFeedState => {
     refresh,
   };
 };
+
+export default useHomeFeed;

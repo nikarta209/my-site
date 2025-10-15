@@ -2,17 +2,11 @@ const STORAGE_KEY = 'kasbook.recentShown.v1';
 const LIMIT = 200;
 const TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
-type StoredEntry = { id: string; ts: number };
-
-type StoredPayload = {
-  entries: StoredEntry[];
-};
-
 const isBrowser = () => typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
 
-const sanitizeEntries = (entries: StoredEntry[], now: number): StoredEntry[] => {
+const sanitizeEntries = (entries, now) => {
   const cutoff = now - TTL_MS;
-  const unique = new Map<string, StoredEntry>();
+  const unique = new Map();
   entries.forEach((entry) => {
     if (!entry?.id) return;
     if (!Number.isFinite(entry.ts)) return;
@@ -27,16 +21,16 @@ const sanitizeEntries = (entries: StoredEntry[], now: number): StoredEntry[] => 
     .slice(-LIMIT);
 };
 
-export const loadRecentIds = (now: number = Date.now()): string[] => {
+export const loadRecentIds = (now = Date.now()) => {
   if (!isBrowser()) return [];
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return [];
-    const payload = JSON.parse(raw) as StoredPayload | StoredEntry[];
+    const payload = JSON.parse(raw);
     const entries = Array.isArray(payload)
-      ? (payload as StoredEntry[])
-      : Array.isArray((payload as StoredPayload).entries)
-        ? (payload as StoredPayload).entries
+      ? payload
+      : Array.isArray(payload?.entries)
+        ? payload.entries
         : [];
     return sanitizeEntries(entries, now).map((entry) => entry.id);
   } catch (error) {
@@ -45,7 +39,7 @@ export const loadRecentIds = (now: number = Date.now()): string[] => {
   }
 };
 
-export const saveRecentIds = (ids: string[], now: number = Date.now()) => {
+export const saveRecentIds = (ids, now = Date.now()) => {
   if (!isBrowser()) return;
   try {
     const existing = loadRecentIds(now);
@@ -53,7 +47,7 @@ export const saveRecentIds = (ids: string[], now: number = Date.now()) => {
       [...existing.map((id) => ({ id, ts: now - 1 })), ...ids.map((id) => ({ id, ts: now }))],
       now
     );
-    const payload: StoredPayload = { entries: merged };
+    const payload = { entries: merged };
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
   } catch (error) {
     console.warn('[feed/storage] saveRecentIds failed', error);

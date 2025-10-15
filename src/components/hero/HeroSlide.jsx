@@ -1,23 +1,12 @@
-'use client';
-
 import { memo } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, BookOpenCheck, ShoppingCart } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import type { HeroTab } from '@/lib/banners';
-import type { Book } from '@/lib/api/books';
 import { ensureCoverUrl } from '@/lib/api/books';
 import { useTranslation } from '@/components/i18n/SimpleI18n';
 import { Skeleton } from '@/components/ui/skeleton';
 
-export type HeroSlideProps = {
-  tab: HeroTab;
-  books: Book[];
-  onAddToCart?: (book: Book) => void;
-  onOpen?: (book: Book) => void;
-};
-
-const CTAIcon = ({ tab }: { tab: HeroTab }) => {
+const CTAIcon = ({ tab }) => {
   if (tab.type !== 'cta') return null;
   const Icon = tab.icon;
   return (
@@ -27,7 +16,7 @@ const CTAIcon = ({ tab }: { tab: HeroTab }) => {
   );
 };
 
-const HeroCtaSlide = ({ tab }: { tab: HeroTab }) => {
+const HeroCtaSlide = ({ tab }) => {
   const { t } = useTranslation();
   if (tab.type !== 'cta') return null;
 
@@ -82,10 +71,10 @@ const HeroCtaSlide = ({ tab }: { tab: HeroTab }) => {
   );
 };
 
-const BookCard = ({ book, onAddToCart, onOpen }: { book: Book; onAddToCart?: (book: Book) => void; onOpen?: (book: Book) => void }) => {
+const HeroBookCard = ({ book, onAddToCart, onOpen }) => {
   const { t } = useTranslation();
   const cover = ensureCoverUrl(book);
-  const rating = book.rating ?? 0;
+  const rating = book?.rating ?? 0;
 
   return (
     <div className="group flex flex-col gap-3 rounded-2xl bg-card/80 p-4 shadow-sm ring-1 ring-border/60 transition hover:-translate-y-1 hover:shadow-lg">
@@ -135,7 +124,7 @@ const BookCard = ({ book, onAddToCart, onOpen }: { book: Book; onAddToCart?: (bo
   );
 };
 
-const HeroBooksSlide = ({ books, tab, onAddToCart, onOpen }: { books: Book[]; tab: HeroTab; onAddToCart?: (book: Book) => void; onOpen?: (book: Book) => void }) => {
+const HeroBooksSlide = ({ books, tab, onAddToCart, onOpen }) => {
   if (tab.type !== 'books') return null;
   if (!books || books.length === 0) {
     return (
@@ -153,13 +142,13 @@ const HeroBooksSlide = ({ books, tab, onAddToCart, onOpen }: { books: Book[]; ta
   return (
     <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
       {books.map((book) => (
-        <BookCard key={book.id} book={book} onAddToCart={onAddToCart} onOpen={onOpen} />
+        <HeroBookCard key={book.id} book={book} onAddToCart={onAddToCart} onOpen={onOpen} />
       ))}
     </div>
   );
 };
 
-const HeroSlideComponent = ({ tab, books, onAddToCart, onOpen }: HeroSlideProps) => {
+const HeroSlideComponent = ({ tab, books, onAddToCart, onOpen }) => {
   if (tab.type === 'cta') {
     return <HeroCtaSlide tab={tab} />;
   }

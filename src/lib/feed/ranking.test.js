@@ -1,9 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { scoreBook, rankAndSampleBooks } from './ranking';
-import type { Book } from '@/lib/api/books';
 
 let uid = 0;
-const makeBook = (overrides: Partial<Book>): Book => ({
+const makeBook = (overrides = {}) => ({
   id: overrides.id ?? `book-${uid++}`,
   title: overrides.title ?? 'Book',
   cover_url: overrides.cover_url ?? 'https://example.com/cover.jpg',

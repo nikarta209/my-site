@@ -1,30 +1,23 @@
 import { useMemo } from 'react';
-import type { Book } from '@/lib/api/books';
-import BookCard, { type BookCardSize } from './BookCard';
+import BookCard from './BookCard';
 import { cn } from '@/lib/utils';
 
-const PATTERNS: BookCardSize[][] = [
+const PATTERNS = [
   ['m', 's', 's', 'm', 'l', 's', 'm', 's'],
   ['l', 's', 'm', 's', 'm', 's', 's', 'm'],
   ['m', 's', 'l', 's', 'm', 's', 'm', 's'],
   ['m', 'm', 's', 's', 'l', 's', 'm', 's'],
 ];
 
-const LAYOUT_CLASSES: Record<BookCardSize, string> = {
+const LAYOUT_CLASSES = {
   s: 'col-span-1',
   m: 'col-span-2 md:col-span-2 xl:col-span-2',
   l: 'col-span-2 md:col-span-3 xl:col-span-3 md:row-span-2 xl:row-span-2',
 };
 
-export type BooksMasonryProps = {
-  books: Book[];
-  onAddToCart?: (book: Book) => void;
-  onOpen?: (book: Book) => void;
-};
-
-const generateSizes = (count: number): BookCardSize[] => {
+const generateSizes = (count) => {
   if (count === 0) return [];
-  const sizes: BookCardSize[] = [];
+  const sizes = [];
   let patternIndex = 0;
   let pointer = 0;
   while (sizes.length < count) {
@@ -39,7 +32,7 @@ const generateSizes = (count: number): BookCardSize[] => {
   return sizes.slice(0, count);
 };
 
-export default function BooksMasonry({ books, onAddToCart, onOpen }: BooksMasonryProps) {
+export default function BooksMasonry({ books, onAddToCart, onOpen }) {
   const sizes = useMemo(() => generateSizes(books.length), [books.length]);
 
   if (!books.length) {

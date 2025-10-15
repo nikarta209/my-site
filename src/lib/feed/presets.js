@@ -1,53 +1,25 @@
 import { createPageUrl } from '@/utils';
-import type { Book } from '@/lib/api/books';
-import type { RankingSampleOptions, ScoreWeights } from '@/lib/feed/ranking';
 
-export type FeedPreset = {
-  id: string;
-  titleKey: string;
-  viewAllHref: string;
-  size: number;
-  weights?: ScoreWeights;
-  applyOptions?: (options: RankingSampleOptions, now: Date) => RankingSampleOptions;
-  filter?: (book: Book, now: Date) => boolean;
-  allowedGenres?: string[];
-  preferredGenres?: string[];
-  requiredTags?: string[];
-  disallowedTags?: string[];
-  allowSubscriptionOnly?: boolean;
-};
-
-const parseDate = (value?: string | null) => {
+const parseDate = (value) => {
   if (!value) return null;
   const ts = Date.parse(value);
   return Number.isFinite(ts) ? ts : null;
 };
 
-const isWithinDays = (book: Book, days: number, now: Date) => {
-  const published = parseDate(book.published_at) ?? parseDate(book.release_date) ?? parseDate(book.created_at);
+const isWithinDays = (book, days, now) => {
+  const published = parseDate(book?.published_at) ?? parseDate(book?.release_date) ?? parseDate(book?.created_at);
   if (!published) return false;
   const diffDays = (now.getTime() - published) / (1000 * 60 * 60 * 24);
   return diffDays >= 0 && diffDays <= days;
 };
 
-const isEditorsPick = (book: Book) => Boolean(book.is_editors_pick);
-const hasPreview = (book: Book) => Boolean(book.is_preview_available || book.is_public_domain);
-const hasAiTag = (book: Book) => Array.isArray(book.tags) && book.tags.some((tag) => typeof tag === 'string' && tag.toLowerCase().includes('ai'));
-
-const genreIncludes = (book: Book, targets: string[]) => {
-  const normalized = targets.map((genre) => genre.toLowerCase());
-  const genres = (book.genres || [])
-    .filter((value): value is string => typeof value === 'string')
-    .map((value) => value.toLowerCase());
-  if (book.genre) {
-    genres.push(book.genre.toLowerCase());
-  }
-  return genres.some((value) => normalized.includes(value));
-};
+const isEditorsPick = (book) => Boolean(book?.is_editors_pick);
+const hasPreview = (book) => Boolean(book?.is_preview_available || book?.is_public_domain);
+const hasAiTag = (book) => Array.isArray(book?.tags) && book.tags.some((tag) => typeof tag === 'string' && tag.toLowerCase().includes('ai'));
 
 const WEEKLY_SALES_POPULAR = 12;
 
-export const HOME_FEED_PRESETS: FeedPreset[] = [
+export const HOME_FEED_PRESETS = [
   {
     id: 'new-week',
     titleKey: 'home.sections.newThisWeek',
@@ -71,7 +43,7 @@ export const HOME_FEED_PRESETS: FeedPreset[] = [
       freshnessHalfLifeDays: 10,
       freshnessMaxBoost: 1.2,
     },
-    filter: (book) => (book.weekly_sales ?? 0) >= WEEKLY_SALES_POPULAR,
+    filter: (book) => (book?.weekly_sales ?? 0) >= WEEKLY_SALES_POPULAR,
   },
   {
     id: 'editor-picks',

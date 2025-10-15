@@ -1,32 +1,21 @@
-'use client';
-
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type KeyboardEvent,
-  type TouchEvent,
-} from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
-import { fetchBestsellers, type Book } from '@/lib/api/books';
+import { fetchBestsellers } from '@/lib/api/books';
 import { HERO_ROTATION_INTERVAL, HERO_TAB_ORDER, HERO_TOUCH_THRESHOLD } from '@/lib/banners';
 import HeroSlide from './HeroSlide';
 import { useCart } from '@/components/cart/CartContext';
 import { useTranslation } from '@/components/i18n/SimpleI18n';
-import type { HeroTab } from '@/lib/banners';
 
-const chunkBooks = (books: Book[], chunkSize: number) => {
-  const chunks: Book[][] = [];
+const chunkBooks = (books, chunkSize) => {
+  const chunks = [];
   for (let i = 0; i < books.length; i += chunkSize) {
     chunks.push(books.slice(i, i + chunkSize));
   }
   return chunks;
 };
 
-const buildChunks = (books: Book[]) => {
+const buildChunks = (books) => {
   const filtered = books.filter((book) => book.cover_url);
   const chunkSize = 3;
   const chunks = chunkBooks(filtered, chunkSize);
@@ -36,13 +25,8 @@ const buildChunks = (books: Book[]) => {
   return chunks.slice(0, 3);
 };
 
-const useHeroRotation = (
-  length: number,
-  isPaused: boolean,
-  activeIndex: number,
-  setIndex: (index: number) => void
-) => {
-  const activeRef = useRef<number>(activeIndex);
+const useHeroRotation = (length, isPaused, activeIndex, setIndex) => {
+  const activeRef = useRef(activeIndex);
 
   useEffect(() => {
     activeRef.current = activeIndex;
@@ -56,19 +40,18 @@ const useHeroRotation = (
     }, HERO_ROTATION_INTERVAL);
     return () => window.clearInterval(timer);
   }, [length, isPaused, setIndex]);
-
 };
 
-const useSwipe = (onSwipe: (direction: 'left' | 'right') => void) => {
-  const touchStartX = useRef<number | null>(null);
-  const touchEndX = useRef<number | null>(null);
+const useSwipe = (onSwipe) => {
+  const touchStartX = useRef(null);
+  const touchEndX = useRef(null);
 
-  const onTouchStart = useCallback((event: TouchEvent<HTMLDivElement>) => {
+  const onTouchStart = useCallback((event) => {
     touchEndX.current = null;
     touchStartX.current = event.changedTouches[0]?.clientX ?? null;
   }, []);
 
-  const onTouchMove = useCallback((event: TouchEvent<HTMLDivElement>) => {
+  const onTouchMove = useCallback((event) => {
     touchEndX.current = event.changedTouches[0]?.clientX ?? null;
   }, []);
 
@@ -85,15 +68,15 @@ const useSwipe = (onSwipe: (direction: 'left' | 'right') => void) => {
 export default function HeroTabs() {
   const { addToCart } = useCart();
   const { t } = useTranslation();
-  const [books, setBooks] = useState<Book[]>([]);
+  const [books, setBooks] = useState([]);
   const [activeIndex, setActiveIndex] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
-  const [error, setError] = useState<Error | null>(null);
+  const [error, setError] = useState(null);
 
   const tabs = HERO_TAB_ORDER;
   const bookChunks = useMemo(() => buildChunks(books), [books]);
 
-  const handleTabChange = useCallback((index: number) => {
+  const handleTabChange = useCallback((index) => {
     setActiveIndex((current) => {
       if (index === current) return current;
       return index;
@@ -120,7 +103,7 @@ export default function HeroTabs() {
   }, []);
 
   const onSwipe = useCallback(
-    (direction: 'left' | 'right') => {
+    (direction) => {
       const delta = direction === 'left' ? 1 : -1;
       setActiveIndex((prev) => (prev + delta + tabs.length) % tabs.length);
     },
@@ -133,7 +116,7 @@ export default function HeroTabs() {
   const resume = useCallback(() => setIsPaused(false), []);
 
   const getBooksForTab = useCallback(
-    (tab: HeroTab): Book[] => {
+    (tab) => {
       if (tab.type !== 'books') return [];
       const chunk = bookChunks[tab.chunkIndex] ?? [];
       return chunk;
@@ -142,7 +125,7 @@ export default function HeroTabs() {
   );
 
   const handleKeyDown = useCallback(
-    (event: KeyboardEvent<HTMLDivElement>) => {
+    (event) => {
       const { key } = event;
       if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(key)) return;
       event.preventDefault();
@@ -160,7 +143,7 @@ export default function HeroTabs() {
   );
 
   const handleAddToCart = useCallback(
-    (book: Book) => {
+    (book) => {
       if (!book) return;
       addToCart({
         id: book.id,

@@ -1,28 +1,6 @@
-import type { LucideIcon } from 'lucide-react';
 import { NotebookPen, PenSquare } from 'lucide-react';
 
-export type HeroCtaTab = {
-  id: string;
-  type: 'cta';
-  labelKey: string;
-  headingKey: string;
-  descriptionKey: string;
-  primaryCta: { labelKey: string; href: string };
-  secondaryCta: { labelKey: string; href: string };
-  icon: LucideIcon;
-  gradient: string;
-};
-
-export type HeroBooksTab = {
-  id: string;
-  type: 'books';
-  labelKey: string;
-  chunkIndex: number;
-};
-
-export type HeroTab = HeroCtaTab | HeroBooksTab;
-
-export const HERO_TAB_ORDER: HeroTab[] = [
+export const HERO_TAB_ORDER = [
   {
     id: 'author-submit',
     type: 'cta',
