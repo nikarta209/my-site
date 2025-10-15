@@ -1,5 +1,6 @@
 import supabase, { isSupabaseConfigured, supabaseStorageBucket } from './supabaseClient';
 import { Book, Purchase, User, UserAIPreferences } from './entities';
+import { determineFileType, isHtmlExtension, looksLikeHtmlContent } from '@/utils/bookContent';
 
 const importMetaEnv = typeof import.meta !== 'undefined' ? import.meta.env : undefined;
 
@@ -205,6 +206,16 @@ const collectBookFileCandidates = (book) => {
   }
 
   return candidates;
+};
+
+const languageEntryIndicatesHtml = (entry) => {
+  if (!entry || typeof entry !== 'object') return false;
+  const extension = (entry.extension || entry.format || '').toString().toLowerCase();
+  if (extension === 'html') return true;
+  const langValue = (entry.lang || '').toString().toLowerCase();
+  if (langValue.includes('html')) return true;
+  if (isHtmlExtension(entry.file_url)) return true;
+  return false;
 };
 
 const COINMARKETCAP_API_KEY = getEnvValue(
@@ -716,10 +727,23 @@ export const getBookContent = async ({ bookId, isPreview } = {}) => {
     if (!book) throw new Error('Книга не найдена');
 
     const sources = collectBookFileCandidates(book);
+    const htmlOrigins = new Set();
+
+    if (Array.isArray(book.languages)) {
+      book.languages.forEach((lang, index) => {
+        if (languageEntryIndicatesHtml(lang)) {
+          htmlOrigins.add(`book.languages[${index}].file_url`);
+        }
+      });
+    }
 
     let content = null;
+    let isHtml = false;
     for (const source of sources) {
       const { value, origin } = source;
+      const typeGuess = determineFileType(value);
+      const originIndicatesHtml = origin ? htmlOrigins.has(origin) : false;
+      const sourceIndicatesHtml = originIndicatesHtml || typeGuess === 'html' || isHtmlExtension(value);
       const storageRef = parseSupabaseStorageReference(value);
 
       if (storageRef) {
@@ -727,6 +751,7 @@ export const getBookContent = async ({ bookId, isPreview } = {}) => {
         if (downloadedText && downloadedText.trim().length > 0) {
           console.info('[getBookContent] Loaded book content via storage download from', origin);
           content = downloadedText;
+          isHtml = sourceIndicatesHtml || looksLikeHtmlContent(downloadedText);
           break;
         }
       }
@@ -735,6 +760,7 @@ export const getBookContent = async ({ bookId, isPreview } = {}) => {
       if (directText && directText.trim().length > 0) {
         console.info('[getBookContent] Loaded book content via direct fetch from', origin);
         content = directText;
+        isHtml = sourceIndicatesHtml || looksLikeHtmlContent(directText);
         break;
       }
 
@@ -744,6 +770,7 @@ export const getBookContent = async ({ bookId, isPreview } = {}) => {
         if (signedText && signedText.trim().length > 0) {
           console.info('[getBookContent] Loaded book content via signed URL from', origin);
           content = signedText;
+          isHtml = sourceIndicatesHtml || looksLikeHtmlContent(signedText);
           break;
         }
 
@@ -752,6 +779,7 @@ export const getBookContent = async ({ bookId, isPreview } = {}) => {
         if (publicText && publicText.trim().length > 0) {
           console.info('[getBookContent] Loaded book content via public URL from', origin);
           content = publicText;
+          isHtml = sourceIndicatesHtml || looksLikeHtmlContent(publicText);
           break;
         }
       }
@@ -761,11 +789,15 @@ export const getBookContent = async ({ bookId, isPreview } = {}) => {
       content = book.preview_text || book.description || 'Контент книги недоступен. Пожалуйста, загрузите файл книги в Supabase Storage.';
     }
 
-    if (isPreview && content.length > 5000) {
+    if (!isHtml) {
+      isHtml = looksLikeHtmlContent(content);
+    }
+
+    if (isPreview && !isHtml && content.length > 5000) {
       content = content.slice(0, 5000);
     }
 
-    return ok({ content, book });
+    return ok({ content, book, isHtml });
   } catch (error) {
     console.error('[getBookContent] error', error);
     return fail(error);
