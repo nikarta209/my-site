@@ -1,9 +1,6 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Document, Page, pdfjs } from 'react-pdf';
-import ePub from 'epubjs';
-import mammoth from 'mammoth';
 import { get, set } from 'idb-keyval';
 import { toast } from 'sonner';
 import { Book, UserBookData } from '@/api/entities';
@@ -21,9 +18,7 @@ import {
 } from '../utils/OfflineManager';
 import ReactMarkdown from 'react-markdown'; // Still imported for potential future use or if markdown is generated
 import { motion } from 'framer-motion';
-
-// Настройка PDF.js worker
-pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.js`;
+import { determineFileType, extractRawTextFromFileBlob, looksLikeHtmlContent } from '@/utils/bookContent';
 
 // Функция для безопасной очистки HTML (перенесена наружу для оптимизации)
 const sanitizeHTML = (html) => {
@@ -136,68 +131,6 @@ export default function ReaderV2() {
     };
     window.addEventListener('online', handleOnline);
     return () => window.removeEventListener('online', handleOnline);
-  }, []);
-
-  const determineFileType = (url, blobType) => {
-    const extension = url.split('.').pop().toLowerCase().split('?')[0];
-    if (['pdf'].includes(extension)) return 'pdf';
-    if (['epub'].includes(extension)) return 'epub';
-    if (['docx'].includes(extension)) return 'docx';
-    if (['txt'].includes(extension)) return 'txt'; // Added .txt support
-    if (['jpg', 'jpeg', 'png', 'gif'].includes(extension)) return 'image';
-    if (blobType) {
-        if (blobType.includes('pdf')) return 'pdf';
-        if (blobType.includes('epub')) return 'epub';
-        if (blobType.includes('vnd.openxmlformats-officedocument.wordprocessingml.document')) return 'docx';
-        if (blobType.startsWith('image/')) return 'image';
-        if (blobType.includes('text/plain')) return 'txt'; // Added text/plain support
-    }
-    // Fallback for signed URLs without extensions or unknown types
-    return 'txt'; // Default to TXT for now
-  };
-
-  // Helper to extract RAW plain text from different file types
-  const extractRawTextFromFileBlob = useCallback(async (blob, type) => {
-    try {
-      if (type === 'txt') {
-        return await blob.text();
-      } else if (type === 'docx') {
-        const arrayBuffer = await blob.arrayBuffer();
-        const result = await mammoth.extractRawText({ arrayBuffer: arrayBuffer }); // Use extractRawText for plain content
-        return result.value;
-      } else if (type === 'epub') {
-        const bookEpub = ePub(blob);
-        await bookEpub.ready;
-        let fullText = '';
-        for (const item of bookEpub.spine.spineItems) {
-            try {
-                await item.load(bookEpub.load.bind(bookEpub));
-                fullText += item.contents.textContent || '';
-            } catch (e) {
-                console.error("Error loading epub spine item:", e);
-            } finally {
-                item.unload();
-            }
-        }
-        return fullText;
-      } else if (type === 'pdf') {
-        const arrayBuffer = await blob.arrayBuffer();
-        const pdf = await pdfjs.getDocument({ data: arrayBuffer }).promise;
-        let fullText = '';
-        for (let i = 1; i <= pdf.numPages; i++) {
-          const page = await pdf.getPage(i);
-          const textContent = await page.getTextContent();
-          fullText += textContent.items.map(item => item.str).join(' ') + '\n';
-        }
-        return fullText;
-      } else if (type === 'image') {
-        return '--- Изображение ---'; // Cannot extract text from image easily
-      }
-    } catch (e) {
-      console.error("Error extracting raw text:", e);
-      return `Ошибка при извлечении текста: ${e.message}`;
-    }
-    return '';
   }, []);
 
   // Функция для обработки содержимого книги и выделения заголовков (пре-процессор)
@@ -336,8 +269,9 @@ export default function ReaderV2() {
             const type = determineFileType(cachedData.details.languages?.[0]?.file_url || '', cachedData.fileBlob.type);
             setFileType(type);
             const rawText = await extractRawTextFromFileBlob(cachedData.fileBlob, type);
-            const preProcessedText = formatBookContent(rawText);
-            const finalHtml = sanitizeHTML(convertPlainTextToHtml(preProcessedText));
+            const finalHtml = looksLikeHtmlContent(rawText)
+              ? sanitizeHTML(rawText)
+              : sanitizeHTML(convertPlainTextToHtml(formatBookContent(rawText)));
             setAllContent(finalHtml);
             toast.success("Книга загружена из кеша");
             return;
@@ -360,8 +294,9 @@ export default function ReaderV2() {
         setFileType(type);
 
         const rawText = await extractRawTextFromFileBlob(blob, type);
-        const preProcessedText = formatBookContent(rawText);
-        const finalHtml = sanitizeHTML(convertPlainTextToHtml(preProcessedText));
+        const finalHtml = looksLikeHtmlContent(rawText)
+          ? sanitizeHTML(rawText)
+          : sanitizeHTML(convertPlainTextToHtml(formatBookContent(rawText)));
         setAllContent(finalHtml);
 
         await cacheBookData(bookId, blob, bookDetails);
@@ -380,7 +315,7 @@ export default function ReaderV2() {
       clearTimeout(timeoutId);
       setLoading(false);
     }
-  }, [bookId, extractRawTextFromFileBlob, formatBookContent]);
+  }, [bookId, formatBookContent]);
 
   useEffect(() => {
     loadBook();
