@@ -1,6 +1,7 @@
 import supabase, { isSupabaseConfigured, supabaseStorageBucket } from './supabaseClient';
 import { Book, Purchase, User, UserAIPreferences } from './entities';
-import { determineFileType, isHtmlExtension, looksLikeHtmlContent } from '@/utils/bookContent';
+import { determineFileType, htmlFromRawText, isHtmlExtension, looksLikeHtmlContent } from '@/utils/bookContent';
+import { ensureString } from '@/utils/safe';
 
 const importMetaEnv = typeof import.meta !== 'undefined' ? import.meta.env : undefined;
 
@@ -750,7 +751,7 @@ export const getBookContent = async ({ bookId, isPreview } = {}) => {
         const downloadedText = await downloadTextFromSupabase(storageRef);
         if (downloadedText && downloadedText.trim().length > 0) {
           console.info('[getBookContent] Loaded book content via storage download from', origin);
-          content = downloadedText;
+          content = ensureString(downloadedText);
           isHtml = sourceIndicatesHtml || looksLikeHtmlContent(downloadedText);
           break;
         }
@@ -759,7 +760,7 @@ export const getBookContent = async ({ bookId, isPreview } = {}) => {
       const directText = await fetchTextWithFallback(value);
       if (directText && directText.trim().length > 0) {
         console.info('[getBookContent] Loaded book content via direct fetch from', origin);
-        content = directText;
+        content = ensureString(directText);
         isHtml = sourceIndicatesHtml || looksLikeHtmlContent(directText);
         break;
       }
@@ -769,7 +770,7 @@ export const getBookContent = async ({ bookId, isPreview } = {}) => {
         const signedText = await fetchTextWithFallback(signedUrl);
         if (signedText && signedText.trim().length > 0) {
           console.info('[getBookContent] Loaded book content via signed URL from', origin);
-          content = signedText;
+          content = ensureString(signedText);
           isHtml = sourceIndicatesHtml || looksLikeHtmlContent(signedText);
           break;
         }
@@ -778,7 +779,7 @@ export const getBookContent = async ({ bookId, isPreview } = {}) => {
         const publicText = await fetchTextWithFallback(publicUrl);
         if (publicText && publicText.trim().length > 0) {
           console.info('[getBookContent] Loaded book content via public URL from', origin);
-          content = publicText;
+          content = ensureString(publicText);
           isHtml = sourceIndicatesHtml || looksLikeHtmlContent(publicText);
           break;
         }
@@ -786,18 +787,29 @@ export const getBookContent = async ({ bookId, isPreview } = {}) => {
     }
 
     if (!content) {
-      content = book.preview_text || book.description || 'Контент книги недоступен. Пожалуйста, загрузите файл книги в Supabase Storage.';
+      content = ensureString(
+        book.preview_text ||
+          book.description ||
+          'Контент книги недоступен. Пожалуйста, загрузите файл книги в Supabase Storage.'
+      );
     }
 
     if (!isHtml) {
       isHtml = looksLikeHtmlContent(content);
     }
 
-    if (isPreview && !isHtml && content.length > 5000) {
-      content = content.slice(0, 5000);
+    let finalContent = ensureString(content);
+
+    if (!isHtml) {
+      let rawText = content;
+      if (isPreview && rawText && rawText.length > 5000) {
+        rawText = rawText.slice(0, 5000);
+      }
+      finalContent = htmlFromRawText(ensureString(rawText));
+      isHtml = true;
     }
 
-    return ok({ content, book, isHtml });
+    return ok({ content: ensureString(finalContent), book, isHtml });
   } catch (error) {
     console.error('[getBookContent] error', error);
     return fail(error);

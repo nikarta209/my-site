@@ -14,14 +14,22 @@ export default defineConfig({
       '@': fileURLToPath(new URL('./src', import.meta.url)),
       'react-helmet-async': fileURLToPath(new URL('./src/components/seo/HelmetShim.js', import.meta.url)),
       'jspdf': fileURLToPath(new URL('./src/shims/jspdf.js', import.meta.url)),
+      'epubjs': fileURLToPath(new URL('./src/shims/epubjs.js', import.meta.url)),
+      'pdfjs-dist': fileURLToPath(new URL('./src/shims/pdfjs-dist', import.meta.url)),
+      'mammoth/mammoth.browser.js': fileURLToPath(new URL('./src/shims/mammoth.browser.js', import.meta.url)),
     },
     extensions: ['.mjs', '.js', '.jsx', '.ts', '.tsx', '.json']
   },
+  build: {
+    sourcemap: true,
+  },
+  assetsInclude: ['**/*.epub'],
   optimizeDeps: {
     esbuildOptions: {
       loader: {
         '.js': 'jsx',
       },
     },
+    exclude: ['pdfjs-dist', 'epubjs', 'mammoth/mammoth.browser.js'],
   },
-}) 
+})

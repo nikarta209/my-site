@@ -32,7 +32,14 @@ import ReaderSidebar from '../components/reader/ReaderSidebar';
 import { AnimatePresence } from 'framer-motion';
 
 import { getBookContent } from '@/api/functions';
-import { looksLikeHtmlContent } from '@/utils/bookContent';
+import { htmlFromRawText } from '@/utils/bookContent';
+import { ensureString } from '@/utils/safe';
+
+const sanitizeHTML = (html = '') =>
+  html
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+    .replace(/javascript:/gi, '')
+    .replace(/on\w+="[^"]*"/gi, '');
 
 export default function Reader() {
   const { user, isAuthenticated } = useAuth();
@@ -46,7 +53,6 @@ export default function Reader() {
   const [book, setBook] = useState(null);
   const [userBookData, setUserBookData] = useState(null);
   const [content, setContent] = useState('');
-  const [isHtmlContent, setIsHtmlContent] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -94,99 +100,119 @@ export default function Reader() {
   }, [theme]);
 
   // Load book and user data
-  const loadData = useCallback(async () => {
-    if (!bookId) {
-      setError('Идентификатор книги не передан');
-      setIsLoading(false);
-      return;
-    }
+  useEffect(() => {
+    let alive = true;
 
-    setIsLoading(true);
-    setError(null);
-    console.log(`[Reader] Loading book ID: ${bookId}`);
+    const loadData = async () => {
+      if (!bookId) {
+        if (alive) {
+          setError('Идентификатор книги не передан');
+          setIsLoading(false);
+        }
+        return;
+      }
 
-    try {
-      const bookData = await Book.get(bookId);
-      if (!bookData) throw new Error('Книга не найдена');
-      setBook(bookData);
-      console.log('[Reader] Book data fetched:', bookData);
+      if (alive) {
+        setIsLoading(true);
+        setError(null);
+      }
 
-      // Load user book data
-      let initialPage = 1;
-      if (isAuthenticated && user) {
-        try {
-          const userBooks = await UserBookData.filter({ user_email: user.email, book_id: bookId });
-          if (userBooks.length > 0) {
-            setUserBookData(userBooks[0]);
-            initialPage = userBooks[0].current_page || 1;
-            console.log('[Reader] User book data loaded:', userBooks[0]);
-          } else if (isPreview) {
-            // Create a new UserBookData record if in preview and none exists
-            const newRecord = await UserBookData.create({
-              user_email: user.email,
-              book_id: bookId,
-              current_page: 1,
-              total_pages: 1,
-              reading_progress: 0,
-              notes: [],
-              bookmarks: [],
-              started_reading_at: new Date().toISOString(),
-              last_read_at: new Date().toISOString()
-            });
-            setUserBookData(newRecord);
-            console.log('[Reader] New UserBookData created for preview:', newRecord);
+      console.log(`[Reader] Loading book ID: ${bookId}`);
+
+      try {
+        const bookData = await Book.get(bookId);
+        if (!alive) return;
+        if (!bookData) throw new Error('Книга не найдена');
+        setBook(bookData);
+        console.log('[Reader] Book data fetched:', bookData);
+
+        // Load user book data
+        let initialPage = 1;
+        if (isAuthenticated && user) {
+          try {
+            const userBooks = await UserBookData.filter({ user_email: user.email, book_id: bookId });
+            if (!alive) return;
+            if (userBooks.length > 0) {
+              setUserBookData(userBooks[0]);
+              initialPage = userBooks[0].current_page || 1;
+              console.log('[Reader] User book data loaded:', userBooks[0]);
+            } else if (isPreview) {
+              const newRecord = await UserBookData.create({
+                user_email: user.email,
+                book_id: bookId,
+                current_page: 1,
+                total_pages: 1,
+                reading_progress: 0,
+                notes: [],
+                bookmarks: [],
+                started_reading_at: new Date().toISOString(),
+                last_read_at: new Date().toISOString()
+              });
+              if (!alive) return;
+              setUserBookData(newRecord);
+              console.log('[Reader] New UserBookData created for preview:', newRecord);
+            }
+          } catch (err) {
+            if (!alive) return;
+            console.warn('Failed to load or create user data:', err);
           }
-        } catch (err) {
-          console.warn('Failed to load or create user data:', err);
+        }
+
+        console.log('[Reader] Loading book content...');
+        const response = await getBookContent({
+          bookId,
+          isPreview
+        });
+
+        if (!alive) return;
+
+        console.log('[Reader] getBookContent response:', response);
+
+        if (!response || response.error) {
+          throw new Error(response?.error || 'Не удалось загрузить содержимое');
+        }
+
+        const raw = response?.data ?? response;
+        const bookContent = ensureString(raw?.content ?? raw);
+        if (!bookContent) {
+          console.warn('[Reader] Empty/invalid html payload', response);
+          setContent('');
+          setTotalPages(0);
+          setCurrentPage(1);
+          return;
+        }
+
+        const sanitizedContent = sanitizeHTML(bookContent);
+        setContent(sanitizedContent);
+        setCurrentPage(initialPage);
+        console.log(`[Reader] Content loaded: ${sanitizedContent.length} characters. Initial page: ${initialPage}`);
+      } catch (err) {
+        if (!alive) return;
+        console.error('Error loading book:', err);
+        setError(err.message);
+        toast.error(`Ошибка загрузки: ${err.message}`);
+
+        let fallbackContent = 'Глава 1\n\nТестовый контент для проверки читалки. ';
+        fallbackContent += 'Это демонстрационный текст, который показывает, что читалка работает корректно. ';
+        fallbackContent += 'В реальной ситуации здесь должен быть текст из загруженного файла книги. ';
+        fallbackContent += '\n\nГлава 2\n\nПродолжение истории с новой главой. ';
+        fallbackContent = fallbackContent.repeat(50);
+        const fallbackHtml = sanitizeHTML(htmlFromRawText(fallbackContent));
+        setContent(fallbackHtml);
+        toast.warning('Загружен демонстрационный контент');
+      } finally {
+        if (alive) {
+          setIsLoading(false);
         }
       }
+    };
 
-      // Load book content via server function
-      console.log('[Reader] Loading book content...');
-      const response = await getBookContent({
-        bookId: bookId,
-        isPreview: isPreview
-      });
-
-      console.log('[Reader] getBookContent response:', response);
-
-      if (!response || response.error) {
-        throw new Error(response?.error || 'Не удалось загрузить содержимое');
-      }
-
-      const bookContent = response.data?.content || response.content;
-      if (!bookContent) {
-        throw new Error('Содержимое книги пустое');
-      }
-
-      setContent(bookContent);
-      const htmlFlag = response.data?.isHtml ?? looksLikeHtmlContent(bookContent);
-      setIsHtmlContent(Boolean(htmlFlag));
-      setCurrentPage(initialPage); // Set current page from user data or default to 1
-      console.log(`[Reader] Content loaded: ${bookContent.length} characters. Initial page: ${initialPage}`);
-
-    } catch (err) {
-      console.error('Error loading book:', err);
-      setError(err.message);
-      toast.error(`Ошибка загрузки: ${err.message}`);
-
-      // Fallback to demo content if content loading fails
-      let fallbackContent = 'Глава 1\n\nТестовый контент для проверки читалки. ';
-      fallbackContent += 'Это демонстрационный текст, который показывает, что читалка работает корректно. ';
-      fallbackContent += 'В реальной ситуации здесь должен быть текст из загруженного файла книги. ';
-      fallbackContent += '\n\nГлава 2\n\nПродолжение истории с новой главой. ';
-      fallbackContent = fallbackContent.repeat(50); // Create enough text
-      setContent(fallbackContent);
-      setIsHtmlContent(false);
-      toast.warning('Загружен демонстрационный контент');
-    } finally {
-      setIsLoading(false);
-    }
-  }, [bookId, user, isAuthenticated]); // Changed dependencies: removed `isPreview`
-
-  useEffect(() => {
     loadData();
-  }, [loadData]);
+
+    return () => {
+      alive = false;
+    };
+  }, [bookId, user, isAuthenticated, isPreview]);
 
   // DYNAMIC PAGINATION LOGIC
   const calculatePages = useCallback(() => {
@@ -347,30 +373,6 @@ export default function Reader() {
     }
   }, [isAuthenticated, user, bookId, userBookData, currentPage, totalPages]);
 
-
-  // ИСПРАВЛЕНО: Улучшенная обработка глав и параграфов
-  const formatContent = (text) => {
-    if (!text) return '';
-    if (isHtmlContent) return text;
-    const chapterRegex = /^(глава\s+\d+|chapter\s+\d+|часть\s+\d+|part\s+\d+|\d+\.)/gim; // Expanded chapter patterns
-    
-    // Split by newlines, then process each part
-    const paragraphs = text.split('\n').map((line, index) => {
-      line = line.trim();
-      if (!line) return ''; // Skip empty lines
-
-      // If it looks like a chapter title
-      if (chapterRegex.test(line)) {
-        return `<h2 class="chapter-title">${line}</h2>`;
-      }
-      // Otherwise, wrap in a paragraph
-      return `<p>${line}</p>`;
-    }).filter(Boolean).join(''); // Filter out empty strings before joining
-
-    return paragraphs;
-  };
-
-
   if (isLoading) {
     return (
       <div className="container mx-auto px-4 py-8">
@@ -460,7 +462,7 @@ export default function Reader() {
                 paddingBottom: pageHeightRef.current / 2, // Add extra padding to allow scrolling last partial page to top
                 color: 'var(--reader-text-color)' // Ensure text color is from theme
               }}
-              dangerouslySetInnerHTML={{ __html: formatContent(content) }}
+              dangerouslySetInnerHTML={{ __html: content }}
             />
           </TextSelectionHandler>
           
