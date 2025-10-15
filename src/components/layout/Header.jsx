@@ -30,6 +30,7 @@ import { useAuth } from '../auth/Auth';
 import { useCart } from '../cart/CartContext';
 import { useTheme } from './ThemeProvider';
 import { useTranslation } from '../i18n/SimpleI18n';
+import { LanguageSwitcher } from '../i18n/LanguageSwitcher';
 import { useExchangeRate } from '../utils/ExchangeRateContext';
 import {
   DropdownMenu,
@@ -42,29 +43,30 @@ import {
 
 // Mobile Bottom Navigation Component
 function MobileBottomNav({ currentPageName, isAuthenticated, cartItems }) {
+  const { t } = useTranslation();
   const navigationItems = [
     {
-      name: 'Главная',
+      name: t('nav.home'),
       path: 'Home',
       icon: Home
     },
     {
-      name: 'Каталог',
+      name: t('nav.catalog'),
       path: 'Catalog',
       icon: Search
     },
     {
-      name: 'Читалка',
+      name: t('nav.reader'),
       path: 'Library',
       icon: BookText
     },
     {
-      name: 'Лента',
+      name: t('nav.feed'),
       path: 'NotesFeed',
       icon: BookOpen
     },
     {
-      name: 'Профиль',
+      name: t('nav.profile'),
       path: 'Profile',
       icon: User,
       showBadge: isAuthenticated && cartItems.length > 0
@@ -165,17 +167,27 @@ export default function Header({ currentPageName, onLoginClick }) {
             {/* Right side icons */}
             <div className="flex items-center gap-1">
               {/* Search */}
-              <button className="relative p-2 text-foreground hover:text-primary">
+              <button
+                className="relative p-2 text-foreground hover:text-primary"
+                aria-label={t('common.search')}
+              >
                 <Search className="w-4 h-4" />
               </button>
-              
+
               {/* Notifications */}
-              <button className="relative p-2 text-foreground hover:text-primary">
+              <button
+                className="relative p-2 text-foreground hover:text-primary"
+                aria-label={t('header.notifications')}
+              >
                 <Bell className="w-4 h-4" />
               </button>
 
               {/* Cart */}
-              <Link to={createPageUrl('Cart')} className="relative p-2 text-foreground hover:text-primary">
+              <Link
+                to={createPageUrl('Cart')}
+                className="relative p-2 text-foreground hover:text-primary"
+                aria-label={t('header.cart')}
+              >
                 <ShoppingCart className="w-4 h-4" />
                 {cartItems.length > 0 && (
                   <Badge className="absolute -top-1 -right-1 h-3 w-3 flex items-center justify-center p-0 text-xs bg-orange-500 hover:bg-orange-500 text-white">
@@ -185,9 +197,17 @@ export default function Header({ currentPageName, onLoginClick }) {
               </Link>
 
               {/* Profile */}
-              <Link to={createPageUrl('Profile')} className="p-2 text-foreground hover:text-primary">
+              <Link
+                to={createPageUrl('Profile')}
+                className="p-2 text-foreground hover:text-primary"
+                aria-label={t('header.profile')}
+              >
                 <User className="w-4 h-4" />
               </Link>
+
+              <div className="px-1">
+                <LanguageSwitcher />
+              </div>
             </div>
           </div>
         </header>
@@ -223,7 +243,7 @@ export default function Header({ currentPageName, onLoginClick }) {
             <div className="relative w-48">
               <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
               <Input
-                placeholder="Поиск книг..."
+                placeholder={t('header.searchPlaceholder')}
                 className="pl-7 h-7 text-sm"
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
@@ -244,7 +264,7 @@ export default function Header({ currentPageName, onLoginClick }) {
                   currentPageName === 'Library' ? 'text-primary' : 'text-foreground'
                 }`}
               >
-                <Library className="w-3 h-3" /> Библиотека
+                <Library className="w-3 h-3" /> {t('header.library')}
               </Link>
             )}
 
@@ -255,7 +275,7 @@ export default function Header({ currentPageName, onLoginClick }) {
                 currentPageName === 'NotesFeed' ? 'text-primary' : 'text-foreground'
               }`}
             >
-              <BookOpen className="w-3 h-3" /> Лента заметок
+              <BookOpen className="w-3 h-3" /> {t('header.notesFeed')}
             </Link>
 
             {/* Exchange Rate Display */}
@@ -264,12 +284,14 @@ export default function Header({ currentPageName, onLoginClick }) {
               <span>{isRateLoading ? '...' : kasRateFormatted}</span>
             </div>
 
+            <LanguageSwitcher />
+
             {/* Theme Toggle */}
             <motion.button
               whileTap={{ scale: 0.95 }}
               onClick={toggleTheme}
               className="p-1 rounded-full hover:bg-secondary transition-colors text-foreground"
-              aria-label="Переключить тему"
+              aria-label={t('header.themeToggle')}
             >
               <ThemeIcon className="h-3 w-3" />
             </motion.button>
@@ -301,22 +323,22 @@ export default function Header({ currentPageName, onLoginClick }) {
                   </motion.button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="rounded-lg bg-card border-border">
-                  <DropdownMenuLabel className="text-foreground text-sm">{user.full_name || 'Профиль'}</DropdownMenuLabel>
+                  <DropdownMenuLabel className="text-foreground text-sm">{user.full_name || t('header.profile')}</DropdownMenuLabel>
                   <DropdownMenuSeparator className="bg-border" />
                   <DropdownMenuItem asChild>
                     <Link to={createPageUrl('Profile')} className="flex items-center text-foreground hover:text-primary text-sm">
                       <UserCog className="w-3 h-3 mr-2" />
-                      Мой профиль
+                      {t('header.myProfile')}
                     </Link>
                   </DropdownMenuItem>
-                  
+
                   <DropdownMenuItem asChild>
                     <Link to={createPageUrl('ReferralDashboard')} className="flex items-center text-foreground hover:text-primary text-sm">
                       <Users className="w-3 h-3 mr-2" />
-                      Реферальная программа
+                      {t('header.referralProgram')}
                     </Link>
                   </DropdownMenuItem>
-                  
+
                   {!canAccessAuthorPanel && (
                     <DropdownMenuItem asChild>
                       <Link
@@ -324,16 +346,16 @@ export default function Header({ currentPageName, onLoginClick }) {
                         className="flex items-center text-purple-600 font-medium text-sm"
                       >
                         <BookOpen className="w-3 h-3 mr-2" />
-                        Стать автором
+                        {t('header.becomeAuthor')}
                       </Link>
                     </DropdownMenuItem>
                   )}
-                  
+
                   {canAccessAuthorPanel && (
                     <DropdownMenuItem asChild>
                       <Link to={createPageUrl('AuthorPanel')} className="flex items-center text-foreground hover:text-primary text-sm">
                         <Crown className="w-3 h-3 mr-2 text-purple-600" />
-                        Панель автора
+                        {t('header.authorPanel')}
                       </Link>
                     </DropdownMenuItem>
                   )}
@@ -342,7 +364,7 @@ export default function Header({ currentPageName, onLoginClick }) {
                     <DropdownMenuItem asChild>
                       <Link to={createPageUrl('ModerationPage')} className="flex items-center text-foreground hover:text-primary text-sm">
                         <Shield className="w-3 h-3 mr-2" />
-                        Панель модерации
+                        {t('header.moderationPanel')}
                       </Link>
                     </DropdownMenuItem>
                   )}
@@ -351,7 +373,7 @@ export default function Header({ currentPageName, onLoginClick }) {
                     <DropdownMenuItem asChild>
                       <Link to={createPageUrl('AdminDashboard')} className="flex items-center text-foreground hover:text-primary text-sm">
                         <Shield className="w-3 h-3 mr-2 text-primary" />
-                        <span className="font-bold text-primary text-sm">Панель администратора</span>
+                        <span className="font-bold text-primary text-sm">{t('header.adminPanel')}</span>
                       </Link>
                     </DropdownMenuItem>
                   )}
@@ -359,7 +381,7 @@ export default function Header({ currentPageName, onLoginClick }) {
                   <DropdownMenuSeparator className="bg-border" />
                   <DropdownMenuItem onClick={logout} className="text-destructive text-sm">
                     <LogOut className="w-3 h-3 mr-2" />
-                    Выйти
+                    {t('header.logout')}
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -367,7 +389,7 @@ export default function Header({ currentPageName, onLoginClick }) {
               <motion.div whileTap={{ scale: 0.95 }}>
                 <Button onClick={handleLoginClick} size="sm" className="h-6 px-3 text-sm">
                   <LogIn className="mr-1 h-3 w-3" />
-                  Войти
+                  {t('header.login')}
                 </Button>
               </motion.div>
             )}

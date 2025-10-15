@@ -6,25 +6,15 @@ import { translateText } from '../utils/translationService';
 import { en } from './locales/en.jsx';
 import { ru } from './locales/ru.jsx';
 import { fr } from './locales/fr.jsx';
-import deLocale from './locales/de.jsx?raw';
-import esLocale from './locales/es.jsx?raw';
-
-// Complete translations with full coverage - adding French and Spanish
-const parseJsonLocale = (raw) => {
-  try {
-    return JSON.parse(raw);
-  } catch (error) {
-    logError('i18n.parseLocale', error);
-    return {};
-  }
-};
+import { de } from './locales/de.jsx';
+import { es } from './locales/es.jsx';
 
 const translations = {
   en,
   ru,
   fr,
-  de: parseJsonLocale(deLocale),
-  es: parseJsonLocale(esLocale)
+  de,
+  es,
 };
 
 class SimpleI18n {

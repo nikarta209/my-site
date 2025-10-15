@@ -6,10 +6,18 @@ export const en = {
     library: 'Library',
     cart: 'Cart',
     authorPanel: 'Author Panel',
+    moderationPanel: 'Moderation Panel',
+    adminPanel: 'Admin Panel',
+    referralProgram: 'Referral program',
+    becomeAuthor: 'Become an author',
+    notesFeed: 'Notes feed',
+    notifications: 'Notifications',
+    themeToggle: 'Toggle theme',
     searchPlaceholder: 'Search books, authors...',
     login: 'Login',
     logout: 'Logout',
     profile: 'Profile',
+    myProfile: 'My profile',
     myAccount: 'My Account'
   },
 
@@ -18,6 +26,8 @@ export const en = {
     home: 'Home',
     catalog: 'Catalog',
     library: 'Library',
+    reader: 'Reader',
+    feed: 'Notes feed',
     cart: 'Cart',
     profile: 'Profile'
   },

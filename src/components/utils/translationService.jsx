@@ -24,9 +24,25 @@ export const translateText = async (text, targetLanguage, sourceLanguage = 'ru')
 
     const translated = await InvokeLLM({ prompt });
 
+    const rawText = typeof translated === 'string'
+      ? translated
+      : typeof translated?.result === 'string'
+        ? translated.result
+        : '';
+
+    if (!rawText || /^AI-ответ:/i.test(rawText)) {
+      translationCache.set(cacheKey, text);
+      return text;
+    }
+
     // Убираем возможные кавычки, которые может добавить модель
-    const cleanedTranslation = translated.trim().replace(/^"|"$/g, '');
-    
+    const cleanedTranslation = rawText.trim().replace(/^"|"$/g, '');
+
+    if (!cleanedTranslation) {
+      translationCache.set(cacheKey, text);
+      return text;
+    }
+
     translationCache.set(cacheKey, cleanedTranslation);
     return cleanedTranslation;
   } catch (error) {
