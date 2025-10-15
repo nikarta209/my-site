@@ -2,16 +2,17 @@ import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { createPageUrl } from '@/utils';
-import { 
-  Sparkles, 
-  TrendingUp, 
-  Heart, 
-  Crown, 
+import {
+  Sparkles,
+  TrendingUp,
+  Heart,
+  Crown,
   Brain,
   BookOpen,
   Award,
   Star
 } from 'lucide-react';
+import { isSubscriptionFeatureEnabled } from '@/utils/featureFlags';
 
 const SUB_NAV_ITEMS = [
   {
@@ -48,11 +49,20 @@ const SUB_NAV_ITEMS = [
     icon: Brain,
     color: 'text-purple-600 bg-purple-50 border-purple-200',
     activeColor: 'text-purple-700 bg-purple-100 border-purple-300'
+  },
+  {
+    label: 'Подписка',
+    href: createPageUrl('SubscriptionPage'),
+    icon: Crown,
+    color: 'text-amber-600 bg-amber-50 border-amber-200',
+    activeColor: 'text-amber-700 bg-amber-100 border-amber-300',
+    requiresSubscription: true
   }
 ];
 
 export default function SubNavigation() {
   const location = useLocation();
+  const subscriptionEnabled = isSubscriptionFeatureEnabled();
   
   const isActive = (href) => {
     const currentPath = location.pathname;
@@ -82,7 +92,7 @@ export default function SubNavigation() {
     <div className="sticky top-12 z-40 bg-background/95 backdrop-blur-lg border-b border-border/50">
       <div className="container mx-auto px-4">
         <div className="flex items-center gap-1 py-2 overflow-x-auto scrollbar-hide">
-          {SUB_NAV_ITEMS.map((item) => {
+          {SUB_NAV_ITEMS.filter((item) => !item.requiresSubscription || subscriptionEnabled).map((item) => {
             const Icon = item.icon;
             const active = isActive(item.href);
             
