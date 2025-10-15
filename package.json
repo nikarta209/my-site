@@ -9,7 +9,7 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "start": "vite preview --host 0.0.0.0 --port ${PORT:-4173}",
-    "test": "vitest run",
+    "test": "vitest run --exclude tests/e2e/**",
     "test:watch": "vitest",
     "test:e2e": "playwright test"
   },

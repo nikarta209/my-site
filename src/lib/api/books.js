@@ -1,12 +1,7 @@
 import { supabase, isSupabaseConfigured } from '@/api/supabaseClient';
+import { logError } from '@/lib/logger';
 
-const logError = (scope, error) => {
-  if (typeof console !== 'undefined') {
-    console.error(`[booksApi] ${scope}`, error);
-  }
-};
-
-const BOOK_FIELDS = [
+export const BOOK_FIELDS = [
   'id',
   'title',
   'slug',
@@ -36,33 +31,56 @@ const BOOK_FIELDS = [
   'published_at',
   'released_at',
   'release_date',
-  'preview_available'
+  'preview_available',
 ]
   .filter(Boolean)
   .join(',');
 
-const ensureCover = (book) =>
-  book && (book.cover_url || (book.cover_images && Object.values(book.cover_images || {}).some(Boolean)));
+const ensureArray = (value) => (Array.isArray(value) ? value : []);
 
-const pickTopWithCover = (data = []) => data.filter(ensureCover);
+const hasCover = (book) => {
+  if (!book) return false;
+  if (book.cover_url) return true;
+  const coverImages = book.cover_images || book.coverImages;
+  return Boolean(coverImages && Object.values(coverImages).some(Boolean));
+};
 
-const normalizeBook = (book) => ({
-  ...book,
-  id: String(book.id),
-  genres: Array.isArray(book.genres)
+const normalizeBook = (book) => {
+  if (!book) return null;
+  const genres = Array.isArray(book.genres)
     ? book.genres
     : book.genre
       ? [book.genre]
-      : [],
-  languages: Array.isArray(book.languages) ? book.languages : [],
-  weekly_sales: typeof book.weekly_sales === 'number'
-    ? book.weekly_sales
-    : book.sales_count || 0,
-  total_sales: typeof book.total_sales === 'number'
-    ? book.total_sales
-    : book.sales_count || 0,
-  rating: typeof book.rating === 'number' ? book.rating : Number(book.rating) || 0,
-});
+      : [];
+
+  const languages = Array.isArray(book.languages)
+    ? book.languages
+    : book.lang
+      ? [book.lang]
+      : [];
+
+  return {
+    ...book,
+    id: book.id != null ? String(book.id) : undefined,
+    genres,
+    languages,
+    weekly_sales:
+      typeof book.weekly_sales === 'number'
+        ? book.weekly_sales
+        : typeof book.sales_count === 'number'
+          ? book.sales_count
+          : 0,
+    total_sales:
+      typeof book.total_sales === 'number'
+        ? book.total_sales
+        : typeof book.sales_count === 'number'
+          ? book.sales_count
+          : 0,
+    rating: typeof book.rating === 'number' ? book.rating : Number(book.rating) || 0,
+  };
+};
+
+const normalizeBooks = (items) => ensureArray(items).map(normalizeBook).filter(hasCover);
 
 export const fetchBestsellers = async (limit = 12) => {
   if (!isSupabaseConfigured) {
@@ -72,32 +90,35 @@ export const fetchBestsellers = async (limit = 12) => {
   try {
     const { data, error } = await supabase
       .from('bestsellers_view')
-      .select('*')
-      .not('cover_url', 'is', null)
+      .select(BOOK_FIELDS)
       .order('weekly_sales', { ascending: false })
       .order('rating', { ascending: false })
-      .limit(limit);
+      .limit(limit * 2);
 
     if (error) throw error;
-    return pickTopWithCover((data || []).map(normalizeBook));
+
+    const books = normalizeBooks(data);
+    return books.slice(0, limit);
   } catch (error) {
-    logError('fetchBestsellers', error);
+    logError('books.fetchBestsellers', error);
+  }
 
-    try {
-      const { data, error: booksError } = await supabase
-        .from('books')
-        .select(BOOK_FIELDS)
-        .eq('status', 'approved')
-        .order('sales_count', { ascending: false })
-        .order('rating', { ascending: false })
-        .limit(limit * 2);
+  try {
+    const { data, error: fallbackError } = await supabase
+      .from('books')
+      .select(BOOK_FIELDS)
+      .eq('status', 'approved')
+      .order('sales_count', { ascending: false })
+      .order('rating', { ascending: false })
+      .limit(limit * 3);
 
-      if (booksError) throw booksError;
-      return pickTopWithCover((data || []).map(normalizeBook)).slice(0, limit);
-    } catch (fallbackError) {
-      logError('fetchBestsellers:fallback', fallbackError);
-      return [];
-    }
+    if (fallbackError) throw fallbackError;
+
+    const books = normalizeBooks(data);
+    return books.slice(0, limit);
+  } catch (fallbackError) {
+    logError('books.fetchBestsellers.fallback', fallbackError);
+    return [];
   }
 };
 
@@ -114,39 +135,55 @@ export const fetchHomeBooks = async () => {
 
     if (error) throw error;
 
-    const books = (data || []).map(normalizeBook);
+    const books = normalizeBooks(data);
+
+    if (books.length === 0) {
+      return [];
+    }
 
     try {
-      const { data: bestsellerData, error: bestsellerError } = await supabase
+      const { data: bestsellerStats, error: statsError } = await supabase
         .from('bestsellers_view')
         .select('id, weekly_sales, total_sales, rating');
 
-      if (!bestsellerError && Array.isArray(bestsellerData)) {
-        const byId = new Map(bestsellerData.map((entry) => [String(entry.id), entry]));
+      if (statsError) throw statsError;
+
+      if (Array.isArray(bestsellerStats) && bestsellerStats.length > 0) {
+        const byId = new Map(bestsellerStats.map((entry) => [String(entry.id), entry]));
+
         return books.map((book) => {
           const stats = byId.get(book.id);
           if (!stats) return book;
+
           return {
             ...book,
-            weekly_sales: typeof stats.weekly_sales === 'number' ? stats.weekly_sales : book.weekly_sales,
-            total_sales: typeof stats.total_sales === 'number' ? stats.total_sales : book.total_sales,
+            weekly_sales:
+              typeof stats.weekly_sales === 'number' ? stats.weekly_sales : book.weekly_sales,
+            total_sales:
+              typeof stats.total_sales === 'number' ? stats.total_sales : book.total_sales,
             rating: typeof stats.rating === 'number' ? stats.rating : book.rating,
           };
         });
       }
     } catch (mergeError) {
-      logError('fetchHomeBooks:merge', mergeError);
+      logError('books.fetchHomeBooks.merge', mergeError);
     }
 
     return books;
   } catch (error) {
-    logError('fetchHomeBooks', error);
+    logError('books.fetchHomeBooks', error);
     return [];
   }
 };
 
 export const fetchBooksByIds = async (ids = []) => {
-  if (!isSupabaseConfigured || !Array.isArray(ids) || ids.length === 0) {
+  if (!isSupabaseConfigured) {
+    return [];
+  }
+
+  const uniqueIds = Array.from(new Set(ensureArray(ids).map((id) => (id != null ? String(id) : null)).filter(Boolean)));
+
+  if (uniqueIds.length === 0) {
     return [];
   }
 
@@ -154,12 +191,13 @@ export const fetchBooksByIds = async (ids = []) => {
     const { data, error } = await supabase
       .from('books')
       .select(BOOK_FIELDS)
-      .in('id', ids);
+      .in('id', uniqueIds);
 
     if (error) throw error;
-    return (data || []).map(normalizeBook);
+
+    return normalizeBooks(data);
   } catch (error) {
-    logError('fetchBooksByIds', error);
+    logError('books.fetchBooksByIds', error);
     return [];
   }
 };

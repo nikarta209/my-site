@@ -1,9 +1,6 @@
-import React from 'react';
+import { memo } from 'react';
 import { motion } from 'framer-motion';
-import { Button } from '@/components/ui/button';
-import { createPageUrl } from '@/utils';
-import { useTranslation } from '@/components/i18n/SimpleI18n';
-import { useCart } from '@/components/cart/CartContext';
+import { Link } from 'react-router-dom';
 import {
   PenSquare,
   LibraryBig,
@@ -14,7 +11,10 @@ import {
   Star,
   ShoppingBag,
 } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Button } from '@/components/ui/button';
+import { createPageUrl } from '@/utils';
+import { useTranslation } from '@/components/i18n/SimpleI18n';
+import { useCart } from '@/components/cart/CartContext';
 
 const ICON_MAP = {
   PenSquare,
@@ -51,14 +51,12 @@ const pickCoverUrl = (book) => {
 const HeroBook = ({ book, onAddToCart, t }) => {
   if (!book) return null;
 
-  const primaryLabel = book.preview_available
-    ? t('home.hero.read')
-    : t('home.hero.open');
+  const primaryLabel = book.preview_available ? t('home.hero.read') : t('home.hero.open');
   const secondaryLabel = t('home.hero.addToCart');
   const canAddToCart = !book.is_free && !book.is_owned && !book.is_subscription_only;
 
   const detailHref = createPageUrl(`BookDetails?id=${book.id}`);
-  const readerHref = createPageUrl(`Reader?id=${book.id}`);
+  const readerHref = createPageUrl(`Reader?bookId=${book.id}`);
 
   return (
     <motion.article
@@ -67,6 +65,7 @@ const HeroBook = ({ book, onAddToCart, t }) => {
     >
       <div className="relative aspect-[3/4] overflow-hidden rounded-xl">
         <img
+          // NOTE: Using a seeded placeholder keeps card heights consistent while covers load.
           src={pickCoverUrl(book) || `https://picsum.photos/seed/${book.id}/400/600`}
           alt={book.title}
           loading="lazy"
@@ -75,15 +74,10 @@ const HeroBook = ({ book, onAddToCart, t }) => {
         <div className="absolute inset-0 bg-gradient-to-t from-background/70 via-background/10 to-transparent" />
       </div>
       <div className="mt-3 flex flex-col gap-2">
-        <Link
-          to={detailHref}
-          className="line-clamp-2 text-base font-semibold leading-tight text-foreground hover:text-primary"
-        >
+        <Link to={detailHref} className="line-clamp-2 text-base font-semibold leading-tight text-foreground hover:text-primary">
           {book.title}
         </Link>
-        {book.author && (
-          <p className="text-sm text-muted-foreground">{book.author}</p>
-        )}
+        {book.author && <p className="text-sm text-muted-foreground">{book.author}</p>}
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           {book.rating > 0 && (
             <span className="flex items-center gap-1">
@@ -94,7 +88,7 @@ const HeroBook = ({ book, onAddToCart, t }) => {
           {book.weekly_sales > 0 && (
             <span className="flex items-center gap-1">
               <Flame className="h-4 w-4 text-orange-500" aria-hidden="true" />
-              {Intl.NumberFormat('ru-RU').format(book.weekly_sales)}
+              {Intl.NumberFormat(undefined, { maximumFractionDigits: 0 }).format(book.weekly_sales)}
             </span>
           )}
         </div>
@@ -119,9 +113,10 @@ const HeroBook = ({ book, onAddToCart, t }) => {
   );
 };
 
-export default function HeroSlide({ slide }) {
+const HeroSlideComponent = ({ slide, onAddToCart }) => {
   const { t } = useTranslation();
   const { addToCart } = useCart();
+  const handleAddToCart = onAddToCart ?? addToCart;
 
   if (slide.type === 'cta') {
     const Icon = ICON_MAP[slide.icon] || Rocket;
@@ -143,22 +138,22 @@ export default function HeroSlide({ slide }) {
               <Icon className="h-5 w-5" aria-hidden="true" />
               {t(slide.titleKey)}
             </span>
-            <h2 className="text-3xl font-bold leading-tight md:text-4xl">
-              {t(slide.headlineKey)}
-            </h2>
-            <p className="text-base text-white/90 md:text-lg">
-              {t(slide.descriptionKey)}
-            </p>
+            <h2 className="text-3xl font-bold leading-tight md:text-4xl">{t(slide.headlineKey)}</h2>
+            <p className="text-base text-white/90 md:text-lg">{t(slide.descriptionKey)}</p>
             <div className="flex flex-col gap-3 sm:flex-row">
-              <Button asChild size="lg" className="shadow-lg shadow-black/20">
-                <Link to={slide.primaryCta.href}>{t(slide.primaryCta.labelKey)}</Link>
-              </Button>
-              <Button asChild variant="secondary" size="lg" className="bg-white/10 text-white hover:bg-white/20">
-                <Link to={slide.secondaryCta.href} className="inline-flex items-center gap-2">
-                  <span>{t(slide.secondaryCta.labelKey)}</span>
-                  <ArrowUpRight className="h-4 w-4" aria-hidden="true" />
-                </Link>
-              </Button>
+              {slide.primaryCta && (
+                <Button asChild size="lg" className="shadow-lg shadow-black/20">
+                  <Link to={slide.primaryCta.href}>{t(slide.primaryCta.labelKey)}</Link>
+                </Button>
+              )}
+              {slide.secondaryCta && (
+                <Button asChild variant="secondary" size="lg" className="bg-white/10 text-white hover:bg-white/20">
+                  <Link to={slide.secondaryCta.href} className="inline-flex items-center gap-2">
+                    <span>{t(slide.secondaryCta.labelKey)}</span>
+                    <ArrowUpRight className="h-4 w-4" aria-hidden="true" />
+                  </Link>
+                </Button>
+              )}
             </div>
           </div>
         </div>
@@ -197,11 +192,14 @@ export default function HeroSlide({ slide }) {
         ) : (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">
             {books.map((book) => (
-              <HeroBook key={book.id} book={book} onAddToCart={addToCart} t={t} />
+              <HeroBook key={book.id} book={book} onAddToCart={handleAddToCart} t={t} />
             ))}
           </div>
         )}
       </div>
     </motion.div>
   );
-}
+};
+
+export const HeroSlide = memo(HeroSlideComponent);
+export default HeroSlide;
