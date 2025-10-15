@@ -1,47 +1,46 @@
-import React from 'react';
 import { Link } from 'react-router-dom';
-import { Github, Twitter, Youtube, Send, ArrowRight, PenSquare, Moon, Sun } from 'lucide-react';
+import { PenSquare, Github, Twitter, Youtube, Send, ArrowRight, Moon, Sun } from 'lucide-react';
 import { createPageUrl } from '@/utils';
 import { LanguageSwitcher } from '../i18n/LanguageSwitcher';
 import { useTranslation } from '../i18n/SimpleI18n';
 import { useTheme } from './ThemeProvider';
 import { Button } from '@/components/ui/button';
 
-const sections = (t) => [
+const navColumns = (t) => [
   {
     title: t('footer.catalog'),
     links: [
       { label: t('footer.links.allBooks'), href: createPageUrl('Catalog') },
-      { label: t('footer.links.newReleases'), href: createPageUrl('Catalog') + '?sort=newest' },
-      { label: t('footer.links.bestSellers'), href: createPageUrl('Catalog') + '?sort=bestseller' },
+      { label: t('footer.links.newReleases'), href: createPageUrl('Catalog?sort=newest') },
+      { label: t('footer.links.bestSellers'), href: createPageUrl('Catalog?sort=bestseller') },
       { label: t('footer.links.collections'), href: createPageUrl('Novelties') },
     ],
   },
   {
     title: t('footer.authors'),
     links: [
-      { label: t('footer.links.submitBook'), href: '/authors/submit' },
-      { label: t('footer.links.authorGuide'), href: '/authors/guide' },
-      { label: t('footer.links.royalties'), href: '/legal/royalties' },
-      { label: t('footer.links.events'), href: '/authors/webinars' },
+      { label: t('footer.links.submitBook'), href: createPageUrl('authors/submit') },
+      { label: t('footer.links.authorGuide'), href: createPageUrl('authors/guide') },
+      { label: t('footer.links.royalties'), href: createPageUrl('legal/royalties') },
+      { label: t('footer.links.events'), href: createPageUrl('authors/webinars') },
     ],
   },
   {
     title: t('footer.about'),
     links: [
-      { label: t('footer.links.aboutProject'), href: '/about' },
-      { label: t('footer.links.blog'), href: '/blog' },
-      { label: t('footer.links.partners'), href: '/partners' },
-      { label: t('footer.links.careers'), href: '/careers' },
+      { label: t('footer.links.aboutProject'), href: createPageUrl('about') },
+      { label: t('footer.links.blog'), href: createPageUrl('blog') },
+      { label: t('footer.links.partners'), href: createPageUrl('partners') },
+      { label: t('footer.links.careers'), href: createPageUrl('careers') },
     ],
   },
   {
     title: t('footer.support'),
     links: [
-      { label: t('footer.links.helpCenter'), href: '/help' },
+      { label: t('footer.links.helpCenter'), href: createPageUrl('help') },
       { label: t('footer.links.contact'), href: 'mailto:support@kasbook.io' },
-      { label: t('footer.links.status'), href: '/status' },
-      { label: t('footer.links.privacy'), href: '/legal/privacy' },
+      { label: t('footer.links.status'), href: createPageUrl('status') },
+      { label: t('footer.links.privacy'), href: createPageUrl('legal/privacy') },
     ],
   },
 ];
@@ -53,6 +52,12 @@ const socialLinks = [
   { icon: Send, href: 'https://t.me/kasbook', label: 'Telegram' },
 ];
 
+const legalLinks = (t) => [
+  { label: t('footer.links.privacyPolicy'), href: createPageUrl('legal/privacy') },
+  { label: t('footer.links.terms'), href: createPageUrl('legal/terms') },
+  { label: t('footer.links.offer'), href: createPageUrl('legal/public-offer') },
+];
+
 export default function Footer() {
   const { t } = useTranslation();
   const { theme, toggleTheme, isMobile } = useTheme();
@@ -62,6 +67,7 @@ export default function Footer() {
   const ThemeIcon = theme === 'light' ? Moon : Sun;
 
   if (isMobile) {
+    // NOTE: The app renders a dedicated mobile navigation footer elsewhere.
     return null;
   }
 
@@ -70,33 +76,31 @@ export default function Footer() {
       <div className="container mx-auto px-4 py-12">
         <div className="grid gap-10 lg:grid-cols-5">
           <div className="space-y-6 lg:col-span-2">
-            <div>
-              <Link to={createPageUrl('Home')} className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-primary/70 text-primary-foreground">
-                  <PenSquare className="h-5 w-5" />
-                </div>
-                <div>
-                  <p className="text-lg font-semibold">Kasbook</p>
-                  <p className="text-sm text-muted-foreground">{t('footer.tagline')}</p>
-                </div>
-              </Link>
-            </div>
+            <Link to={createPageUrl('Home')} className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-primary/70 text-primary-foreground">
+                <PenSquare className="h-5 w-5" aria-hidden="true" />
+              </div>
+              <div>
+                <p className="text-lg font-semibold">Kasbook</p>
+                <p className="text-sm text-muted-foreground">{t('footer.tagline')}</p>
+              </div>
+            </Link>
 
             <div className="rounded-2xl border border-primary/20 bg-primary/5 p-5">
               <h3 className="text-lg font-semibold text-primary">{t('footer.authorCtaTitle')}</h3>
               <p className="mt-2 text-sm text-primary/80">{t('footer.authorCtaSubtitle')}</p>
               <Button asChild className="mt-4">
-                <Link to="/authors/submit" className="inline-flex items-center gap-2">
+                <Link to={createPageUrl('authors/submit')} className="inline-flex items-center gap-2">
                   {t('footer.authorCtaButton')}
-                  <ArrowRight className="h-4 w-4" />
+                  <ArrowRight className="h-4 w-4" aria-hidden="true" />
                 </Link>
               </Button>
             </div>
 
-            <div className="flex items-center gap-4">
+            <div className="flex flex-wrap items-center gap-4">
               <LanguageSwitcher />
               <Button variant="ghost" size="icon" onClick={toggleTheme} aria-label={themeLabel}>
-                <ThemeIcon className="h-5 w-5" />
+                <ThemeIcon className="h-5 w-5" aria-hidden="true" />
               </Button>
             </div>
 
@@ -110,13 +114,13 @@ export default function Footer() {
                   rel="noreferrer"
                   aria-label={label}
                 >
-                  <Icon className="h-5 w-5" />
+                  <Icon className="h-5 w-5" aria-hidden="true" />
                 </a>
               ))}
             </div>
           </div>
 
-          {sections(t).map((section) => (
+          {navColumns(t).map((section) => (
             <div key={section.title} className="space-y-3">
               <h4 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">{section.title}</h4>
               <ul className="space-y-2 text-sm text-muted-foreground">
@@ -148,15 +152,11 @@ export default function Footer() {
         <div className="container mx-auto flex flex-col gap-4 px-4 text-sm text-muted-foreground md:flex-row md:items-center md:justify-between">
           <p>© {year} Kasbook. {t('footer.rights')}</p>
           <div className="flex flex-wrap gap-4">
-            <Link to="/legal/privacy" className="hover:text-primary">
-              {t('footer.links.privacyPolicy')}
-            </Link>
-            <Link to="/legal/terms" className="hover:text-primary">
-              {t('footer.links.terms')}
-            </Link>
-            <Link to="/legal/public-offer" className="hover:text-primary">
-              {t('footer.links.offer')}
-            </Link>
+            {legalLinks(t).map((link) => (
+              <Link key={link.label} to={link.href} className="hover:text-primary">
+                {link.label}
+              </Link>
+            ))}
           </div>
         </div>
       </div>

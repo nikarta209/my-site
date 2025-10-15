@@ -1,13 +1,14 @@
 'use client';
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import HeroSlide from './HeroSlide';
-import { HERO_TABS } from '@/lib/banners';
+import { HERO_TABS, HERO_TAB_ORDER } from '@/lib/banners';
 import { fetchBestsellers } from '@/lib/api/books';
 import { useTranslation } from '@/components/i18n/SimpleI18n';
+import { useCart } from '@/components/cart/CartContext';
 
-const AUTO_DELAY = 7000;
+const HERO_ROTATION_INTERVAL = 7000;
 
 const chunkArray = (items, chunkSize) => {
   if (!Array.isArray(items) || chunkSize <= 0) return [];
@@ -20,6 +21,7 @@ const chunkArray = (items, chunkSize) => {
 
 export default function HeroTabs() {
   const { t } = useTranslation();
+  const { addToCart } = useCart();
   const [activeIndex, setActiveIndex] = useState(0);
   const [bestsellers, setBestsellers] = useState([]);
   const [isPaused, setIsPaused] = useState(false);
@@ -30,12 +32,14 @@ export default function HeroTabs() {
     let mounted = true;
     fetchBestsellers(12)
       .then((data) => {
-        if (mounted) {
-          setBestsellers(Array.isArray(data) ? data : []);
-        }
+        if (!mounted) return;
+        setBestsellers(Array.isArray(data) ? data : []);
       })
-      .catch((error) => {
-        console.error('[HeroTabs] Failed to load bestsellers', error);
+      .catch(() => {
+        // NOTE: Errors are logged inside the books API helper.
+        if (mounted) {
+          setBestsellers([]);
+        }
       });
     return () => {
       mounted = false;
@@ -44,38 +48,33 @@ export default function HeroTabs() {
 
   const bookChunks = useMemo(() => chunkArray(bestsellers, 3), [bestsellers]);
 
-  const slides = useMemo(
-    () =>
-      HERO_TABS.map((tab) =>
-        tab.type === 'books'
-          ? {
-              ...tab,
-              title: t(tab.titleKey),
-              books: bookChunks[tab.chunkIndex] || [],
-            }
-          : {
-              ...tab,
-              title: t(tab.titleKey),
-            }
-      ),
-    [bookChunks, t]
-  );
+  const slides = useMemo(() => {
+    return HERO_TAB_ORDER.map((tabId) => {
+      const tab = HERO_TABS[tabId];
+      if (!tab) return null;
+      if (tab.type === 'books') {
+        return {
+          ...tab,
+          books: bookChunks[tab.chunkIndex] || [],
+        };
+      }
+      return tab;
+    }).filter(Boolean);
+  }, [bookChunks]);
 
   useEffect(() => {
-    if (isPaused) return undefined;
+    if (isPaused || slides.length <= 1) return undefined;
     const id = window.setInterval(() => {
       setActiveIndex((prev) => (prev + 1) % slides.length);
-    }, AUTO_DELAY);
+    }, HERO_ROTATION_INTERVAL);
     return () => window.clearInterval(id);
   }, [isPaused, slides.length]);
 
   const switchToIndex = useCallback(
     (index) => {
-      if (index < 0) {
-        setActiveIndex(slides.length - 1);
-      } else {
-        setActiveIndex(index % slides.length);
-      }
+      if (slides.length === 0) return;
+      const normalized = ((index % slides.length) + slides.length) % slides.length;
+      setActiveIndex(normalized);
     },
     [slides.length]
   );
@@ -123,6 +122,14 @@ export default function HeroTabs() {
     }
   };
 
+  const handleAddToCart = useCallback(
+    (book) => {
+      if (!book) return;
+      addToCart(book);
+    },
+    [addToCart]
+  );
+
   const activeSlide = slides[activeIndex] ?? slides[0];
 
   return (
@@ -157,7 +164,7 @@ export default function HeroTabs() {
                 : 'bg-muted text-muted-foreground hover:bg-muted/80'
             }`}
           >
-            {tab.title}
+            {t(tab.titleKey)}
           </button>
         ))}
       </div>
@@ -171,7 +178,7 @@ export default function HeroTabs() {
               aria-labelledby={`hero-tab-${activeSlide.id}`}
               className="focus:outline-none"
             >
-              <HeroSlide slide={activeSlide} />
+              <HeroSlide slide={activeSlide} onAddToCart={handleAddToCart} />
             </div>
           )}
         </AnimatePresence>
