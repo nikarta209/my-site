@@ -1,30 +1,15 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Document, Page, pdfjs } from 'react-pdf';
-import ePub from 'epubjs';
-import mammoth from 'mammoth';
-import { get, set } from 'idb-keyval';
 import { toast } from 'sonner';
-import { Book, UserBookData } from '@/api/entities';
 import { useAuth } from '../auth/Auth';
 import ReaderV2Toolbar from './ReaderV2Toolbar';
 import ReaderV2Sidebar from './ReaderV2Sidebar';
 import Watermark from './Watermark';
 import { AlertTriangle, Loader2 } from 'lucide-react';
 import { InvokeLLM } from '@/api/integrations';
-import {
-  cacheBookData,
-  getCachedBookData,
-  queueMutation,
-  syncOfflineData
-} from '../utils/OfflineManager';
-import ReactMarkdown from 'react-markdown'; // Still imported for potential future use or if markdown is generated
 import { motion } from 'framer-motion';
-import { determineFileType, extractRawTextFromFileBlob, looksLikeHtmlContent } from '@/utils/bookContent';
-
-// Настройка PDF.js worker
-pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.js`;
+import { getBookContent } from '@/api/functions';
 
 // Функция для безопасной очистки HTML (перенесена наружу для оптимизации)
 const sanitizeHTML = (html) => {
@@ -35,50 +20,12 @@ const sanitizeHTML = (html) => {
     .replace(/on\w+="[^"]*"/gi, '');
 };
 
-// Функция для конвертации простого текста с маркерами в HTML
-const convertPlainTextToHtml = (plainText) => {
-  return plainText.split('\n\n').map((paragraph) => { // Разделяем по двойным переводам строки для параграфов
-    const trimmed = paragraph.trim();
-    if (!trimmed) return '';
-
-    // Проверяем наличие маркеров глав и применяем соответствующие стили
-    if (trimmed.startsWith('_CHAPTER_TITLE_TYPE1_') && trimmed.endsWith('_CHAPTER_TITLE_TYPE1_')) {
-      const content = trimmed.substring('_CHAPTER_TITLE_TYPE1_'.length, trimmed.length - '_CHAPTER_TITLE_TYPE1_'.length);
-      return `<h2 class="chapter-title">${content}</h2>`;
-    } else if (trimmed.startsWith('_CHAPTER_TITLE_TYPE2_') && trimmed.endsWith('_CHAPTER_TITLE_TYPE2_')) {
-      const content = trimmed.substring('_CHAPTER_TITLE_TYPE2_'.length, trimmed.length - '_CHAPTER_TITLE_TYPE2_'.length);
-      return `<h2 class="numbered-title">${content}</h2>`;
-    } else if (trimmed.startsWith('_CHAPTER_TITLE_TYPE3_') && trimmed.endsWith('_CHAPTER_TITLE_TYPE3_')) {
-      const content = trimmed.substring('_CHAPTER_TITLE_TYPE3_'.length, trimmed.length - '_CHAPTER_TITLE_TYPE3_'.length);
-      return `<h2 class="caps-title">${content}</h2>`;
-    }
-    // Простые правила для определения заголовков и цитат из обычного текста (существующие)
-    else if (trimmed.startsWith('# ')) {
-      return `<h1 class="text-center text-3xl font-bold mb-6 mt-8 text-primary">${trimmed.substring(2)}</h1>`;
-    } else if (trimmed.startsWith('## ')) {
-      return `<h2 class="text-center text-2xl font-semibold mb-4 mt-6 text-primary">${trimmed.substring(3)}</h2>`;
-    } else if (trimmed.startsWith('### ')) {
-      return `<h3 class="text-xl font-medium mb-3 mt-5 text-primary">${trimmed.substring(4)}</h3>`;
-    } else if (trimmed.toUpperCase() === trimmed && trimmed.length < 100 && trimmed.split(' ').length < 10) { // All caps, short string
-      return `<h2 class="text-center text-xl font-bold mb-4 mt-6 text-primary uppercase tracking-wide">${trimmed}</h2>`;
-    } else if (trimmed.startsWith('"') && trimmed.endsWith('"')) {
-      return `<blockquote class="border-l-4 border-primary/30 pl-4 py-2 my-4 italic bg-muted/30"><p>${trimmed.substring(1, trimmed.length - 1)}</p></blockquote>`;
-    } else {
-      // Обычные параграфы
-      return `<p class="mb-4 text-justify first-letter:text-2xl first-letter:font-bold first-letter:mr-1 first-letter:float-left">${trimmed}</p>`;
-    }
-  }).join(''); // Объединяем все параграфы в одну HTML-строку
-};
-
-
 export default function ReaderV2() {
   const [searchParams] = useSearchParams();
   const bookId = searchParams.get('bookId');
   const { user } = useAuth();
 
   const [book, setBook] = useState(null);
-  const [fileBlob, setFileBlob] = useState(null);
-  const [fileType, setFileType] = useState(null);
   const [error, setError] = useState(null);
 
   // Новое состояние для текстового ридера
@@ -126,51 +73,11 @@ export default function ReaderV2() {
 
   useEffect(() => {
     const handleOnline = () => {
-      toast.info('Вы снова в сети! Синхронизируем данные...');
-      syncOfflineData().then(result => {
-        if (result.success) {
-          toast.success(result.message);
-        } else if (result.message !== 'Offline') { // Only show error if it's not simply "offline"
-          toast.error(`Ошибка синхронизации: ${result.message}`);
-        }
-      });
+      toast.info('Вы снова в сети!');
     };
     window.addEventListener('online', handleOnline);
     return () => window.removeEventListener('online', handleOnline);
   }, []);
-
-  // Функция для обработки содержимого книги и выделения заголовков (пре-процессор)
-  const formatBookContent = useCallback((content) => {
-    if (!content) return '';
-    
-    // Паттерны для определения заголовков
-    const chapterPatterns = [
-      // Explicit "Глава/Chapter N" or "Часть/Part N"
-      { regex: /^(?:Глава|Chapter|ГЛАВА|CHAPTER)\s+(\d+|[IVXLC]+)[\.\:]?\s*(.*)$/gim, marker: '_CHAPTER_TITLE_TYPE1_' },
-      { regex: /^(?:Часть|Part|ЧАСТЬ|PART)\s+(\d+|[IVXLC]+)[\.\:]?\s*(.*)$/gim, marker: '_CHAPTER_TITLE_TYPE1_' },
-      // Numbered headings like "1. Введение"
-      { regex: /^(\d+\.\s+.+)$/gm, marker: '_CHAPTER_TITLE_TYPE2_' },
-      // All caps, reasonably short
-      { regex: /^([А-ЯЁA-Z][А-ЯЁA-Z\s]{5,70})$/gm, marker: '_CHAPTER_TITLE_TYPE3_' } // Adjusted length for better accuracy
-    ];
-    
-    let preprocessedText = content;
-    
-    // Применяем маркеры для специфических паттернов глав
-    chapterPatterns.forEach(pattern => {
-      preprocessedText = preprocessedText.replace(pattern.regex, (match) => {
-        // Заменяем на уникальный маркер, который convertPlainTextToHtml сможет распознать
-        return `${pattern.marker}${match}${pattern.marker}`;
-      });
-    });
-    
-    // Нормализуем множественные переводы строк для разделения параграфов
-    preprocessedText = preprocessedText.replace(/\n\s*\n/g, '\n\n'); // Гарантируем двойной перевод строки для параграфов
-    preprocessedText = preprocessedText.replace(/\n\s*([^\n])/g, '\n$1'); // Обрезаем пробелы в начале новых строк
-
-    return preprocessedText;
-  }, []);
-
 
   // Pagination logic
   const paginateContent = useCallback(() => {
@@ -255,73 +162,31 @@ export default function ReaderV2() {
       setLoading(false);
       return;
     }
+
     setLoading(true);
     setError(null);
 
-    const abortController = new AbortController();
-    const timeoutId = setTimeout(() => {
-        abortController.abort();
-        setError('Загрузка книги заняла слишком много времени.');
-        toast.error('Тайм-аут загрузки');
-        setLoading(false);
-    }, 30000);
-
     try {
-        const cachedData = await getCachedBookData(bookId);
-        if (cachedData?.fileBlob && cachedData?.details) {
-            console.log('Loading book from IndexedDB cache.');
-            setFileBlob(cachedData.fileBlob);
-            setBook(cachedData.details);
-            const type = determineFileType(cachedData.details.languages?.[0]?.file_url || '', cachedData.fileBlob.type);
-            setFileType(type);
-            const rawText = await extractRawTextFromFileBlob(cachedData.fileBlob, type);
-            const finalHtml = looksLikeHtmlContent(rawText)
-              ? sanitizeHTML(rawText)
-              : sanitizeHTML(convertPlainTextToHtml(formatBookContent(rawText)));
-            setAllContent(finalHtml);
-            toast.success("Книга загружена из кеша");
-            return;
-        }
-        
-        console.log('Book not in cache, fetching from network.');
-        const bookDetails = await Book.get(bookId);
-        if (!bookDetails) throw new Error("Книга не найдена");
-        setBook(bookDetails);
-
-        const primaryFileUrl = bookDetails.languages.find(l => l.file_url)?.file_url;
-        if (!primaryFileUrl) throw new Error("Файл книги отсутствует");
-
-        const response = await fetch(primaryFileUrl, { signal: abortController.signal });
-        if (!response.ok) throw new Error(`Ошибка при загрузке файла: ${response.statusText}`);
-
-        const blob = await response.blob();
-        setFileBlob(blob);
-        const type = determineFileType(primaryFileUrl, blob.type);
-        setFileType(type);
-
-        const rawText = await extractRawTextFromFileBlob(blob, type);
-        const finalHtml = looksLikeHtmlContent(rawText)
-          ? sanitizeHTML(rawText)
-          : sanitizeHTML(convertPlainTextToHtml(formatBookContent(rawText)));
-        setAllContent(finalHtml);
-
-        await cacheBookData(bookId, blob, bookDetails);
-        toast.success("Книга загружена из сети и сохранена в кеше");
-
-    } catch (e) {
-      if (e.name === 'AbortError') {
-        console.warn('Fetch aborted due to timeout or unmount.');
-        setError('Загрузка книги отменена.');
-      } else {
-        console.error("Load book error:", e);
-        setError(e.message || 'Не удалось загрузить книгу.');
-        toast.error('Ошибка загрузки', { description: e.message });
+      const response = await getBookContent({ bookId });
+      if (!response || response.error) {
+        throw new Error(response?.error || 'Не удалось загрузить книгу.');
       }
+
+      const { book: bookDetails, content } = response.data || {};
+      if (bookDetails) {
+        setBook(bookDetails);
+      }
+
+      const sanitized = sanitizeHTML(content || '');
+      setAllContent(sanitized);
+    } catch (e) {
+      console.error('Load book error:', e);
+      setError(e.message || 'Не удалось загрузить книгу.');
+      toast.error('Ошибка загрузки', { description: e.message });
     } finally {
-      clearTimeout(timeoutId);
       setLoading(false);
     }
-  }, [bookId, formatBookContent]);
+  }, [bookId]);
 
   useEffect(() => {
     loadBook();
@@ -508,14 +373,6 @@ export default function ReaderV2() {
     if (page >= 1 && page <= totalPages) {
       setCurrentPage(page);
       setCurrentPageContent(pages[page - 1]);
-      if (bookId && totalPages > 0) {
-        const progress = (page / totalPages) * 100;
-        queueMutation({
-          bookId,
-          type: 'progress',
-          payload: { page, progress: parseFloat(progress.toFixed(2)) }
-        });
-      }
     }
   }, [bookId, totalPages, pages]);
 

@@ -31,7 +31,7 @@ import { UploadFile } from '@/api/integrations';
 import { detectLanguageFromFile, getLanguageMetadata, isSameLanguage } from '@/utils/languageDetection';
 import { buildSupabasePath } from '@/utils/storagePaths';
 import { createBook } from '../utils/supabase';
-import { determineFileType, extractRawTextFromFileBlob } from '@/utils/bookContent';
+import { determineFileType, extractRawTextFromFileBlob, htmlFromRawText } from '@/utils/bookContent';
 
 const GENRES = [
   { value: 'fiction', label: 'Художественная литература', emoji: '📚' },
@@ -59,50 +59,10 @@ const LANGUAGES = [
   { value: 'ar', label: 'العربية', flag: '🇸🇦' }
 ];
 
-const HTML_COMPATIBLE_TYPES = ['pdf', 'epub', 'docx'];
+const SHOULD_CONVERT_TO_HTML = new Set(['pdf', 'epub', 'docx', 'txt']);
 
-const escapeHtml = (input = '') =>
-  input
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-
-const convertExtractedTextToHtml = (rawText = '') => {
-  if (!rawText) return '';
-
-  const normalized = rawText
-    .replace(/\r\n/g, '\n')
-    .replace(/\u00a0/g, ' ')
-    .replace(/\s+\n/g, '\n')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim();
-
-  if (!normalized) return '';
-
-  const chapterRegex = /^(?:глава|chapter|часть|part)\s+[\divxlc]+/i;
-
-  return normalized
-    .split(/\n{2,}/)
-    .map((block) => {
-      const trimmed = block.trim();
-      if (!trimmed) return '';
-      const inlineNormalized = trimmed.replace(/\s*\n\s*/g, ' ');
-      const escaped = escapeHtml(inlineNormalized);
-
-      if (chapterRegex.test(inlineNormalized)) {
-        return `<h2 class="chapter-title">${escaped}</h2>`;
-      }
-
-      return `<p>${escaped}</p>`;
-    })
-    .filter(Boolean)
-    .join('\n');
-};
-
-const wrapHtmlDocument = (body = '') =>
-  `<!DOCTYPE html><html lang="ru"><head><meta charset="utf-8" /></head><body>${body}</body></html>`;
+const wrapHtmlDocument = (body = '', lang = 'ru') =>
+  `<!DOCTYPE html><html lang="${lang}"><head><meta charset="utf-8" /></head><body>${body}</body></html>`;
 
 // Drag & Drop зона с анимацией
 const DropZone = ({ onDrop, accept, maxSize, children, isDragActive, className = '' }) => {
@@ -399,22 +359,30 @@ export default function BookUploadForm({ onUploadSuccess }) {
     setUploadProgress(0);
 
     try {
-      const originalType = determineFileType(bookFile.name, bookFile.type);
+      const kind = determineFileType(bookFile);
       let fileToUpload = bookFile;
       let uploadExtension = (bookFile.name.split('.').pop() || '').toLowerCase();
-      let uploadFormat = originalType;
+      let uploadFormat = kind === 'unknown' ? uploadExtension : kind;
+      let isHtmlAsset = kind === 'html';
 
-      if (HTML_COMPATIBLE_TYPES.includes(originalType)) {
+      if (SHOULD_CONVERT_TO_HTML.has(kind)) {
         toast.info('Конвертация книги в HTML...', { id: 'upload-convert' });
-        const rawText = await extractRawTextFromFileBlob(bookFile, originalType);
-        const htmlBody = convertExtractedTextToHtml(rawText);
-        const htmlDocument = wrapHtmlDocument(htmlBody);
-        const safeName = bookFile.name.replace(/\.[^/.]+$/, '') || 'book';
-        const htmlBlob = new Blob([htmlDocument], { type: 'text/html' });
-        fileToUpload = new File([htmlBlob], `${safeName}.html`, { type: 'text/html' });
-        uploadExtension = 'html';
-        uploadFormat = 'html';
-        toast.success('Файл конвертирован в HTML', { id: 'upload-convert' });
+        const rawText = await extractRawTextFromFileBlob(bookFile);
+        if (rawText && rawText.trim()) {
+          const htmlBody = htmlFromRawText(rawText);
+          const safeName = bookFile.name.replace(/\.[^/.]+$/, '') || 'book';
+          const langCode = detectedLanguage || 'ru';
+          const htmlDocument = wrapHtmlDocument(htmlBody, langCode);
+          const htmlBlob = new Blob([htmlDocument], { type: 'text/html' });
+          fileToUpload = new File([htmlBlob], `${safeName}.html`, { type: 'text/html' });
+          uploadExtension = 'html';
+          uploadFormat = 'html';
+          isHtmlAsset = true;
+          toast.success('Файл конвертирован в HTML', { id: 'upload-convert' });
+        } else {
+          toast.dismiss('upload-convert');
+          toast.warning('Не удалось извлечь текст из файла. Загружаем оригинальный файл.');
+        }
       }
 
       // 1. Загрузка файлов
@@ -449,7 +417,8 @@ export default function BookUploadForm({ onUploadSuccess }) {
             file_url: bookUrl,
             original: true,
             extension: uploadExtension,
-            format: uploadFormat
+            format: uploadFormat,
+            isHtml: isHtmlAsset
           }
         ],
         status: 'pending'

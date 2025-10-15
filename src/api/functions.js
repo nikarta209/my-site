@@ -1,6 +1,6 @@
 import supabase, { isSupabaseConfigured, supabaseStorageBucket } from './supabaseClient';
 import { Book, Purchase, User, UserAIPreferences } from './entities';
-import { determineFileType, isHtmlExtension, looksLikeHtmlContent } from '@/utils/bookContent';
+import { determineFileType, htmlFromRawText, isHtmlExtension, looksLikeHtmlContent } from '@/utils/bookContent';
 
 const importMetaEnv = typeof import.meta !== 'undefined' ? import.meta.env : undefined;
 
@@ -793,11 +793,18 @@ export const getBookContent = async ({ bookId, isPreview } = {}) => {
       isHtml = looksLikeHtmlContent(content);
     }
 
-    if (isPreview && !isHtml && content.length > 5000) {
-      content = content.slice(0, 5000);
+    let finalContent = content;
+
+    if (!isHtml) {
+      let rawText = content;
+      if (isPreview && rawText && rawText.length > 5000) {
+        rawText = rawText.slice(0, 5000);
+      }
+      finalContent = htmlFromRawText(rawText || '');
+      isHtml = true;
     }
 
-    return ok({ content, book, isHtml });
+    return ok({ content: finalContent, book, isHtml });
   } catch (error) {
     console.error('[getBookContent] error', error);
     return fail(error);
