@@ -31,6 +31,7 @@ import { UploadFile } from '@/api/integrations';
 import { detectLanguageFromFile, getLanguageMetadata, isSameLanguage } from '@/utils/languageDetection';
 import { buildSupabasePath } from '@/utils/storagePaths';
 import { createBook } from '../utils/supabase';
+import { determineFileType, extractRawTextFromFileBlob } from '@/utils/bookContent';
 
 const GENRES = [
   { value: 'fiction', label: 'Художественная литература', emoji: '📚' },
@@ -57,6 +58,51 @@ const LANGUAGES = [
   { value: 'ko', label: '한국어', flag: '🇰🇷' },
   { value: 'ar', label: 'العربية', flag: '🇸🇦' }
 ];
+
+const HTML_COMPATIBLE_TYPES = ['pdf', 'epub', 'docx'];
+
+const escapeHtml = (input = '') =>
+  input
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+
+const convertExtractedTextToHtml = (rawText = '') => {
+  if (!rawText) return '';
+
+  const normalized = rawText
+    .replace(/\r\n/g, '\n')
+    .replace(/\u00a0/g, ' ')
+    .replace(/\s+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+
+  if (!normalized) return '';
+
+  const chapterRegex = /^(?:глава|chapter|часть|part)\s+[\divxlc]+/i;
+
+  return normalized
+    .split(/\n{2,}/)
+    .map((block) => {
+      const trimmed = block.trim();
+      if (!trimmed) return '';
+      const inlineNormalized = trimmed.replace(/\s*\n\s*/g, ' ');
+      const escaped = escapeHtml(inlineNormalized);
+
+      if (chapterRegex.test(inlineNormalized)) {
+        return `<h2 class="chapter-title">${escaped}</h2>`;
+      }
+
+      return `<p>${escaped}</p>`;
+    })
+    .filter(Boolean)
+    .join('\n');
+};
+
+const wrapHtmlDocument = (body = '') =>
+  `<!DOCTYPE html><html lang="ru"><head><meta charset="utf-8" /></head><body>${body}</body></html>`;
 
 // Drag & Drop зона с анимацией
 const DropZone = ({ onDrop, accept, maxSize, children, isDragActive, className = '' }) => {
@@ -353,13 +399,31 @@ export default function BookUploadForm({ onUploadSuccess }) {
     setUploadProgress(0);
 
     try {
+      const originalType = determineFileType(bookFile.name, bookFile.type);
+      let fileToUpload = bookFile;
+      let uploadExtension = (bookFile.name.split('.').pop() || '').toLowerCase();
+      let uploadFormat = originalType;
+
+      if (HTML_COMPATIBLE_TYPES.includes(originalType)) {
+        toast.info('Конвертация книги в HTML...', { id: 'upload-convert' });
+        const rawText = await extractRawTextFromFileBlob(bookFile, originalType);
+        const htmlBody = convertExtractedTextToHtml(rawText);
+        const htmlDocument = wrapHtmlDocument(htmlBody);
+        const safeName = bookFile.name.replace(/\.[^/.]+$/, '') || 'book';
+        const htmlBlob = new Blob([htmlDocument], { type: 'text/html' });
+        fileToUpload = new File([htmlBlob], `${safeName}.html`, { type: 'text/html' });
+        uploadExtension = 'html';
+        uploadFormat = 'html';
+        toast.success('Файл конвертирован в HTML', { id: 'upload-convert' });
+      }
+
       // 1. Загрузка файлов
       setUploadProgress(25);
       toast.loading('Загрузка файлов...', { id: 'upload' });
 
       const originalLang = detectedLanguage || 'ru';
       const [{ file_url: bookUrl }, { file_url: coverUrl }] = await Promise.all([
-        UploadFile({ file: bookFile, path: buildSupabasePath('books/originals', bookFile) }),
+        UploadFile({ file: fileToUpload, path: buildSupabasePath('books/originals', fileToUpload) }),
         UploadFile({ file: coverFile, path: buildSupabasePath('books/covers', coverFile) })
       ]);
 
@@ -383,7 +447,9 @@ export default function BookUploadForm({ onUploadSuccess }) {
             title: data.title,
             description: data.description,
             file_url: bookUrl,
-            original: true
+            original: true,
+            extension: uploadExtension,
+            format: uploadFormat
           }
         ],
         status: 'pending'
