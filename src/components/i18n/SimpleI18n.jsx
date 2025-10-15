@@ -189,7 +189,109 @@ const translations = {
         title: "Popular in Your Genre",
         description: "Analyze trends to create bestsellers",
         notFound: "Could not find similar books."
+      },
+    home: {
+      hero: {
+        tablistLabel: "Featured promotions",
+        becomeAuthor: "Become an author",
+        publishHeadline: "Publish your book on Kasbook",
+        publishDescription: "Reach crypto readers worldwide, keep transparent royalties and full rights.",
+        publishCta: "Submit a manuscript",
+        learnMoreCta: "Explore author tools",
+        prepareManuscript: "How to prepare a manuscript",
+        guideHeadline: "Editorial standards and formatting tips",
+        guideDescription: "Follow the Kasbook guide to pass moderation and launch faster.",
+        prepareCta: "Read the guide",
+        eventsCta: "Join webinars",
+        bestsellersOne: "Bestsellers #1",
+        bestsellersTwo: "Bestsellers #2",
+        bestsellersThree: "Bestsellers #3",
+        read: "Read",
+        open: "Open",
+        addToCart: "Add to cart"
+      },
+      cards: {
+        exclusive: "Exclusive",
+        read: "Read",
+        addToCart: "Add to cart",
+        empty: "No books to display right now"
+      },
+      sections: {
+        newWeek: "New this week",
+        bestSellers: "Top sellers",
+        editorsChoice: "Editor’s picks",
+        freePreviews: "Free previews",
+        aiChoice: "AI suggestions",
+        classics: "Classics that resonate",
+        adventure: "Fantasy & adventure",
+        viewAll: "View all",
+        loading: "Loading selection"
+      },
+      errors: {
+        failedToLoad: "We couldn’t load the home feed",
+        tryAgain: "Check your connection and try again."
+      },
+      actions: {
+        reload: "Reload"
       }
+    },
+    footer: {
+      catalog: "Catalogue",
+      authors: "For authors",
+      about: "About",
+      support: "Support",
+      tagline: "Digital books powered by Kaspa blockchain.",
+      authorCtaTitle: "Share your stories with Kasbook readers",
+      authorCtaSubtitle: "Upload a manuscript and track sales in real time.",
+      authorCtaButton: "Publish a book",
+      rights: "All rights reserved.",
+      actions: {
+        darkMode: "Switch to dark",
+        lightMode: "Switch to light"
+      },
+      links: {
+        allBooks: "All books",
+        newReleases: "New releases",
+        bestSellers: "Bestsellers",
+        collections: "Collections",
+        submitBook: "Submit a book",
+        authorGuide: "Author guide",
+        royalties: "Royalties",
+        events: "Workshops",
+        aboutProject: "About Kasbook",
+        blog: "Blog",
+        partners: "Partners",
+        careers: "Careers",
+        helpCenter: "Help center",
+        contact: "Contact us",
+        status: "System status",
+        privacy: "Privacy & security",
+        privacyPolicy: "Privacy policy",
+        terms: "Terms of use",
+        offer: "Public offer"
+      }
+    },
+    subscription: {
+      disabledTitle: "Subscription is temporarily unavailable",
+      disabledDescription: "We’re refreshing Kasbook Premium benefits. Existing members keep their access.",
+      heroDescription: "Unlock premium reading tools, AI recommendations and exclusive releases.",
+      includesTitle: "What’s included",
+      features: {
+        translationsTitle: "5 book translations per month",
+        translationsDescription: "Translate any title when an official edition is missing.",
+        catalogTitle: "Extended premium catalogue",
+        catalogDescription: "Read exclusive books available only to subscribers.",
+        notesTitle: "Custom note backgrounds",
+        notesDescription: "Personalise shared notes with your own artwork.",
+        aiTitle: "AI-powered analysis",
+        aiDescription: "Get personalised reading plans tuned to your taste."
+      },
+      checkoutTitle: "Activate subscription",
+      checkoutSubtitle: "30 days of full access.",
+      priceLabel: "Price",
+      alreadyActive: "Subscription already active",
+      subscribeCta: "Subscribe",
+      loginCta: "Log in to subscribe"
     }
   },
 
@@ -377,7 +479,109 @@ const translations = {
         title: "Популярное в вашем жанре",
         description: "Анализируйте тренды, чтобы создавать бестселлеры",
         notFound: "Не удалось найти похожие книги."
+      },
+    home: {
+      hero: {
+        tablistLabel: "Разделы главного баннера",
+        becomeAuthor: "Стань автором",
+        publishHeadline: "Опубликуйте книгу на Kasbook",
+        publishDescription: "Получайте прозрачные роялти и доступ к аудитории читателей KAS.",
+        publishCta: "Опубликовать рукопись",
+        learnMoreCta: "Инструменты для авторов",
+        prepareManuscript: "Как подготовить рукопись",
+        guideHeadline: "Требования редакции и советы по оформлению",
+        guideDescription: "Следуйте гайду Kasbook, чтобы пройти модерацию и быстрее выйти в продажу.",
+        prepareCta: "Открыть гайд",
+        eventsCta: "Вебинары для авторов",
+        bestsellersOne: "Хиты продаж #1",
+        bestsellersTwo: "Хиты продаж #2",
+        bestsellersThree: "Хиты продаж #3",
+        read: "Читать",
+        open: "Открыть",
+        addToCart: "В корзину"
+      },
+      cards: {
+        exclusive: "Эксклюзив",
+        read: "Читать",
+        addToCart: "В корзину",
+        empty: "Пока нечего показать"
+      },
+      sections: {
+        newWeek: "Новинки недели",
+        bestSellers: "Хиты продаж",
+        editorsChoice: "Редакция рекомендует",
+        freePreviews: "Бесплатные превью",
+        aiChoice: "Выбор ИИ",
+        classics: "Классика, которая цепляет",
+        adventure: "Фантастика и приключения",
+        viewAll: "Смотреть всё",
+        loading: "Загружаем подборку"
+      },
+      errors: {
+        failedToLoad: "Не удалось загрузить главную ленту",
+        tryAgain: "Проверьте соединение и повторите попытку."
+      },
+      actions: {
+        reload: "Обновить"
       }
+    },
+    footer: {
+      catalog: "Каталог",
+      authors: "Авторам",
+      about: "О проекте",
+      support: "Поддержка",
+      tagline: "Платформа цифровых книг на блокчейне Kaspa.",
+      authorCtaTitle: "Публикуйте и зарабатывайте вместе с Kasbook",
+      authorCtaSubtitle: "Загружайте рукописи и отслеживайте продажи в реальном времени.",
+      authorCtaButton: "Опубликовать книгу",
+      rights: "Все права защищены.",
+      actions: {
+        darkMode: "Темная тема",
+        lightMode: "Светлая тема"
+      },
+      links: {
+        allBooks: "Все книги",
+        newReleases: "Новинки",
+        bestSellers: "Бестселлеры",
+        collections: "Подборки",
+        submitBook: "Опубликовать книгу",
+        authorGuide: "Гид для авторов",
+        royalties: "Роялти",
+        events: "Мероприятия",
+        aboutProject: "О Kasbook",
+        blog: "Блог",
+        partners: "Партнёрам",
+        careers: "Вакансии",
+        helpCenter: "Центр помощи",
+        contact: "Связаться",
+        status: "Статус сервиса",
+        privacy: "Конфиденциальность и безопасность",
+        privacyPolicy: "Политика конфиденциальности",
+        terms: "Пользовательское соглашение",
+        offer: "Публичная оферта"
+      }
+    },
+    subscription: {
+      disabledTitle: "Подписка временно недоступна",
+      disabledDescription: "Мы обновляем возможности Kasbook Premium. Активные подписчики сохраняют доступ.",
+      heroDescription: "Откройте премиальные инструменты чтения, рекомендации ИИ и эксклюзивные релизы.",
+      includesTitle: "Что входит",
+      features: {
+        translationsTitle: "5 переводов книг в месяц",
+        translationsDescription: "Переводите книги, когда нет официального издания.",
+        catalogTitle: "Расширенный каталог",
+        catalogDescription: "Читайте эксклюзивные книги только для подписчиков.",
+        notesTitle: "Фоны для заметок",
+        notesDescription: "Используйте собственные изображения для оформления заметок.",
+        aiTitle: "Аналитика от ИИ",
+        aiDescription: "Получайте персональные планы чтения под ваши интересы."
+      },
+      checkoutTitle: "Активировать подписку",
+      checkoutSubtitle: "30 дней полного доступа.",
+      priceLabel: "Стоимость",
+      alreadyActive: "Подписка уже активна",
+      subscribeCta: "Подписаться",
+      loginCta: "Войдите, чтобы подписаться"
     }
   },
 
@@ -565,7 +769,109 @@ const translations = {
         title: "Beliebt in Ihrem Genre",
         description: "Analysieren Sie Trends, um Bestseller zu erstellen",
         notFound: "Ähnliche Bücher konnten nicht gefunden werden."
+      },
+    home: {
+      hero: {
+        tablistLabel: "Empfohlene Bereiche",
+        becomeAuthor: "Autor werden",
+        publishHeadline: "Veröffentlichen Sie Ihr Buch auf Kasbook",
+        publishDescription: "Erreichen Sie Leser weltweit und behalten Sie transparente Tantiemen.",
+        publishCta: "Manuskript einreichen",
+        learnMoreCta: "Autorentools",
+        prepareManuscript: "Manuskript vorbereiten",
+        guideHeadline: "Redaktionsstandards und Formatierungstipps",
+        guideDescription: "Folgen Sie dem Kasbook-Leitfaden, um die Moderation zu bestehen.",
+        prepareCta: "Leitfaden lesen",
+        eventsCta: "Autor-Webinare",
+        bestsellersOne: "Bestseller #1",
+        bestsellersTwo: "Bestseller #2",
+        bestsellersThree: "Bestseller #3",
+        read: "Lesen",
+        open: "Öffnen",
+        addToCart: "In den Warenkorb"
+      },
+      cards: {
+        exclusive: "Exklusiv",
+        read: "Lesen",
+        addToCart: "In den Warenkorb",
+        empty: "Keine Bücher verfügbar"
+      },
+      sections: {
+        newWeek: "Neu diese Woche",
+        bestSellers: "Top-Verkäufe",
+        editorsChoice: "Empfehlung der Redaktion",
+        freePreviews: "Kostenlose Vorschauen",
+        aiChoice: "KI-Auswahl",
+        classics: "Klassiker, die berühren",
+        adventure: "Fantasy & Abenteuer",
+        viewAll: "Alle anzeigen",
+        loading: "Auswahl wird geladen"
+      },
+      errors: {
+        failedToLoad: "Startseite konnte nicht geladen werden",
+        tryAgain: "Verbindung prüfen und erneut versuchen."
+      },
+      actions: {
+        reload: "Neu laden"
       }
+    },
+    footer: {
+      catalog: "Katalog",
+      authors: "Für Autoren",
+      about: "Über uns",
+      support: "Support",
+      tagline: "Digitale Bücher auf der Kaspa-Blockchain.",
+      authorCtaTitle: "Teilen Sie Ihre Geschichten mit Kasbook",
+      authorCtaSubtitle: "Laden Sie Manuskripte hoch und verfolgen Sie Verkäufe in Echtzeit.",
+      authorCtaButton: "Buch veröffentlichen",
+      rights: "Alle Rechte vorbehalten.",
+      actions: {
+        darkMode: "Dunkles Design",
+        lightMode: "Helles Design"
+      },
+      links: {
+        allBooks: "Alle Bücher",
+        newReleases: "Neuheiten",
+        bestSellers: "Bestseller",
+        collections: "Kollektionen",
+        submitBook: "Buch einreichen",
+        authorGuide: "Autorenleitfaden",
+        royalties: "Tantiemen",
+        events: "Workshops",
+        aboutProject: "Über Kasbook",
+        blog: "Blog",
+        partners: "Partner",
+        careers: "Karriere",
+        helpCenter: "Hilfezentrum",
+        contact: "Kontakt",
+        status: "Systemstatus",
+        privacy: "Datenschutz & Sicherheit",
+        privacyPolicy: "Datenschutzerklärung",
+        terms: "Nutzungsbedingungen",
+        offer: "Öffentliches Angebot"
+      }
+    },
+    subscription: {
+      disabledTitle: "Abonnement vorübergehend nicht verfügbar",
+      disabledDescription: "Wir erneuern Kasbook Premium. Aktive Abonnenten behalten den Zugriff.",
+      heroDescription: "Entsperren Sie Premium-Lesetools, KI-Empfehlungen und exklusive Neuheiten.",
+      includesTitle: "Inhalt",
+      features: {
+        translationsTitle: "5 Buchübersetzungen pro Monat",
+        translationsDescription: "Übersetzen Sie Titel ohne offizielle Ausgabe.",
+        catalogTitle: "Erweiterter Premium-Katalog",
+        catalogDescription: "Lesen Sie exklusive Bücher nur für Abonnenten.",
+        notesTitle: "Eigene Notiz-Hintergründe",
+        notesDescription: "Verwenden Sie eigene Bilder für Ihre Notizen.",
+        aiTitle: "KI-Analyse",
+        aiDescription: "Erhalten Sie personalisierte Lesepläne."
+      },
+      checkoutTitle: "Abonnement aktivieren",
+      checkoutSubtitle: "30 Tage voller Zugriff.",
+      priceLabel: "Preis",
+      alreadyActive: "Abonnement bereits aktiv",
+      subscribeCta: "Abonnieren",
+      loginCta: "Anmelden zum Abonnieren"
     }
   },
 
@@ -753,7 +1059,109 @@ const translations = {
         title: "Populaire dans votre genre",
         description: "Analysez les tendances pour créer des best-sellers",
         notFound: "Impossible de trouver des livres similaires."
+      },
+    home: {
+      hero: {
+        tablistLabel: "Sections en vedette",
+        becomeAuthor: "Devenir auteur",
+        publishHeadline: "Publiez votre livre sur Kasbook",
+        publishDescription: "Touchez des lecteurs dans le monde entier avec des redevances transparentes.",
+        publishCta: "Soumettre un manuscrit",
+        learnMoreCta: "Outils auteurs",
+        prepareManuscript: "Préparer son manuscrit",
+        guideHeadline: "Normes éditoriales et conseils de mise en page",
+        guideDescription: "Suivez le guide Kasbook pour réussir la modération et lancer plus vite.",
+        prepareCta: "Lire le guide",
+        eventsCta: "Webinaires auteurs",
+        bestsellersOne: "Meilleures ventes #1",
+        bestsellersTwo: "Meilleures ventes #2",
+        bestsellersThree: "Meilleures ventes #3",
+        read: "Lire",
+        open: "Ouvrir",
+        addToCart: "Ajouter au panier"
+      },
+      cards: {
+        exclusive: "Exclusivité",
+        read: "Lire",
+        addToCart: "Ajouter au panier",
+        empty: "Aucun livre pour le moment"
+      },
+      sections: {
+        newWeek: "Nouveautés de la semaine",
+        bestSellers: "Meilleures ventes",
+        editorsChoice: "Sélection de la rédaction",
+        freePreviews: "Extraits gratuits",
+        aiChoice: "Choix de l'IA",
+        classics: "Classiques inspirants",
+        adventure: "Fantastique et aventures",
+        viewAll: "Tout voir",
+        loading: "Chargement de la sélection"
+      },
+      errors: {
+        failedToLoad: "Impossible de charger l'accueil",
+        tryAgain: "Vérifiez votre connexion et réessayez."
+      },
+      actions: {
+        reload: "Recharger"
       }
+    },
+    footer: {
+      catalog: "Catalogue",
+      authors: "Auteurs",
+      about: "À propos",
+      support: "Support",
+      tagline: "Livres numériques propulsés par la blockchain Kaspa.",
+      authorCtaTitle: "Publiez vos histoires avec Kasbook",
+      authorCtaSubtitle: "Déposez vos manuscrits et suivez vos ventes en direct.",
+      authorCtaButton: "Publier un livre",
+      rights: "Tous droits réservés.",
+      actions: {
+        darkMode: "Mode sombre",
+        lightMode: "Mode clair"
+      },
+      links: {
+        allBooks: "Tous les livres",
+        newReleases: "Nouveautés",
+        bestSellers: "Meilleures ventes",
+        collections: "Collections",
+        submitBook: "Soumettre un livre",
+        authorGuide: "Guide auteur",
+        royalties: "Redevances",
+        events: "Ateliers",
+        aboutProject: "À propos de Kasbook",
+        blog: "Blog",
+        partners: "Partenaires",
+        careers: "Carrières",
+        helpCenter: "Centre d'aide",
+        contact: "Contact",
+        status: "Statut du service",
+        privacy: "Confidentialité et sécurité",
+        privacyPolicy: "Politique de confidentialité",
+        terms: "Conditions d'utilisation",
+        offer: "Offre publique"
+      }
+    },
+    subscription: {
+      disabledTitle: "Abonnement temporairement indisponible",
+      disabledDescription: "Nous améliorons Kasbook Premium. Les abonnés actifs conservent leur accès.",
+      heroDescription: "Débloquez des outils de lecture premium, des recommandations IA et des sorties exclusives.",
+      includesTitle: "Ce qui est inclus",
+      features: {
+        translationsTitle: "5 traductions par mois",
+        translationsDescription: "Traduisez les titres sans édition officielle.",
+        catalogTitle: "Catalogue premium étendu",
+        catalogDescription: "Lisez des ouvrages exclusifs réservés aux abonnés.",
+        notesTitle: "Arrière-plans de notes personnalisés",
+        notesDescription: "Utilisez vos propres images pour vos notes.",
+        aiTitle: "Analyse IA",
+        aiDescription: "Recevez des plans de lecture personnalisés."
+      },
+      checkoutTitle: "Activer l'abonnement",
+      checkoutSubtitle: "30 jours d'accès complet.",
+      priceLabel: "Prix",
+      alreadyActive: "Abonnement déjà actif",
+      subscribeCta: "S'abonner",
+      loginCta: "Se connecter pour s'abonner"
     }
   },
 
@@ -941,7 +1349,109 @@ const translations = {
         title: "Popular en su género",
         description: "Analice tendencias para crear best-sellers",
         notFound: "No se pudieron encontrar libros similares."
+      },
+    home: {
+      hero: {
+        tablistLabel: "Secciones destacadas",
+        becomeAuthor: "Conviértete en autor",
+        publishHeadline: "Publica tu libro en Kasbook",
+        publishDescription: "Llega a lectores de todo el mundo con regalías transparentes.",
+        publishCta: "Enviar manuscrito",
+        learnMoreCta: "Herramientas para autores",
+        prepareManuscript: "Preparar manuscrito",
+        guideHeadline: "Estándares editoriales y consejos de formato",
+        guideDescription: "Sigue la guía Kasbook para aprobar la moderación y lanzar más rápido.",
+        prepareCta: "Leer la guía",
+        eventsCta: "Webinars para autores",
+        bestsellersOne: "Más vendidos #1",
+        bestsellersTwo: "Más vendidos #2",
+        bestsellersThree: "Más vendidos #3",
+        read: "Leer",
+        open: "Abrir",
+        addToCart: "Añadir al carrito"
+      },
+      cards: {
+        exclusive: "Exclusivo",
+        read: "Leer",
+        addToCart: "Añadir al carrito",
+        empty: "No hay libros por ahora"
+      },
+      sections: {
+        newWeek: "Novedades de la semana",
+        bestSellers: "Éxitos de ventas",
+        editorsChoice: "Recomendado por la redacción",
+        freePreviews: "Previas gratuitas",
+        aiChoice: "Elección de la IA",
+        classics: "Clásicos que inspiran",
+        adventure: "Fantasía y aventuras",
+        viewAll: "Ver todo",
+        loading: "Cargando selección"
+      },
+      errors: {
+        failedToLoad: "No pudimos cargar la portada",
+        tryAgain: "Revisa tu conexión e inténtalo de nuevo."
+      },
+      actions: {
+        reload: "Recargar"
       }
+    },
+    footer: {
+      catalog: "Catálogo",
+      authors: "Autores",
+      about: "Acerca de",
+      support: "Soporte",
+      tagline: "Libros digitales impulsados por la blockchain de Kaspa.",
+      authorCtaTitle: "Comparte tus historias con Kasbook",
+      authorCtaSubtitle: "Sube manuscritos y sigue tus ventas en tiempo real.",
+      authorCtaButton: "Publicar un libro",
+      rights: "Todos los derechos reservados.",
+      actions: {
+        darkMode: "Modo oscuro",
+        lightMode: "Modo claro"
+      },
+      links: {
+        allBooks: "Todos los libros",
+        newReleases: "Novedades",
+        bestSellers: "Más vendidos",
+        collections: "Colecciones",
+        submitBook: "Enviar libro",
+        authorGuide: "Guía para autores",
+        royalties: "Regalías",
+        events: "Talleres",
+        aboutProject: "Sobre Kasbook",
+        blog: "Blog",
+        partners: "Socios",
+        careers: "Carreras",
+        helpCenter: "Centro de ayuda",
+        contact: "Contacto",
+        status: "Estado del servicio",
+        privacy: "Privacidad y seguridad",
+        privacyPolicy: "Política de privacidad",
+        terms: "Términos de uso",
+        offer: "Oferta pública"
+      }
+    },
+    subscription: {
+      disabledTitle: "Suscripción temporalmente no disponible",
+      disabledDescription: "Estamos renovando Kasbook Premium. Los suscriptores activos mantienen el acceso.",
+      heroDescription: "Desbloquea herramientas premium, recomendaciones de IA y lanzamientos exclusivos.",
+      includesTitle: "Qué incluye",
+      features: {
+        translationsTitle: "5 traducciones al mes",
+        translationsDescription: "Traduce títulos cuando no exista edición oficial.",
+        catalogTitle: "Catálogo premium ampliado",
+        catalogDescription: "Lee libros exclusivos solo para suscriptores.",
+        notesTitle: "Fondos personalizados para notas",
+        notesDescription: "Usa tus propias imágenes para destacar tus notas.",
+        aiTitle: "Análisis con IA",
+        aiDescription: "Recibe planes de lectura personalizados."
+      },
+      checkoutTitle: "Activar suscripción",
+      checkoutSubtitle: "30 días de acceso completo.",
+      priceLabel: "Precio",
+      alreadyActive: "Suscripción ya activa",
+      subscribeCta: "Suscribirse",
+      loginCta: "Inicia sesión para suscribirte"
     }
   }
 };

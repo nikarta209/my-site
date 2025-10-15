@@ -9,6 +9,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Crown, BookOpen, ChevronDown, ChevronUp, Save, Loader2, AlertCircle } from 'lucide-react';
 import { updateSubscriptionBooks } from '@/api/functions';
+import { useTranslation } from '@/components/i18n/SimpleI18n';
+import { isSubscriptionFeatureEnabled } from '@/utils/featureFlags';
 
 const AuthorSection = ({ author, books, selectedBooks, onBookToggle, onAuthorToggle, expanded, onExpandToggle }) => {
   const isAllSelected = books.every(book => selectedBooks.has(book.id));
@@ -66,6 +68,23 @@ export default function SubscriptionManagement() {
   const [isSaving, setIsSaving] = useState(false);
   const [selectedBooks, setSelectedBooks] = useState(new Set());
   const [expandedSections, setExpandedSections] = useState({});
+  const { t } = useTranslation();
+
+  if (!isSubscriptionFeatureEnabled()) {
+    return (
+      <div className="min-h-screen bg-background">
+        <div className="container mx-auto px-4 py-16 text-center">
+          <Crown className="mx-auto h-12 w-12 text-muted-foreground" />
+          <h1 className="mt-4 text-2xl font-semibold text-foreground md:text-3xl">
+            {t('subscription.disabledTitle')}
+          </h1>
+          <p className="mt-2 text-sm text-muted-foreground md:text-base">
+            {t('subscription.disabledDescription')}
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   useEffect(() => {
     const fetchBooks = async () => {

@@ -18,6 +18,14 @@ set `COINMARKETCAP_API_KEY` in the runtime environment for production. Locally y
 define the same secret inside `.env`; the Node server now loads `.env` automatically and
 falls back to `VITE_COINMARKETCAP_API_KEY` when `COINMARKETCAP_API_KEY` is not provided.
 
+Feature flags:
+
+```
+NEXT_PUBLIC_FEATURE_SUBSCRIPTION=false
+```
+
+Set to `true` to re-enable the Premium subscription banner and related navigation.
+
 ## Install dependencies
 
 ```bash
