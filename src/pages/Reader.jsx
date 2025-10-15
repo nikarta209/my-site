@@ -32,7 +32,13 @@ import ReaderSidebar from '../components/reader/ReaderSidebar';
 import { AnimatePresence } from 'framer-motion';
 
 import { getBookContent } from '@/api/functions';
-import { looksLikeHtmlContent } from '@/utils/bookContent';
+import { htmlFromRawText } from '@/utils/bookContent';
+
+const sanitizeHTML = (html = '') =>
+  html
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+    .replace(/javascript:/gi, '')
+    .replace(/on\w+="[^"]*"/gi, '');
 
 export default function Reader() {
   const { user, isAuthenticated } = useAuth();
@@ -46,7 +52,6 @@ export default function Reader() {
   const [book, setBook] = useState(null);
   const [userBookData, setUserBookData] = useState(null);
   const [content, setContent] = useState('');
-  const [isHtmlContent, setIsHtmlContent] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -159,9 +164,8 @@ export default function Reader() {
         throw new Error('Содержимое книги пустое');
       }
 
-      setContent(bookContent);
-      const htmlFlag = response.data?.isHtml ?? looksLikeHtmlContent(bookContent);
-      setIsHtmlContent(Boolean(htmlFlag));
+      const sanitizedContent = sanitizeHTML(bookContent);
+      setContent(sanitizedContent);
       setCurrentPage(initialPage); // Set current page from user data or default to 1
       console.log(`[Reader] Content loaded: ${bookContent.length} characters. Initial page: ${initialPage}`);
 
@@ -176,8 +180,8 @@ export default function Reader() {
       fallbackContent += 'В реальной ситуации здесь должен быть текст из загруженного файла книги. ';
       fallbackContent += '\n\nГлава 2\n\nПродолжение истории с новой главой. ';
       fallbackContent = fallbackContent.repeat(50); // Create enough text
-      setContent(fallbackContent);
-      setIsHtmlContent(false);
+      const fallbackHtml = sanitizeHTML(htmlFromRawText(fallbackContent));
+      setContent(fallbackHtml);
       toast.warning('Загружен демонстрационный контент');
     } finally {
       setIsLoading(false);
@@ -347,30 +351,6 @@ export default function Reader() {
     }
   }, [isAuthenticated, user, bookId, userBookData, currentPage, totalPages]);
 
-
-  // ИСПРАВЛЕНО: Улучшенная обработка глав и параграфов
-  const formatContent = (text) => {
-    if (!text) return '';
-    if (isHtmlContent) return text;
-    const chapterRegex = /^(глава\s+\d+|chapter\s+\d+|часть\s+\d+|part\s+\d+|\d+\.)/gim; // Expanded chapter patterns
-    
-    // Split by newlines, then process each part
-    const paragraphs = text.split('\n').map((line, index) => {
-      line = line.trim();
-      if (!line) return ''; // Skip empty lines
-
-      // If it looks like a chapter title
-      if (chapterRegex.test(line)) {
-        return `<h2 class="chapter-title">${line}</h2>`;
-      }
-      // Otherwise, wrap in a paragraph
-      return `<p>${line}</p>`;
-    }).filter(Boolean).join(''); // Filter out empty strings before joining
-
-    return paragraphs;
-  };
-
-
   if (isLoading) {
     return (
       <div className="container mx-auto px-4 py-8">
@@ -460,7 +440,7 @@ export default function Reader() {
                 paddingBottom: pageHeightRef.current / 2, // Add extra padding to allow scrolling last partial page to top
                 color: 'var(--reader-text-color)' // Ensure text color is from theme
               }}
-              dangerouslySetInnerHTML={{ __html: formatContent(content) }}
+              dangerouslySetInnerHTML={{ __html: content }}
             />
           </TextSelectionHandler>
           

@@ -1,99 +1,219 @@
-import { pdfjs } from 'react-pdf';
-import ePub from 'epubjs';
-import mammoth from 'mammoth';
+const isBrowser = typeof window !== 'undefined' && typeof document !== 'undefined';
 
-if (pdfjs?.GlobalWorkerOptions) {
-  pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.js`;
+const normalizeName = (value) => {
+  if (!value) return '';
+  if (typeof value === 'string') return value;
+  if (typeof value === 'object' && value !== null) {
+    if (typeof value.name === 'string') return value.name;
+    if (typeof value.filename === 'string') return value.filename;
+  }
+  return '';
+};
+
+const getExtension = (value) => {
+  const name = normalizeName(value).toLowerCase();
+  if (!name) return '';
+  const cleanName = name.split('?')[0].split('#')[0];
+  const parts = cleanName.split('.');
+  if (parts.length < 2) return '';
+  return parts.pop() || '';
+};
+
+const getMimeType = (value) => {
+  if (value && typeof value === 'object' && 'type' in value) {
+    return (value.type || '').toLowerCase();
+  }
+  return '';
+};
+
+export function determineFileType(fileOrName) {
+  const extension = getExtension(fileOrName);
+  const mimeType = getMimeType(fileOrName);
+
+  if (extension === 'pdf' || mimeType.includes('pdf')) return 'pdf';
+  if (extension === 'epub' || mimeType.includes('epub')) return 'epub';
+  if (extension === 'docx' || mimeType.includes('vnd.openxmlformats-officedocument.wordprocessingml.document')) return 'docx';
+  if (extension === 'html' || extension === 'htm' || mimeType.includes('html')) return 'html';
+  if (extension === 'txt' || mimeType.includes('text/plain')) return 'txt';
+
+  return 'unknown';
 }
 
-const normalizeSource = (source) => {
-  if (typeof source !== 'string') return '';
-  return source.split('?')[0].trim().toLowerCase();
-};
+async function extractPdfText(file) {
+  if (!isBrowser) return '';
 
-export const determineFileType = (source, blobType) => {
-  const normalizedSource = normalizeSource(source);
-  const extension = normalizedSource.split('.').pop();
-
-  if (['pdf'].includes(extension)) return 'pdf';
-  if (['epub'].includes(extension)) return 'epub';
-  if (['docx'].includes(extension)) return 'docx';
-  if (['html', 'htm'].includes(extension)) return 'html';
-  if (['txt'].includes(extension)) return 'txt';
-  if (['jpg', 'jpeg', 'png', 'gif'].includes(extension)) return 'image';
-
-  if (blobType) {
-    const lowerBlobType = blobType.toLowerCase();
-    if (lowerBlobType.includes('pdf')) return 'pdf';
-    if (lowerBlobType.includes('epub')) return 'epub';
-    if (lowerBlobType.includes('vnd.openxmlformats-officedocument.wordprocessingml.document')) return 'docx';
-    if (lowerBlobType.includes('html')) return 'html';
-    if (lowerBlobType.startsWith('image/')) return 'image';
-    if (lowerBlobType.includes('text/plain')) return 'txt';
-  }
-
-  return 'txt';
-};
-
-export const extractRawTextFromFileBlob = async (blob, type) => {
   try {
-    if (type === 'html') {
-      return await blob.text();
+    const [{ getDocument, GlobalWorkerOptions }, workerUrl] = await Promise.all([
+      import('pdfjs-dist/build/pdf.mjs'),
+      import('pdfjs-dist/build/pdf.worker.mjs?url'),
+    ]);
+
+    GlobalWorkerOptions.workerSrc = (workerUrl && workerUrl.default) || workerUrl;
+    const data = new Uint8Array(await file.arrayBuffer());
+    const doc = await getDocument({ data }).promise;
+    let out = '';
+
+    for (let p = 1; p <= doc.numPages; p += 1) {
+      const page = await doc.getPage(p);
+      const textContent = await page.getTextContent();
+      const pageText = textContent.items.map((item) => item?.str || '').join(' ').trim();
+      if (pageText) {
+        out += `${pageText}\n`;
+      }
     }
 
-    if (type === 'txt') {
-      return await blob.text();
-    }
+    return out.trim();
+  } catch (error) {
+    console.warn('[bookContent] Failed to extract PDF text', error);
+    return '';
+  }
+}
 
-    if (type === 'docx') {
-      const arrayBuffer = await blob.arrayBuffer();
-      const result = await mammoth.extractRawText({ arrayBuffer });
-      return result.value;
-    }
+async function extractDocxText(file) {
+  if (!isBrowser) return '';
 
-    if (type === 'epub') {
-      const bookEpub = ePub(blob);
-      await bookEpub.ready;
-      let fullText = '';
+  try {
+    const mammoth = await import('mammoth/mammoth.browser.js');
+    const arrayBuffer = await file.arrayBuffer();
+    const { value: html } = await mammoth.convertToHtml({ arrayBuffer });
+    const tmp = document.createElement('div');
+    tmp.innerHTML = html;
+    return tmp.textContent || '';
+  } catch (error) {
+    console.warn('[bookContent] Failed to extract DOCX text', error);
+    return '';
+  }
+}
 
-      for (const item of bookEpub.spine.spineItems) {
-        try {
-          await item.load(bookEpub.load.bind(bookEpub));
-          fullText += item.contents.textContent || '';
-        } catch (error) {
-          console.error('Error loading epub spine item:', error);
-        } finally {
+async function extractEpubText(file) {
+  if (!isBrowser) return '';
+
+  try {
+    const ePubModule = await import('epubjs');
+    const ePub = ePubModule.default || ePubModule;
+    const book = ePub(file);
+    await book.ready;
+    const spine = await book.loaded.spine;
+    let out = '';
+
+    for (const item of spine) {
+      try {
+        const doc = await item.load(book.load.bind(book));
+        const text = doc?.documentElement?.textContent || '';
+        if (text) {
+          out += `${text}\n`;
+        }
+      } finally {
+        if (typeof item.unload === 'function') {
           item.unload();
         }
       }
+    }
 
-      return fullText;
+    return out.trim();
+  } catch (error) {
+    console.warn('[bookContent] Failed to extract EPUB text', error);
+    return '';
+  }
+}
+
+export async function extractRawTextFromFileBlob(file) {
+  if (!file) return '';
+
+  const type = determineFileType(file);
+
+  try {
+    if (type === 'html') {
+      return typeof file.text === 'function' ? await file.text() : '';
+    }
+
+    if (type === 'txt' || type === 'unknown') {
+      return typeof file.text === 'function' ? await file.text() : '';
     }
 
     if (type === 'pdf') {
-      const arrayBuffer = await blob.arrayBuffer();
-      const pdf = await pdfjs.getDocument({ data: arrayBuffer }).promise;
-      let fullText = '';
-
-      for (let i = 1; i <= pdf.numPages; i += 1) {
-        const page = await pdf.getPage(i);
-        const textContent = await page.getTextContent();
-        fullText += textContent.items.map((item) => item.str).join(' ') + '\n';
-      }
-
-      return fullText;
+      return await extractPdfText(file);
     }
 
-    if (type === 'image') {
-      return '--- Изображение ---';
+    if (type === 'docx') {
+      return await extractDocxText(file);
+    }
+
+    if (type === 'epub') {
+      return await extractEpubText(file);
     }
   } catch (error) {
-    console.error('Error extracting raw text:', error);
-    return `Ошибка при извлечении текста: ${error.message}`;
+    console.error('[bookContent] Error extracting raw text', error);
+    return '';
   }
 
   return '';
+}
+
+const escapeHtml = (input = '') =>
+  input
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+
+const looksLikeChapterTitle = (line) => {
+  const trimmed = line.trim();
+  if (!trimmed) return false;
+
+  if (/^(?:глава|chapter|часть|part)\b/i.test(trimmed)) return true;
+  if (/^#+\s+/.test(trimmed)) return true;
+  const noPunctuation = trimmed.replace(/[^A-Za-zА-Яа-яЁё0-9\s]/g, '').trim();
+  if (noPunctuation.length >= 6 && noPunctuation === noPunctuation.toUpperCase()) return true;
+
+  return false;
 };
+
+export function htmlFromRawText(text = '') {
+  if (!text) return '';
+
+  const normalized = text
+    .replace(/\r\n/g, '\n')
+    .replace(/\u00a0/g, ' ')
+    .replace(/\t/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+
+  if (!normalized) return '';
+
+  const lines = normalized.split('\n');
+  const blocks = [];
+  let buffer = [];
+
+  const flushBuffer = () => {
+    if (!buffer.length) return;
+    const paragraph = buffer.join(' ').replace(/\s+/g, ' ').trim();
+    buffer = [];
+    if (paragraph) {
+      blocks.push(`<p>${escapeHtml(paragraph)}</p>`);
+    }
+  };
+
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+    if (!line) {
+      flushBuffer();
+      continue;
+    }
+
+    if (looksLikeChapterTitle(line)) {
+      flushBuffer();
+      const title = line.replace(/^#+\s*/, '').trim();
+      blocks.push(`<h2 class="chapter-title">${escapeHtml(title)}</h2>`);
+    } else {
+      buffer.push(line);
+    }
+  }
+
+  flushBuffer();
+  return blocks.join('\n');
+}
 
 export const looksLikeHtmlContent = (content) => {
   if (!content || typeof content !== 'string') return false;
@@ -104,6 +224,6 @@ export const looksLikeHtmlContent = (content) => {
 
 export const isHtmlExtension = (value) => {
   if (!value) return false;
-  return /\.(html?|xhtml)$/i.test(typeof value === 'string' ? value : value.name || '');
+  const name = typeof value === 'string' ? value : value?.name || '';
+  return /\.(html?|xhtml)$/i.test(name);
 };
-
