@@ -9,6 +9,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Crown, BookOpen, ChevronDown, ChevronUp, Save, Loader2, AlertCircle } from 'lucide-react';
 import { updateSubscriptionBooks } from '@/api/functions';
+import { isSubscriptionEnabled } from '@/lib/config/flags';
+import { useTranslation } from '@/components/i18n/SimpleI18n';
 
 const AuthorSection = ({ author, books, selectedBooks, onBookToggle, onAuthorToggle, expanded, onExpandToggle }) => {
   const isAllSelected = books.every(book => selectedBooks.has(book.id));
@@ -61,6 +63,29 @@ const AuthorSection = ({ author, books, selectedBooks, onBookToggle, onAuthorTog
 };
 
 export default function SubscriptionManagement() {
+  const { t } = useTranslation();
+  if (!isSubscriptionEnabled()) {
+    return (
+      <ProtectedRoute>
+        <div className="container mx-auto px-4 py-10">
+          <Card className="mx-auto max-w-2xl text-center">
+            <CardHeader>
+              <CardTitle>{t('subscription.managementDisabled', 'Управление подпиской временно недоступно')}</CardTitle>
+            </CardHeader>
+            <CardContent className="text-sm text-muted-foreground space-y-3">
+              <p>
+                {t(
+                  'subscription.managementDisabledDescription',
+                  'Мы обновляем каталог подписки. Пожалуйста, загляните позже — ничего из ваших настроек не пропадёт.'
+                )}
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      </ProtectedRoute>
+    );
+  }
+
   const [books, setBooks] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);

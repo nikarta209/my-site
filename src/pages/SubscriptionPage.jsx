@@ -5,6 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import CryptoPaymentModal from '../components/payment/CryptoPaymentModal';
 import { CheckCircle, Crown, BookOpen, MessageSquare, Globe } from 'lucide-react';
+import { isSubscriptionEnabled } from '@/lib/config/flags';
+import { useTranslation } from '@/components/i18n/SimpleI18n';
 
 const SubscriptionFeature = ({ icon: Icon, title, description }) => (
   <div className="flex items-start gap-4">
@@ -22,6 +24,41 @@ export default function SubscriptionPage() {
   const { user } = useAuth();
   const { kasRate, isLoading: isRateLoading } = useExchangeRate();
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const { t } = useTranslation();
+
+  if (!isSubscriptionEnabled()) {
+    return (
+      <div className="min-h-screen bg-background">
+        <div className="container mx-auto px-4 py-12">
+          <Card className="mx-auto max-w-2xl text-center">
+            <CardHeader>
+              <CardTitle className="text-2xl font-semibold">
+                {user?.subscription_status === 'active'
+                  ? t('subscription.suspendedWithAccess', 'Подписка активна, доступ сохранён')
+                  : t('subscription.suspendedTitle', 'Подписка временно недоступна')}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4 text-muted-foreground">
+              <p>
+                {user?.subscription_status === 'active'
+                  ? t(
+                      'subscription.suspendedActiveDescription',
+                      'Мы сохраняем ваш премиум-доступ, но оформление новых подписок сейчас приостановлено.'
+                    )
+                  : t(
+                      'subscription.suspendedDescription',
+                      'Продажи подписки временно приостановлены. Следите за обновлениями — мы вернёмся совсем скоро.'
+                    )}
+              </p>
+              <Button variant="outline" onClick={() => window.history.back()}>
+                {t('subscription.back', 'Вернуться назад')}
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
 
   const subscriptionPriceUSD = 10;
   const subscriptionPriceKAS = kasRate ? (subscriptionPriceUSD / kasRate).toFixed(2) : '...';

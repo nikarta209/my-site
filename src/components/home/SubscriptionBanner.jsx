@@ -8,8 +8,13 @@ import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { useAuth, useSubscription } from '../auth/Auth';
 import { useExchangeRate } from '../utils/ExchangeRateContext';
+import { isSubscriptionEnabled } from '@/lib/config/flags';
 
 export default function SubscriptionBanner() {
+  if (!isSubscriptionEnabled()) {
+    return null;
+  }
+
   const { isAuthenticated } = useAuth();
   const subscription = useSubscription();
   const { kasRate, isLoading: isRateLoading } = useExchangeRate();

@@ -35,6 +35,147 @@ const translations = {
         button: "Learn More"
       }
     },
+    home: {
+      hero: {
+        tablistAria: "Kasbook highlights",
+        tabs: {
+          becomeAuthor: "Become an author",
+          howTo: "Prepare a manuscript",
+          bestsellers1: "Best sellers · 1",
+          bestsellers2: "Best sellers · 2",
+          bestsellers3: "Best sellers · 3"
+        },
+        cta: {
+          publish: {
+            title: "Publish on Kasbook",
+            description: "Distribute worldwide, keep up to 90% royalties and grow your readership.",
+            primary: "Publish a book",
+            secondary: "How to prepare a manuscript"
+          },
+          guide: {
+            title: "Master the Kasbook author workflow",
+            description: "Formatting templates, metadata checklists and editorial best practices.",
+            primary: "Manuscript checklist",
+            secondary: "Submit a book"
+          },
+          highlight: {
+            label: "Author success",
+            value: "3K+ writers on Kasbook",
+            description: "New authors earn their first royalties within the first month on average."
+          }
+        },
+        books: {
+          primaryCta: "Read now",
+          secondaryCta: "Add to cart",
+          sales: "{{count}} sold this week",
+          new: "New arrival"
+        }
+      },
+      sections: {
+        newThisWeek: "New this week",
+        bestSellers: "Top sellers",
+        editorsChoice: "Editor’s choice",
+        freePreviews: "Free previews",
+        aiPicks: "AI recommendations",
+        classics: "Classics that resonate",
+        fantasyAdventure: "Fantasy & adventures",
+        viewAll: "See all",
+        empty: "Nothing to show yet — check back soon."
+      },
+      cards: {
+        exclusive: "Exclusive",
+        bestseller: "Hit",
+        editorsPick: "Editors’ pick",
+        new: "Fresh release",
+        sales: "{{count}} sold",
+        open: "Open",
+        addToCart: "Add to cart"
+      },
+      errors: {
+        feedTitle: "We couldn’t load the home feed",
+        feedDescription: "Please check your connection or try again in a moment.",
+        retry: "Retry"
+      }
+    },
+    footer: {
+      columns: {
+        catalog: {
+          title: "Catalog",
+          links: {
+            all: "All books",
+            new: "New releases",
+            popular: "Best sellers",
+            collections: "Curated collections"
+          }
+        },
+        authors: {
+          title: "For authors",
+          links: {
+            submit: "Submit a book",
+            guide: "Manuscript guide",
+            royalties: "Royalties & rules",
+            community: "Author community"
+          }
+        },
+        about: {
+          title: "About",
+          links: {
+            about: "About Kasbook",
+            blog: "Blog",
+            roadmap: "Roadmap",
+            careers: "Careers"
+          }
+        },
+        support: {
+          title: "Support",
+          links: {
+            help: "Help center",
+            contact: "Contact us",
+            faq: "FAQ",
+            report: "Report an issue"
+          }
+        }
+      },
+      actions: {
+        languageLabel: "Language",
+        theme: {
+          label: "Theme",
+          light: "Light",
+          dark: "Dark",
+          toggle: "Switch to {{theme}} theme",
+          aria: "Switch to {{theme}} theme"
+        }
+      },
+      cta: {
+        badge: "Authors",
+        tagline: "Grow with Kasbook",
+        title: "Share your book with millions of readers",
+        description: "Upload once, get transparent analytics, instant royalty payouts and editorial support at every step.",
+        primary: "Publish a book",
+        secondary: "How to prepare a manuscript"
+      },
+      bottom: {
+        copyright: "© {{year}} Kasbook. All rights reserved.",
+        privacy: "Privacy policy",
+        terms: "Terms of use",
+        offer: "Public offer"
+      },
+      socials: {
+        telegram: "Kasbook on Telegram",
+        instagram: "Kasbook on Instagram",
+        x: "Kasbook on X",
+        youtube: "Kasbook on YouTube"
+      }
+    },
+    subscription: {
+      suspendedWithAccess: "Your Premium access stays active while subscriptions are paused.",
+      suspendedTitle: "Kasbook Premium is temporarily paused",
+      suspendedDescription: "Subscription sales are temporarily paused. Check back soon for updates.",
+      suspendedActiveDescription: "We’re refreshing Premium — your current benefits remain, but new activations are on hold.",
+      back: "Go back",
+      managementDisabled: "Subscription management is temporarily unavailable",
+      managementDisabledDescription: "We’re refreshing the Premium catalog. Nothing you’ve configured will be lost."
+    },
     cart: {
       title: "Cart",
       emptyTitle: "Your cart is empty",
@@ -222,6 +363,147 @@ const translations = {
         description: "Покупайте и продавайте книги с помощью быстрой и надежной криптовалюты.",
         button: "Подробнее"
       }
+    },
+    home: {
+      hero: {
+        tablistAria: "Главные подборки Kasbook",
+        tabs: {
+          becomeAuthor: "Стань автором",
+          howTo: "Как подготовить рукопись",
+          bestsellers1: "Хиты продаж · 1",
+          bestsellers2: "Хиты продаж · 2",
+          bestsellers3: "Хиты продаж · 3"
+        },
+        cta: {
+          publish: {
+            title: "Опубликуйте книгу на Kasbook",
+            description: "Продавайте по всему миру, сохраняйте до 90% роялти и растите аудиторию.",
+            primary: "Опубликовать книгу",
+            secondary: "Как подготовить рукопись"
+          },
+          guide: {
+            title: "Подготовьте рукопись вместе с редакцией",
+            description: "Шаблоны оформления, чек-листы метаданных и советы редакторов.",
+            primary: "Чек-лист рукописи",
+            secondary: "Отправить книгу"
+          },
+          highlight: {
+            label: "Истории успеха",
+            value: "3K+ авторов на Kasbook",
+            description: "Новые авторы в среднем получают первые продажи уже в первый месяц."
+          }
+        },
+        books: {
+          primaryCta: "Читать",
+          secondaryCta: "В корзину",
+          sales: "{{count}} продаж за неделю",
+          new: "Новинка"
+        }
+      },
+      sections: {
+        newThisWeek: "Новинки недели",
+        bestSellers: "Хиты продаж",
+        editorsChoice: "Редакция рекомендует",
+        freePreviews: "Бесплатные превью",
+        aiPicks: "Выбор ИИ",
+        classics: "Классика, которая цепляет",
+        fantasyAdventure: "Фантастика и приключения",
+        viewAll: "Смотреть всё",
+        empty: "Здесь пока пусто — скоро добавим книги."
+      },
+      cards: {
+        exclusive: "Эксклюзив",
+        bestseller: "Хит",
+        editorsPick: "Выбор редакции",
+        new: "Свежий релиз",
+        sales: "{{count}} продаж",
+        open: "Открыть",
+        addToCart: "В корзину"
+      },
+      errors: {
+        feedTitle: "Не удалось загрузить ленту",
+        feedDescription: "Проверьте подключение к интернету или попробуйте ещё раз позже.",
+        retry: "Попробовать снова"
+      }
+    },
+    footer: {
+      columns: {
+        catalog: {
+          title: "Каталог",
+          links: {
+            all: "Все книги",
+            new: "Новинки",
+            popular: "Популярное",
+            collections: "Подборки редакции"
+          }
+        },
+        authors: {
+          title: "Для авторов",
+          links: {
+            submit: "Опубликовать книгу",
+            guide: "Гид по рукописи",
+            royalties: "Роялти и правила",
+            community: "Сообщество авторов"
+          }
+        },
+        about: {
+          title: "О проекте",
+          links: {
+            about: "О Kasbook",
+            blog: "Блог",
+            roadmap: "Дорожная карта",
+            careers: "Карьера"
+          }
+        },
+        support: {
+          title: "Поддержка",
+          links: {
+            help: "Центр помощи",
+            contact: "Связаться с нами",
+            faq: "FAQ",
+            report: "Сообщить о проблеме"
+          }
+        }
+      },
+      actions: {
+        languageLabel: "Язык",
+        theme: {
+          label: "Тема",
+          light: "светлую",
+          dark: "тёмную",
+          toggle: "Переключить на {{theme}} тему",
+          aria: "Переключить на {{theme}} тему"
+        }
+      },
+      cta: {
+        badge: "Для авторов",
+        tagline: "Расскажите о себе читателям Kasbook",
+        title: "Поделитесь книгой с аудиторией Kasbook",
+        description: "Загружайте рукопись, получайте аналитику, мгновенные выплаты и поддержку редакции на каждом шаге.",
+        primary: "Опубликовать книгу",
+        secondary: "Как подготовить рукопись"
+      },
+      bottom: {
+        copyright: "© {{year}} Kasbook. Все права защищены.",
+        privacy: "Политика конфиденциальности",
+        terms: "Пользовательское соглашение",
+        offer: "Публичная оферта"
+      },
+      socials: {
+        telegram: "Kasbook в Telegram",
+        instagram: "Kasbook в Instagram",
+        x: "Kasbook в X",
+        youtube: "Kasbook на YouTube"
+      }
+    },
+    subscription: {
+      suspendedWithAccess: "Ваша подписка остаётся активной, пока оформление временно приостановлено.",
+      suspendedTitle: "Kasbook Premium временно недоступна",
+      suspendedDescription: "Продажи подписки приостановлены. Следите за новостями — мы скоро вернёмся.",
+      suspendedActiveDescription: "Мы обновляем Premium. Ваш доступ сохранён, новые подключения пока недоступны.",
+      back: "Вернуться назад",
+      managementDisabled: "Управление подпиской временно недоступно",
+      managementDisabledDescription: "Мы обновляем каталог подписки. Ваши настройки будут сохранены."
     },
     cart: {
       title: "Корзина",
@@ -411,6 +693,147 @@ const translations = {
         button: "Mehr erfahren"
       }
     },
+    home: {
+      hero: {
+        tablistAria: "Kasbook-Highlights",
+        tabs: {
+          becomeAuthor: "Autor werden",
+          howTo: "Manuskript vorbereiten",
+          bestsellers1: "Bestseller · 1",
+          bestsellers2: "Bestseller · 2",
+          bestsellers3: "Bestseller · 3"
+        },
+        cta: {
+          publish: {
+            title: "Auf Kasbook veröffentlichen",
+            description: "Verkaufen Sie weltweit, behalten Sie bis zu 90 % Tantiemen und vergrößern Sie Ihre Leserschaft.",
+            primary: "Buch veröffentlichen",
+            secondary: "Manuskript vorbereiten"
+          },
+          guide: {
+            title: "Bereiten Sie Ihr Manuskript mit unserem Team vor",
+            description: "Formatvorlagen, Metadaten-Checklisten und redaktionelle Best Practices.",
+            primary: "Checkliste Manuskript",
+            secondary: "Buch einreichen"
+          },
+          highlight: {
+            label: "Autorenerfolg",
+            value: "3K+ Autor:innen auf Kasbook",
+            description: "Neue Autor:innen erzielen im Schnitt innerhalb des ersten Monats ihre ersten Verkäufe."
+          }
+        },
+        books: {
+          primaryCta: "Jetzt lesen",
+          secondaryCta: "In den Warenkorb",
+          sales: "{{count}} Verkäufe diese Woche",
+          new: "Neu"
+        }
+      },
+      sections: {
+        newThisWeek: "Neu diese Woche",
+        bestSellers: "Bestseller",
+        editorsChoice: "Empfehlung der Redaktion",
+        freePreviews: "Kostenlose Previews",
+        aiPicks: "KI-Auswahl",
+        classics: "Klassiker, die fesseln",
+        fantasyAdventure: "Fantasy & Abenteuer",
+        viewAll: "Alles ansehen",
+        empty: "Hier ist noch nichts – bald gibt es neue Bücher."
+      },
+      cards: {
+        exclusive: "Exklusiv",
+        bestseller: "Top",
+        editorsPick: "Redaktionstipp",
+        new: "Frische Neuheit",
+        sales: "{{count}} Verkäufe",
+        open: "Öffnen",
+        addToCart: "In den Warenkorb"
+      },
+      errors: {
+        feedTitle: "Feed konnte nicht geladen werden",
+        feedDescription: "Bitte überprüfen Sie Ihre Verbindung oder versuchen Sie es später erneut.",
+        retry: "Erneut versuchen"
+      }
+    },
+    footer: {
+      columns: {
+        catalog: {
+          title: "Katalog",
+          links: {
+            all: "Alle Bücher",
+            new: "Neuheiten",
+            popular: "Bestseller",
+            collections: "Kurierte Sammlungen"
+          }
+        },
+        authors: {
+          title: "Für Autor:innen",
+          links: {
+            submit: "Buch einreichen",
+            guide: "Manuskriptleitfaden",
+            royalties: "Tantiemen & Regeln",
+            community: "Autoren-Community"
+          }
+        },
+        about: {
+          title: "Über uns",
+          links: {
+            about: "Über Kasbook",
+            blog: "Blog",
+            roadmap: "Roadmap",
+            careers: "Karriere"
+          }
+        },
+        support: {
+          title: "Support",
+          links: {
+            help: "Hilfecenter",
+            contact: "Kontakt",
+            faq: "FAQ",
+            report: "Problem melden"
+          }
+        }
+      },
+      actions: {
+        languageLabel: "Sprache",
+        theme: {
+          label: "Design",
+          light: "hellen",
+          dark: "dunklen",
+          toggle: "Zum {{theme}} Design wechseln",
+          aria: "Zum {{theme}} Design wechseln"
+        }
+      },
+      cta: {
+        badge: "Für Autor:innen",
+        tagline: "Wachsen Sie mit Kasbook",
+        title: "Teilen Sie Ihr Buch mit Millionen Leser:innen",
+        description: "Einmal hochladen, transparente Analysen, sofortige Tantiemen-Auszahlungen und redaktionelle Unterstützung.",
+        primary: "Buch veröffentlichen",
+        secondary: "Manuskript vorbereiten"
+      },
+      bottom: {
+        copyright: "© {{year}} Kasbook. Alle Rechte vorbehalten.",
+        privacy: "Datenschutzerklärung",
+        terms: "Nutzungsbedingungen",
+        offer: "Angebotsbedingungen"
+      },
+      socials: {
+        telegram: "Kasbook auf Telegram",
+        instagram: "Kasbook auf Instagram",
+        x: "Kasbook auf X",
+        youtube: "Kasbook auf YouTube"
+      }
+    },
+    subscription: {
+      suspendedWithAccess: "Ihr Premium-Zugang bleibt aktiv, während Abos pausieren.",
+      suspendedTitle: "Kasbook Premium ist vorübergehend pausiert",
+      suspendedDescription: "Der Verkauf der Abos ist vorübergehend pausiert. Schauen Sie bald wieder vorbei.",
+      suspendedActiveDescription: "Wir aktualisieren Premium – Ihr Zugang bleibt bestehen, neue Aktivierungen sind kurzfristig ausgesetzt.",
+      back: "Zurück",
+      managementDisabled: "Die Verwaltung der Abos ist vorübergehend deaktiviert",
+      managementDisabledDescription: "Wir aktualisieren den Premium-Katalog. Ihre Einstellungen bleiben erhalten."
+    },
     cart: {
       title: "Warenkorb",
       emptyTitle: "Ihr Warenkorb ist leer",
@@ -599,6 +1022,147 @@ const translations = {
         button: "En savoir plus"
       }
     },
+    home: {
+      hero: {
+        tablistAria: "Sélections Kasbook",
+        tabs: {
+          becomeAuthor: "Devenir auteur",
+          howTo: "Préparer le manuscrit",
+          bestsellers1: "Meilleures ventes · 1",
+          bestsellers2: "Meilleures ventes · 2",
+          bestsellers3: "Meilleures ventes · 3"
+        },
+        cta: {
+          publish: {
+            title: "Publiez sur Kasbook",
+            description: "Vendez dans le monde entier, gardez jusqu'à 90 % de redevances et développez votre lectorat.",
+            primary: "Publier un livre",
+            secondary: "Préparer le manuscrit"
+          },
+          guide: {
+            title: "Préparez votre manuscrit avec l'équipe Kasbook",
+            description: "Modèles de mise en forme, listes de contrôle de métadonnées et conseils éditoriaux.",
+            primary: "Checklist manuscrit",
+            secondary: "Soumettre un livre"
+          },
+          highlight: {
+            label: "Succès auteurs",
+            value: "3K+ auteurs sur Kasbook",
+            description: "Les nouveaux auteurs réalisent en moyenne leurs premières ventes dès le premier mois."
+          }
+        },
+        books: {
+          primaryCta: "Lire maintenant",
+          secondaryCta: "Ajouter au panier",
+          sales: "{{count}} ventes cette semaine",
+          new: "Nouveauté"
+        }
+      },
+      sections: {
+        newThisWeek: "Nouveautés de la semaine",
+        bestSellers: "Meilleures ventes",
+        editorsChoice: "Choix de la rédaction",
+        freePreviews: "Aperçus gratuits",
+        aiPicks: "Sélection IA",
+        classics: "Classiques captivants",
+        fantasyAdventure: "Fantasy & aventures",
+        viewAll: "Tout voir",
+        empty: "Rien pour le moment — de nouveaux livres arrivent bientôt."
+      },
+      cards: {
+        exclusive: "Exclusif",
+        bestseller: "Succès",
+        editorsPick: "Sélection rédaction",
+        new: "Nouvelle parution",
+        sales: "{{count}} ventes",
+        open: "Ouvrir",
+        addToCart: "Ajouter au panier"
+      },
+      errors: {
+        feedTitle: "Impossible de charger le flux d'accueil",
+        feedDescription: "Vérifiez votre connexion ou réessayez dans un instant.",
+        retry: "Réessayer"
+      }
+    },
+    footer: {
+      columns: {
+        catalog: {
+          title: "Catalogue",
+          links: {
+            all: "Tous les livres",
+            new: "Nouveautés",
+            popular: "Meilleures ventes",
+            collections: "Sélections thématiques"
+          }
+        },
+        authors: {
+          title: "Pour les auteurs",
+          links: {
+            submit: "Publier un livre",
+            guide: "Guide manuscrit",
+            royalties: "Redevances & règles",
+            community: "Communauté des auteurs"
+          }
+        },
+        about: {
+          title: "À propos",
+          links: {
+            about: "À propos de Kasbook",
+            blog: "Blog",
+            roadmap: "Feuille de route",
+            careers: "Carrières"
+          }
+        },
+        support: {
+          title: "Support",
+          links: {
+            help: "Centre d'aide",
+            contact: "Nous contacter",
+            faq: "FAQ",
+            report: "Signaler un problème"
+          }
+        }
+      },
+      actions: {
+        languageLabel: "Langue",
+        theme: {
+          label: "Thème",
+          light: "clair",
+          dark: "sombre",
+          toggle: "Passer au thème {{theme}}",
+          aria: "Passer au thème {{theme}}"
+        }
+      },
+      cta: {
+        badge: "Espace auteurs",
+        tagline: "Développez-vous avec Kasbook",
+        title: "Partagez votre livre avec des millions de lecteurs",
+        description: "Publiez une fois, profitez d'analyses transparentes, de paiements rapides et d'un accompagnement éditorial.",
+        primary: "Publier un livre",
+        secondary: "Préparer le manuscrit"
+      },
+      bottom: {
+        copyright: "© {{year}} Kasbook. Tous droits réservés.",
+        privacy: "Politique de confidentialité",
+        terms: "Conditions d'utilisation",
+        offer: "Offre publique"
+      },
+      socials: {
+        telegram: "Kasbook sur Telegram",
+        instagram: "Kasbook sur Instagram",
+        x: "Kasbook sur X",
+        youtube: "Kasbook sur YouTube"
+      }
+    },
+    subscription: {
+      suspendedWithAccess: "Votre accès Premium reste actif pendant cette pause.",
+      suspendedTitle: "Kasbook Premium est temporairement suspendu",
+      suspendedDescription: "Les ventes d'abonnement sont momentanément suspendues. Revenez bientôt.",
+      suspendedActiveDescription: "Nous actualisons Premium : vos avantages restent actifs, les nouvelles activations sont en pause.",
+      back: "Revenir",
+      managementDisabled: "Gestion de l'abonnement temporairement indisponible",
+      managementDisabledDescription: "Nous mettons à jour le catalogue Premium. Vos réglages seront conservés."
+    },
     cart: {
       title: "Panier",
       emptyTitle: "Votre panier est vide",
@@ -786,6 +1350,147 @@ const translations = {
         description: "Compre y venda libros con criptomoneda rápida y confiable.",
         button: "Más información"
       }
+    },
+    home: {
+      hero: {
+        tablistAria: "Destacados de Kasbook",
+        tabs: {
+          becomeAuthor: "Hazte autor",
+          howTo: "Preparar manuscrito",
+          bestsellers1: "Más vendidos · 1",
+          bestsellers2: "Más vendidos · 2",
+          bestsellers3: "Más vendidos · 3"
+        },
+        cta: {
+          publish: {
+            title: "Publica en Kasbook",
+            description: "Vende en todo el mundo, conserva hasta el 90 % de regalías y haz crecer tu audiencia.",
+            primary: "Publicar un libro",
+            secondary: "Cómo preparar el manuscrito"
+          },
+          guide: {
+            title: "Prepara tu manuscrito con nuestro equipo",
+            description: "Plantillas de formato, listas de verificación de metadatos y consejos editoriales.",
+            primary: "Checklist de manuscrito",
+            secondary: "Enviar un libro"
+          },
+          highlight: {
+            label: "Éxitos de autores",
+            value: "3K+ autores en Kasbook",
+            description: "Los nuevos autores logran sus primeras ventas en promedio durante el primer mes."
+          }
+        },
+        books: {
+          primaryCta: "Leer ahora",
+          secondaryCta: "Agregar al carrito",
+          sales: "{{count}} ventas esta semana",
+          new: "Nuevo"
+        }
+      },
+      sections: {
+        newThisWeek: "Novedades de la semana",
+        bestSellers: "Éxitos de ventas",
+        editorsChoice: "Recomendado por la editorial",
+        freePreviews: "Vistas previas gratuitas",
+        aiPicks: "Selección de IA",
+        classics: "Clásicos que enganchan",
+        fantasyAdventure: "Fantasía y aventuras",
+        viewAll: "Ver todo",
+        empty: "Aún no hay nada aquí; pronto llegarán nuevos libros."
+      },
+      cards: {
+        exclusive: "Exclusivo",
+        bestseller: "Éxito",
+        editorsPick: "Selección editorial",
+        new: "Lanzamiento reciente",
+        sales: "{{count}} ventas",
+        open: "Abrir",
+        addToCart: "Agregar al carrito"
+      },
+      errors: {
+        feedTitle: "No se pudo cargar el feed de inicio",
+        feedDescription: "Verifique su conexión o inténtelo de nuevo en unos instantes.",
+        retry: "Reintentar"
+      }
+    },
+    footer: {
+      columns: {
+        catalog: {
+          title: "Catálogo",
+          links: {
+            all: "Todos los libros",
+            new: "Novedades",
+            popular: "Más vendidos",
+            collections: "Colecciones destacadas"
+          }
+        },
+        authors: {
+          title: "Para autores",
+          links: {
+            submit: "Publicar un libro",
+            guide: "Guía de manuscrito",
+            royalties: "Regalías y normas",
+            community: "Comunidad de autores"
+          }
+        },
+        about: {
+          title: "Acerca de",
+          links: {
+            about: "Sobre Kasbook",
+            blog: "Blog",
+            roadmap: "Hoja de ruta",
+            careers: "Carreras"
+          }
+        },
+        support: {
+          title: "Soporte",
+          links: {
+            help: "Centro de ayuda",
+            contact: "Contáctanos",
+            faq: "FAQ",
+            report: "Reportar un problema"
+          }
+        }
+      },
+      actions: {
+        languageLabel: "Idioma",
+        theme: {
+          label: "Tema",
+          light: "claro",
+          dark: "oscuro",
+          toggle: "Cambiar al tema {{theme}}",
+          aria: "Cambiar al tema {{theme}}"
+        }
+      },
+      cta: {
+        badge: "Espacio para autores",
+        tagline: "Crece con Kasbook",
+        title: "Comparte tu libro con millones de lectores",
+        description: "Sube una vez, recibe analíticas transparentes, pagos rápidos de regalías y apoyo editorial en cada etapa.",
+        primary: "Publicar un libro",
+        secondary: "Cómo preparar el manuscrito"
+      },
+      bottom: {
+        copyright: "© {{year}} Kasbook. Todos los derechos reservados.",
+        privacy: "Política de privacidad",
+        terms: "Términos de uso",
+        offer: "Oferta pública"
+      },
+      socials: {
+        telegram: "Kasbook en Telegram",
+        instagram: "Kasbook en Instagram",
+        x: "Kasbook en X",
+        youtube: "Kasbook en YouTube"
+      }
+    },
+    subscription: {
+      suspendedWithAccess: "Tu acceso Premium sigue activo mientras las suscripciones están en pausa.",
+      suspendedTitle: "Kasbook Premium está temporalmente en pausa",
+      suspendedDescription: "Las ventas de suscripciones están pausadas temporalmente. Vuelve pronto.",
+      suspendedActiveDescription: "Estamos renovando Premium: mantienes tus beneficios, pero las nuevas activaciones están en pausa.",
+      back: "Volver",
+      managementDisabled: "La gestión de la suscripción está temporalmente deshabilitada",
+      managementDisabledDescription: "Estamos actualizando el catálogo Premium. Tus ajustes permanecerán intactos."
     },
     cart: {
       title: "Carrito",
