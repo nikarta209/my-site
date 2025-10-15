@@ -211,5 +211,93 @@ export const ru = {
     fairRoyalties: 'Справедливые роялти для авторов, настоящее владение для читателей',
     nftOwnership: 'Владейте книгами как NFT',
     globalMarketplace: 'Глобальная площадка для цифровых книг'
+  },
+
+  home: {
+    hero: {
+      tablistLabel: 'Избранные разделы Kasbook',
+      becomeAuthor: 'Станьте автором',
+      publishHeadline: 'Опубликуйте книгу в Kasbook и найдите новых читателей',
+      publishDescription: 'Загрузите рукопись, назначьте роялти до 90% и запустите свой веб3-магазин книг.',
+      publishCta: 'Отправить рукопись',
+      learnMoreCta: 'Узнать больше',
+      prepareManuscript: 'Подготовьте рукопись',
+      guideHeadline: 'Пошаговый гид для автора',
+      guideDescription: 'Получите советы по продвижению и подключайтесь к вебинарам сообщества.',
+      prepareCta: 'Читать гид',
+      eventsCta: 'Смотреть события',
+      bestsellersOne: 'Тренды продаж',
+      bestsellersTwo: 'Выбор читателей',
+      bestsellersThree: 'Выбор редакции',
+      read: 'Читать',
+      open: 'Открыть предпросмотр',
+      addToCart: 'В корзину'
+    },
+    sections: {
+      viewAll: 'Показать все',
+      loading: 'Загружаем рекомендации…',
+      newWeek: 'Новинки недели',
+      bestSellers: 'Бестселлеры',
+      aiChoice: 'Выбор ИИ'
+    },
+    cards: {
+      empty: 'Книг не найдено. Измените фильтры.',
+      exclusive: 'Эксклюзив Kasbook',
+      read: 'Читать',
+      addToCart: 'В корзину'
+    },
+    errors: {
+      failedToLoad: 'Не удалось загрузить ленту',
+      tryAgain: 'Попробуйте ещё раз чуть позже.'
+    },
+    actions: {
+      reload: 'Обновить'
+    },
+    subNavigation: {
+      new: 'Новинки недели',
+      popular: 'Популярное',
+      collections: 'Подборки',
+      exclusive: 'Эксклюзив',
+      ai: 'Выбор ИИ',
+      subscription: 'Подписка',
+      all: 'Все книги'
+    }
+  },
+
+  footer: {
+    catalog: 'Каталог',
+    authors: 'Авторам',
+    about: 'О проекте',
+    support: 'Поддержка',
+    tagline: 'Web3-платформа для цифровых книг на Kaspa',
+    authorCtaTitle: 'Начните зарабатывать с Kasbook',
+    authorCtaSubtitle: 'Публикуйте книги, отслеживайте продажи и получайте выплаты моментально.',
+    authorCtaButton: 'Стать автором',
+    rights: 'Все права защищены.',
+    actions: {
+      darkMode: 'Темная тема',
+      lightMode: 'Светлая тема'
+    },
+    links: {
+      allBooks: 'Все книги',
+      newReleases: 'Новинки',
+      bestSellers: 'Бестселлеры',
+      collections: 'Подборки',
+      submitBook: 'Отправить книгу',
+      authorGuide: 'Гид для автора',
+      royalties: 'Роялти и выплаты',
+      events: 'События для авторов',
+      aboutProject: 'О проекте',
+      blog: 'Блог',
+      partners: 'Партнёры',
+      careers: 'Карьера',
+      helpCenter: 'Центр помощи',
+      contact: 'Связаться с поддержкой',
+      status: 'Статус сервиса',
+      privacy: 'Конфиденциальность',
+      privacyPolicy: 'Политика конфиденциальности',
+      terms: 'Условия использования',
+      offer: 'Публичная оферта'
+    }
   }
 };

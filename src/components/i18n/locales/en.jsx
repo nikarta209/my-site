@@ -137,5 +137,93 @@ export const en = {
     twoFactor: 'Two-Factor Authentication',
     enable2FA: 'Enable 2FA',
     disable2FA: 'Disable 2FA'
+  },
+
+  home: {
+    hero: {
+      tablistLabel: 'Highlighted Kasbook sections',
+      becomeAuthor: 'Become an author',
+      publishHeadline: 'Publish on Kasbook and reach global readers',
+      publishDescription: 'Upload your manuscript, set royalties up to 90%, and launch your web3-powered book store.',
+      publishCta: 'Submit manuscript',
+      learnMoreCta: 'Learn more',
+      prepareManuscript: 'Prepare your manuscript',
+      guideHeadline: 'Author success toolkit',
+      guideDescription: 'Follow our step-by-step guide, get marketing tips, and join community webinars.',
+      prepareCta: 'Read the guide',
+      eventsCta: 'View events',
+      bestsellersOne: 'Trending bestsellers',
+      bestsellersTwo: 'Readers love',
+      bestsellersThree: 'Editors pick',
+      read: 'Read now',
+      open: 'Open preview',
+      addToCart: 'Add to cart'
+    },
+    sections: {
+      viewAll: 'View all',
+      loading: 'Loading recommendations…',
+      newWeek: 'New this week',
+      bestSellers: 'Bestsellers',
+      aiChoice: 'AI choice'
+    },
+    cards: {
+      empty: 'No books found yet. Try adjusting your filters.',
+      exclusive: 'Kasbook Exclusive',
+      read: 'Read now',
+      addToCart: 'Add to cart'
+    },
+    errors: {
+      failedToLoad: 'Failed to load the feed',
+      tryAgain: 'Please try again in a moment.'
+    },
+    actions: {
+      reload: 'Reload feed'
+    },
+    subNavigation: {
+      new: 'New this week',
+      popular: 'Popular',
+      collections: 'Collections',
+      exclusive: 'Exclusive',
+      ai: 'AI picks',
+      subscription: 'Subscription',
+      all: 'All books'
+    }
+  },
+
+  footer: {
+    catalog: 'Catalog',
+    authors: 'For authors',
+    about: 'About Kasbook',
+    support: 'Support',
+    tagline: 'Web3 platform for digital books on Kaspa',
+    authorCtaTitle: 'Start earning with Kasbook',
+    authorCtaSubtitle: 'Publish to the marketplace, track performance, and get paid instantly.',
+    authorCtaButton: 'Become an author',
+    rights: 'All rights reserved.',
+    actions: {
+      darkMode: 'Switch to dark mode',
+      lightMode: 'Switch to light mode'
+    },
+    links: {
+      allBooks: 'All books',
+      newReleases: 'New releases',
+      bestSellers: 'Bestsellers',
+      collections: 'Collections',
+      submitBook: 'Submit a book',
+      authorGuide: 'Author guide',
+      royalties: 'Royalties & payouts',
+      events: 'Author events',
+      aboutProject: 'About the project',
+      blog: 'Blog',
+      partners: 'Partners',
+      careers: 'Careers',
+      helpCenter: 'Help center',
+      contact: 'Contact support',
+      status: 'Platform status',
+      privacy: 'Privacy & security',
+      privacyPolicy: 'Privacy policy',
+      terms: 'Terms of use',
+      offer: 'Public offer'
+    }
   }
 };
