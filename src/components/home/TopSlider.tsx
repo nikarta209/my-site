@@ -13,8 +13,25 @@ export function TopSlider({ slides }: TopSliderProps) {
   const [active, setActive] = useState(0);
   const [isPaused, setPaused] = useState(false);
   const liveRegionRef = useRef<HTMLDivElement | null>(null);
+  const manualPauseRef = useRef(false);
 
   const orderedSlides = useMemo(() => (slides.length ? slides : []), [slides]);
+  const firstSlideId = orderedSlides[0]?.id;
+
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.hidden) {
+        setPaused(true);
+      } else if (!manualPauseRef.current) {
+        setPaused(false);
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, []);
 
   useEffect(() => {
     if (isPaused || orderedSlides.length <= 1) return undefined;
@@ -27,7 +44,10 @@ export function TopSlider({ slides }: TopSliderProps) {
   useEffect(() => {
     const slide = orderedSlides[active];
     if (!slide || !liveRegionRef.current) return;
-    const text = slide.type === 'promo' ? `${slide.title}. ${slide.description}` : `${slide.book.title} — ${slide.book.authorName}`;
+    const text =
+      slide.type === 'promo'
+        ? `${slide.title}. ${slide.description}`
+        : `${slide.book.id.startsWith('placeholder-') ? 'Заглушка: ' : ''}${slide.book.title} — ${slide.book.authorName}`;
     liveRegionRef.current.textContent = text;
   }, [active, orderedSlides]);
 
@@ -65,25 +85,42 @@ export function TopSlider({ slides }: TopSliderProps) {
 
   const currentSlide = orderedSlides[active];
 
+  const pauseManually = () => {
+    manualPauseRef.current = true;
+    setPaused(true);
+  };
+
+  const resumeManually = () => {
+    manualPauseRef.current = false;
+    if (!document.hidden) {
+      setPaused(false);
+    }
+  };
+
+  if (!orderedSlides.length) {
+    return null;
+  }
+
   return (
     <section
       className="relative mx-auto w-full max-w-6xl px-3"
-      onMouseEnter={() => setPaused(true)}
-      onMouseLeave={() => setPaused(false)}
-      onFocusCapture={() => setPaused(true)}
-      onBlurCapture={() => setPaused(false)}
+      onMouseEnter={pauseManually}
+      onMouseLeave={resumeManually}
+      onFocusCapture={pauseManually}
+      onBlurCapture={resumeManually}
     >
       <div ref={liveRegionRef} className="sr-only" aria-live="polite" />
       <div
-        className="relative mx-auto flex w-full flex-col items-center justify-center rounded-3xl border border-primary/20 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800 p-6 shadow-2xl"
+        className="relative mx-auto flex w-full flex-col items-center justify-center overflow-hidden rounded-3xl border border-primary/20 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800 p-6 shadow-2xl"
         role="group"
         aria-roledescription="carousel"
         aria-label="Главные промо-слайды"
         onKeyDown={handleKeyDown}
         tabIndex={0}
       >
-        <div className="absolute inset-0 -z-10 overflow-hidden rounded-3xl">
+        <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden rounded-3xl">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(99,102,241,0.45),_transparent_65%)]" />
+          <div className="absolute inset-0 bg-gradient-to-b from-slate-900/30 via-transparent to-slate-950/60" />
         </div>
 
         {currentSlide && (
@@ -93,7 +130,7 @@ export function TopSlider({ slides }: TopSliderProps) {
             id={`top-slider-panel-${currentSlide.id}`}
             aria-labelledby={`top-slider-tab-${currentSlide.id}`}
           >
-            <SlideArtwork slide={currentSlide} />
+            <SlideArtwork slide={currentSlide} isFirst={currentSlide.id === firstSlideId} />
             <SlideContent slide={currentSlide} />
           </div>
         )}
@@ -141,9 +178,10 @@ export function TopSlider({ slides }: TopSliderProps) {
 
 type SlideProps = {
   slide: Slide;
+  isFirst?: boolean;
 };
 
-const SlideArtwork = ({ slide }: SlideProps) => {
+const SlideArtwork = ({ slide, isFirst = false }: SlideProps) => {
   if (slide.type === 'promo') {
     return (
       <div className="relative w-full max-w-[320px] overflow-hidden rounded-2xl border border-white/20 bg-white/5 shadow-lg">
@@ -151,8 +189,10 @@ const SlideArtwork = ({ slide }: SlideProps) => {
           src={slide.image}
           alt={slide.title}
           className="h-full w-full object-cover"
-          loading="lazy"
+          loading={isFirst ? 'eager' : 'lazy'}
+          decoding="async"
         />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
       </div>
     );
   }
@@ -161,8 +201,14 @@ const SlideArtwork = ({ slide }: SlideProps) => {
   const cover = book.covers.mainBanner ?? book.covers['1600x900'] ?? book.covers['400x600'];
   return (
     <div className="relative w-full max-w-[360px] overflow-hidden rounded-3xl border border-indigo-400/30 bg-indigo-500/20 shadow-lg">
-      <img src={cover} alt={book.title} className="h-full w-full object-cover" loading="lazy" />
-      <div className="absolute inset-0 bg-gradient-to-t from-slate-900/70 via-slate-900/10 to-transparent" />
+      <img
+        src={cover}
+        alt={book.title}
+        className="h-full w-full object-cover"
+        loading={isFirst ? 'eager' : 'lazy'}
+        decoding="async"
+      />
+      <div className="absolute inset-0 bg-gradient-to-t from-slate-950/70 via-slate-900/20 to-transparent" />
       <div className="absolute bottom-4 left-4 right-4 text-left text-sm text-white/90">
         <p className="font-semibold uppercase tracking-wide text-indigo-200">Главный баннер</p>
         <p>{book.description?.slice(0, 80)}</p>

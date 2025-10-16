@@ -12,6 +12,7 @@ type BookCarousel600Props = {
 export function BookCarousel600({ id, title, books }: BookCarousel600Props) {
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const itemRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const observerRef = useRef<IntersectionObserver | null>(null);
   const [activeIndex, setActiveIndex] = useState(0);
 
   useEffect(() => {
@@ -29,10 +30,23 @@ export function BookCarousel600({ id, title, books }: BookCarousel600Props) {
       },
       { root: viewport, threshold: 0.6 }
     );
+    observerRef.current = observer;
 
+    return () => {
+      observer.disconnect();
+      observerRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    itemRefs.current = itemRefs.current.slice(0, books.length);
+    const observer = observerRef.current;
+    if (!observer) return;
     itemRefs.current.forEach((item) => item && observer.observe(item));
-    return () => observer.disconnect();
-  }, [books.length]);
+    return () => {
+      itemRefs.current.forEach((item) => item && observer.unobserve(item));
+    };
+  }, [books]);
 
   const scrollToIndex = (nextIndex: number) => {
     const clamped = Math.max(0, Math.min(books.length - 1, nextIndex));
@@ -104,16 +118,17 @@ export function BookCarousel600({ id, title, books }: BookCarousel600Props) {
             data-index={index}
             role="group"
             aria-roledescription="slide"
-            aria-label={`${book.title} — ${book.authorName}`}
+            aria-label={`${book.id.startsWith('placeholder-') ? 'Заглушка: ' : ''}${book.title} — ${book.authorName}`}
             aria-selected={activeIndex === index}
             className="snap-start"
           >
-            <article className="flex w-[240px] flex-col gap-3 md:w-[280px]">
-              <div className="overflow-hidden rounded-3xl border border-border/60 bg-muted">
+            <article className="flex w-[240px] flex-col gap-3 md:w-[280px]" style={{ contain: 'content' }}>
+              <div className="overflow-hidden rounded-3xl border border-border/60 bg-muted" style={{ willChange: 'transform' }}>
                 <img
                   src={book.covers['600x600'] ?? book.covers['400x600'] ?? book.covers['1600x900'] ?? ''}
                   alt={book.title}
                   loading="lazy"
+                  decoding="async"
                   className="aspect-square w-full object-cover"
                 />
               </div>

@@ -49,20 +49,29 @@ export default function HomePage() {
   const { t } = useTranslation();
 
   useEffect(() => {
-    let mounted = true;
-    loadBooks()
+    const controller = new AbortController();
+    setLoading(true);
+
+    loadBooks({ signal: controller.signal })
       .then((data) => {
-        if (!mounted) return;
+        if (controller.signal.aborted) return;
         setBooks(Array.isArray(data) ? data : []);
       })
+      .catch((error) => {
+        if (controller.signal.aborted) return;
+        if (import.meta.env?.DEV) {
+          console.error('[home] failed to load books', error);
+        }
+        setBooks([]);
+      })
       .finally(() => {
-        if (mounted) {
+        if (!controller.signal.aborted) {
           setLoading(false);
         }
       });
 
     return () => {
-      mounted = false;
+      controller.abort();
     };
   }, []);
 

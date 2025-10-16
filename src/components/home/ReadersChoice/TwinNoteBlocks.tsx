@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { KeyboardEvent } from 'react';
 import type { Book } from '@/api/books';
 
@@ -20,8 +20,23 @@ const noteText = (book: Book): string => {
 export function TwinNoteBlocks({ pairs }: TwinNoteBlocksProps) {
   const [active, setActive] = useState(0);
   const [isPaused, setPaused] = useState(false);
+  const manualPauseRef = useRef(false);
 
   const orderedPairs = useMemo(() => (pairs.length ? pairs : []), [pairs]);
+
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.hidden) {
+        setPaused(true);
+      } else if (!manualPauseRef.current) {
+        setPaused(false);
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, []);
 
   useEffect(() => {
     if (isPaused || orderedPairs.length <= 1) return undefined;
@@ -62,13 +77,29 @@ export function TwinNoteBlocks({ pairs }: TwinNoteBlocksProps) {
 
   const currentPair = orderedPairs[active] ?? [];
 
+  const pauseManually = () => {
+    manualPauseRef.current = true;
+    setPaused(true);
+  };
+
+  const resumeManually = () => {
+    manualPauseRef.current = false;
+    if (!document.hidden) {
+      setPaused(false);
+    }
+  };
+
+  if (!orderedPairs.length) {
+    return null;
+  }
+
   return (
     <section
       className="mx-auto flex w-full max-w-6xl flex-col gap-6"
-      onMouseEnter={() => setPaused(true)}
-      onMouseLeave={() => setPaused(false)}
-      onFocusCapture={() => setPaused(true)}
-      onBlurCapture={() => setPaused(false)}
+      onMouseEnter={pauseManually}
+      onMouseLeave={resumeManually}
+      onFocusCapture={pauseManually}
+      onBlurCapture={resumeManually}
     >
       <div className="flex items-center justify-between px-2">
         <h3 className="text-xl font-semibold text-foreground">Выбор читателей</h3>
