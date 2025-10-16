@@ -224,6 +224,12 @@ export const ru = {
   },
 
   home: {
+    tabs: {
+      novelties: 'Новинки',
+      readers: 'Выбор читателей',
+      taste: 'На ваш вкус',
+      editors: 'Выбор редакции'
+    },
     hero: {
       tablistLabel: 'Избранные разделы Kasbook',
       becomeAuthor: 'Станьте автором',
@@ -248,7 +254,13 @@ export const ru = {
       loading: 'Загружаем рекомендации…',
       newWeek: 'Новинки недели',
       bestSellers: 'Бестселлеры',
-      aiChoice: 'Выбор ИИ'
+      aiChoice: 'Выбор ИИ',
+      noveltiesFirst: 'Главные новинки',
+      noveltiesSecond: 'Ещё новинки',
+      square600: 'В квадратном формате',
+      tasteSoon: 'Скоро',
+      tasteDescription: 'Мы собираем коллекцию рекомендаций специально под ваш вкус.',
+      editorsChoice: 'Выбор редакции'
     },
     cards: {
       empty: 'Книг не найдено. Измените фильтры.',

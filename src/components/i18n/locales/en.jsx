@@ -150,6 +150,12 @@ export const en = {
   },
 
   home: {
+    tabs: {
+      novelties: 'New releases',
+      readers: 'Readers’ choice',
+      taste: 'For your taste',
+      editors: 'Editors’ pick'
+    },
     hero: {
       tablistLabel: 'Highlighted Kasbook sections',
       becomeAuthor: 'Become an author',
@@ -174,7 +180,13 @@ export const en = {
       loading: 'Loading recommendations…',
       newWeek: 'New this week',
       bestSellers: 'Bestsellers',
-      aiChoice: 'AI choice'
+      aiChoice: 'AI choice',
+      noveltiesFirst: 'Top new releases',
+      noveltiesSecond: 'More new titles',
+      square600: 'Square format gems',
+      tasteSoon: 'Coming soon',
+      tasteDescription: 'We are curating personal picks tailored to your taste.',
+      editorsChoice: 'Editors’ pick'
     },
     cards: {
       empty: 'No books found yet. Try adjusting your filters.',

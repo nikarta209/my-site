@@ -6,7 +6,6 @@ import { ThemeProvider } from '@/components/layout/ThemeProvider';
 import { Toaster } from 'sonner';
 import { AnimatePresence, motion } from 'framer-motion';
 import Header from '@/components/layout/Header';
-import SubNavigation from '@/components/layout/SubNavigation';
 import Footer from '@/components/layout/Footer';
 import { ExchangeRateProvider } from '@/components/utils/ExchangeRateContext';
 import AuthModal from '@/components/auth/AuthModal';
@@ -52,8 +51,6 @@ export default function Layout({ children, currentPageName }) {
                 currentPageName={currentPageName}
                 onLoginClick={() => setAuthOpen(true)}
               />
-              {currentPageName?.toLowerCase() === 'home' && <SubNavigation />}
-              
               <main className="flex-1 mobile-safe-bottom">
                 <AnimatePresence mode="wait" initial={false}>
                   <motion.div
