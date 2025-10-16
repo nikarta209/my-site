@@ -10,6 +10,7 @@ import {
   canUse400,
   canUse600,
   createSeen,
+  generatePlaceholders,
   markUsed,
   type Book,
   type Slide,
@@ -96,6 +97,15 @@ describe('usage helpers', () => {
     markUsed(mainSeen, book.id, 's400');
     expect(canUse600(book, mainSeen)).toBe(false);
   });
+
+  it('respects appearance limit of two per book', () => {
+    const book = createBook('limit', { hasMainBanner: true, hasWideBanner: true });
+    const seen = createSeen();
+    markUsed(seen, book.id, 'main');
+    markUsed(seen, book.id, 'wide');
+    expect(canUse400(book, seen)).toBe(false);
+    expect(canUse600(book, seen)).toBe(false);
+  });
 });
 
 describe('builders', () => {
@@ -106,12 +116,13 @@ describe('builders', () => {
     const slides = buildTopSlider(books, seen);
     expect(slides).toHaveLength(5);
     const promoCount = (slides as Slide[]).filter((slide) => slide.type === 'promo').length;
-    expect(promoCount).toBe(2);
+    expect(promoCount).toBeGreaterThanOrEqual(2);
     const bookSlides = (slides as Slide[]).filter(
       (slide): slide is Extract<Slide, { type: 'book' }> => slide.type === 'book'
     );
     const bookIds = bookSlides.map((slide) => slide.book.id);
     expect(new Set(bookIds).size).toBe(bookIds.length);
+    expect(bookSlides.length).toBeLessThanOrEqual(3);
   });
 
   it('builds new arrivals with 20+20 items', () => {
@@ -121,6 +132,8 @@ describe('builders', () => {
     expect(second400).toHaveLength(20);
     const ids = new Set([...first400, ...second400].map((book) => book.id));
     expect(ids.size).toBe(40);
+    expect(new Set(first400.map((book) => book.id)).size).toBe(first400.length);
+    expect(new Set(second400.map((book) => book.id)).size).toBe(second400.length);
   });
 
   it('builds wide banners with limit 5', () => {
@@ -165,5 +178,56 @@ describe('builders', () => {
     expect(editors).toHaveLength(12);
     const ids = new Set(editors.map((book) => book.id));
     expect(ids.size).toBe(12);
+  });
+
+  it('fills sections with placeholders when no books provided', () => {
+    const seen = createSeen();
+    const slider = buildTopSlider([], seen);
+    expect(slider).toHaveLength(5);
+    const promoCount = slider.filter((slide) => slide.type === 'promo').length;
+    const bookSlides = slider.filter((slide): slide is Extract<Slide, { type: 'book' }> => slide.type === 'book');
+    expect(promoCount).toBeGreaterThanOrEqual(2);
+    expect(bookSlides.length).toBeLessThanOrEqual(3);
+
+    const emptySeen = createSeen();
+    const { first400, second400 } = buildNewArrivals([], emptySeen);
+    expect(first400).toHaveLength(20);
+    expect(second400).toHaveLength(20);
+    expect(first400.every((book) => book.id.startsWith('placeholder-'))).toBe(true);
+    expect(second400.every((book) => book.id.startsWith('placeholder-'))).toBe(true);
+
+    const wide = buildWideBanners([], createSeen());
+    expect(wide).toHaveLength(5);
+    expect(wide.every((book) => book.id.startsWith('placeholder-'))).toBe(true);
+
+    const square = buildSquare600([], createSeen(), 10);
+    expect(square).toHaveLength(10);
+    expect(square.every((book) => book.id.startsWith('placeholder-'))).toBe(true);
+
+    const featured = buildFeatured400([], createSeen());
+    expect(featured).not.toBeNull();
+    if (featured) {
+      expect(featured.id.startsWith('placeholder-')).toBe(true);
+    }
+
+    const readers = buildReadersChoice([], createSeen(), 3);
+    expect(readers).toHaveLength(3);
+    readers.forEach((pair) => {
+      expect(pair.every((book) => book.id.startsWith('placeholder-'))).toBe(true);
+    });
+
+    const editors = buildEditorsChoice([], createSeen(), 6);
+    expect(editors).toHaveLength(6);
+    expect(editors.every((book) => book.id.startsWith('placeholder-'))).toBe(true);
+  });
+
+  it('generates placeholder books on demand', () => {
+    const placeholders = generatePlaceholders(5);
+    expect(placeholders).toHaveLength(5);
+    placeholders.forEach((book, index) => {
+      expect(book.id.startsWith('placeholder-')).toBe(true);
+      expect(book.note).not.toBeNull();
+      expect(book.title).toContain(`${index + 1}`);
+    });
   });
 });

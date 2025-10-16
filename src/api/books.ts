@@ -1,5 +1,7 @@
 import { supabase, isSupabaseConfigured } from '@/api/supabaseClient';
 
+const DEBUG = typeof import.meta !== 'undefined' && import.meta.env?.VITE_DEBUG_HOME === '1';
+
 export type CoverUrls = {
   '400x600'?: string;
   '600x600'?: string;
@@ -46,49 +48,12 @@ export type Slide =
       book: Book;
     };
 
-type RawNote = {
-  id?: string;
-  book_id?: string;
-  bookId?: string;
-  html?: string | null;
-  bg_image_url?: string | null;
-  background?: string | null;
-  bgImageUrl?: string | null;
-  image?: string | null;
-};
-
-type RawBook = {
-  id?: string | number;
-  title?: string | null;
-  author?: string | null;
-  author_name?: string | null;
-  authorName?: string | null;
-  created_at?: string | null;
-  updated_at?: string | null;
-  published_at?: string | null;
-  released_at?: string | null;
-  release_date?: string | null;
-  cover_url?: string | null;
-  coverImages?: Record<string, string | null> | null;
-  cover_images?: Record<string, string | null> | null;
-  hero_main?: string | null;
-  banner?: string | null;
-  main_banner?: string | null;
-  library_hero?: string | null;
-  coverImagesLandscape?: string | null;
-  cover_images_landscape?: string | null;
-  likes_count?: number | null;
-  weekly_sales?: number | null;
-  total_sales?: number | null;
-  sales_count?: number | null;
-  popularity?: number | null;
-  description?: string | null;
-  summary?: string | null;
-  short_description?: string | null;
-  note?: RawNote | null;
-  notes?: RawNote[] | null;
-  metadata?: Record<string, unknown> | null;
-};
+class TimeoutError extends Error {
+  constructor(message = 'Request timed out') {
+    super(message);
+    this.name = 'TimeoutError';
+  }
+}
 
 const PROMO_SLIDES: Slide[] = [
   {
@@ -125,7 +90,7 @@ const PLACEHOLDER_NOTES: string[] = [
   'Роман, вдохновлённый реальными событиями. Заметка содержит эксклюзивный комментарий автора.',
 ];
 
-const PLACEHOLDER_BG = [
+const PLACEHOLDER_BACKGROUNDS = [
   'https://images.unsplash.com/photo-1512820790803-83ca734da794?auto=format&fit=crop&w=1200&q=80',
   'https://images.unsplash.com/photo-1481627834876-b7833e8f5570?auto=format&fit=crop&w=1200&q=80',
   'https://images.unsplash.com/photo-1463320726281-696a485928c7?auto=format&fit=crop&w=1200&q=80',
@@ -133,8 +98,16 @@ const PLACEHOLDER_BG = [
   'https://images.unsplash.com/photo-1458682625221-3a45f8a844c7?auto=format&fit=crop&w=1200&q=80',
 ];
 
-const PLACEHOLDER_COVER = (w: number, h: number, label: string) =>
-  `https://placehold.co/${w}x${h}?text=${encodeURIComponent(label)}`;
+const PLACEHOLDER_COVERS = [
+  'https://images.unsplash.com/photo-1491841573634-28140fc7ced7?auto=format&fit=crop&w=600&q=80',
+  'https://images.unsplash.com/photo-1498050108023-c5249f4df085?auto=format&fit=crop&w=600&q=80',
+  'https://images.unsplash.com/photo-1481833761820-0509d3217039?auto=format&fit=crop&w=600&q=80',
+  'https://images.unsplash.com/photo-1495446815901-a7297e633e8d?auto=format&fit=crop&w=600&q=80',
+  'https://images.unsplash.com/photo-1516979187457-637abb4f9353?auto=format&fit=crop&w=600&q=80',
+  'https://images.unsplash.com/photo-1447752875215-b2761acb3c5d?auto=format&fit=crop&w=600&q=80',
+  'https://images.unsplash.com/photo-1473862170181-5b0b9c63038d?auto=format&fit=crop&w=600&q=80',
+  'https://images.unsplash.com/photo-1434030216411-0b793f4b4173?auto=format&fit=crop&w=600&q=80',
+];
 
 const ensureString = (value: unknown, fallback = ''): string => {
   if (typeof value === 'string') return value;
@@ -161,110 +134,29 @@ const toNumber = (raw: unknown, fallback = 0): number => {
   return fallback;
 };
 
-const pickCover = (source: Record<string, string | null> | null | undefined, key: string): string | undefined => {
-  if (!source) return undefined;
-  const value = source[key] ?? source[key.toLowerCase()];
-  return value ?? undefined;
-};
+const PLACEHOLDER_POOL_SIZE = 120;
 
-const normalizeNote = (bookId: string, raw: RawNote | null | undefined, index: number): Note | null => {
-  if (!raw) return null;
-  const id = ensureString(raw.id ?? `${bookId}-note-${index}`, `${bookId}-note-${index}`);
-  const bgImageUrl =
-    ensureString(
-      raw.bgImageUrl ?? raw.bg_image_url ?? raw.background ?? raw.image ?? raw.bg_image_url,
-      PLACEHOLDER_BG[index % PLACEHOLDER_BG.length]
-    ) || PLACEHOLDER_BG[index % PLACEHOLDER_BG.length];
-
-  const html = raw.html ?? undefined;
-  return {
-    id,
-    bookId,
-    html,
-    bgImageUrl,
-  };
-};
-
-const normalizeBook = (raw: RawBook, index: number): Book => {
-  const id = ensureString(raw.id, `placeholder-${index + 1}`) || `placeholder-${index + 1}`;
-  const coverImages = raw.cover_images ?? raw.coverImages ?? null;
-  const covers: CoverUrls = {};
-
-  const portrait = pickCover(coverImages, 'portrait_400x600') ?? raw.cover_url ?? undefined;
-  if (portrait) covers['400x600'] = portrait;
-
-  const square =
-    pickCover(coverImages, 'square_600x600') ??
-    pickCover(coverImages, 'square') ??
-    pickCover(coverImages, 'square_large') ??
-    undefined;
-  if (square) covers['600x600'] = square;
-
-  const landscape =
-    pickCover(coverImages, 'landscape_1600x900') ??
-    pickCover(coverImages, 'landscape') ??
-    raw.coverImagesLandscape ??
-    raw.cover_images_landscape ??
-    raw.library_hero ??
-    undefined;
-  if (landscape) covers['1600x900'] = landscape;
-
-  const mainBanner = raw.main_banner ?? raw.hero_main ?? raw.banner ?? pickCover(coverImages, 'main_banner') ?? undefined;
-  if (mainBanner) covers.mainBanner = mainBanner;
-
-  const hasWideBanner = Boolean(covers['1600x900']);
-  const hasMainBanner = Boolean(covers.mainBanner);
-
-  const baseDescription = raw.description ?? raw.summary ?? raw.short_description ?? PLACEHOLDER_TEXT;
-  const noteSource = Array.isArray(raw.notes) ? raw.notes[0] : raw.note;
-  const note = noteSource ? normalizeNote(id, noteSource, index) : null;
-
-  return {
-    id,
-    title: ensureString(raw.title, `Книга ${index + 1}`) || `Книга ${index + 1}`,
-    authorName: ensureString(raw.authorName ?? raw.author ?? raw.author_name, `Автор ${index + 1}`) || `Автор ${index + 1}`,
-    covers,
-    createdAt:
-      parseDate(
-        raw.created_at ?? raw.published_at ?? raw.released_at ?? raw.release_date ?? raw.updated_at ?? new Date().toISOString()
-      ) || new Date().toISOString(),
-    popularity:
-      toNumber(raw.popularity ?? raw.likes_count ?? raw.weekly_sales ?? raw.total_sales ?? raw.sales_count, index % 100) +
-      10,
-    hasMainBanner,
-    hasWideBanner,
-    note,
-    description: baseDescription,
-  };
-};
-
-const createPlaceholderBook = (index: number): Book => {
+const PLACEHOLDER_BOOKS: Book[] = Array.from({ length: PLACEHOLDER_POOL_SIZE }, (_, index) => {
   const id = `placeholder-${index + 1}`;
   const title = `Плейсхолдер ${index + 1}`;
-  const authorName = `Команда KASBOOK`;
+  const authorName = 'Команда KASBOOK';
   const createdAt = new Date(Date.now() - index * 36e5).toISOString();
+  const cover = PLACEHOLDER_COVERS[index % PLACEHOLDER_COVERS.length];
+  const square = PLACEHOLDER_COVERS[(index + 3) % PLACEHOLDER_COVERS.length];
+  const wide = PLACEHOLDER_BACKGROUNDS[index % PLACEHOLDER_BACKGROUNDS.length];
 
   const covers: CoverUrls = {
-    '400x600': PLACEHOLDER_COVER(400, 600, title),
+    '400x600': cover,
+    '600x600': square,
+    '1600x900': wide,
+    mainBanner: wide,
   };
-
-  if (index % 2 === 0) {
-    covers['600x600'] = PLACEHOLDER_COVER(600, 600, title);
-  }
-
-  if (index < 12) {
-    covers['1600x900'] = PLACEHOLDER_COVER(1600, 900, `${title} Wide`);
-  }
-
-  if (index < 6) {
-    covers.mainBanner = PLACEHOLDER_COVER(1600, 600, `${title} Banner`);
-  }
 
   const note: Note = {
     id: `${id}-note`,
     bookId: id,
     html: PLACEHOLDER_NOTES[index % PLACEHOLDER_NOTES.length],
-    bgImageUrl: PLACEHOLDER_BG[index % PLACEHOLDER_BG.length],
+    bgImageUrl: PLACEHOLDER_BACKGROUNDS[index % PLACEHOLDER_BACKGROUNDS.length],
   };
 
   return {
@@ -273,29 +165,438 @@ const createPlaceholderBook = (index: number): Book => {
     authorName,
     covers,
     createdAt,
-    popularity: 100 - index,
-    hasMainBanner: Boolean(covers.mainBanner),
-    hasWideBanner: Boolean(covers['1600x900']),
+    popularity: PLACEHOLDER_POOL_SIZE - index,
+    hasMainBanner: true,
+    hasWideBanner: true,
     note,
     description: PLACEHOLDER_TEXT,
   };
+});
+
+type RawNote = {
+  id?: string;
+  book_id?: string;
+  note_text?: string | null;
+  metadata?: unknown;
+  likes_count?: number | null;
+  is_public?: boolean | null;
 };
 
-const PLACEHOLDER_BOOKS: Book[] = Array.from({ length: 80 }, (_, index) => createPlaceholderBook(index));
+type RawBook = {
+  id?: string | number | null;
+  title?: string | null;
+  author?: string | null;
+  author_name?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+  cover_url?: string | null;
+  cover_images?: unknown;
+  coverImages?: unknown;
+  hero_main?: string | null;
+  banner?: string | null;
+  main_banner?: string | null;
+  library_hero?: string | null;
+  likes_count?: number | null;
+  sales_count?: number | null;
+  popularity?: number | null;
+  description?: string | null;
+  preview_text?: string | null;
+  status?: string | null;
+};
 
-const mergePlaceholders = (books: Book[]): Book[] => {
-  const byId = new Map<string, Book>();
-  books.forEach((book) => {
-    byId.set(book.id, book);
-  });
+type LegacyBook = RawBook & {
+  note?: RawNote | null;
+  notes?: RawNote[] | null;
+};
 
-  for (const placeholder of PLACEHOLDER_BOOKS) {
-    if (!byId.has(placeholder.id)) {
-      byId.set(placeholder.id, placeholder);
+type NotesMap = Map<string, Note>;
+
+const parseCoverImages = (raw: unknown): Record<string, string> | undefined => {
+  if (!raw) return undefined;
+  if (typeof raw === 'object') return raw as Record<string, string>;
+  if (typeof raw === 'string') {
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object') {
+        return parsed as Record<string, string>;
+      }
+    } catch (error) {
+      if (DEBUG) {
+        console.info('[books] invalid cover_images JSON', error);
+      }
+    }
+  }
+  return undefined;
+};
+
+const storageBucket = 'books';
+
+const urlFromStorage = (path: string | null | undefined): string | undefined => {
+  const value = ensureString(path).trim();
+  if (!value) return undefined;
+  if (/^https?:\/\//i.test(value)) return value;
+  const normalized = value.replace(/^\/+/, '');
+  const { data } = supabase.storage.from(storageBucket).getPublicUrl(normalized);
+  return data?.publicUrl ?? undefined;
+};
+
+const logMissingCover = (id: string, kind: keyof CoverUrls) => {
+  if (!DEBUG) return;
+  console.info(`[books] missing ${kind} cover for`, id);
+};
+
+const ensureCovers = (covers: CoverUrls, id: string): boolean => {
+  const hasCover = Boolean(covers['400x600'] || covers['600x600'] || covers['1600x900'] || covers.mainBanner);
+  if (!hasCover) {
+    if (DEBUG) {
+      console.info('[books] skipping book without covers', id);
+    }
+    return false;
+  }
+  if (!covers['400x600']) logMissingCover(id, '400x600');
+  if (!covers['600x600']) logMissingCover(id, '600x600');
+  if (!covers['1600x900']) logMissingCover(id, '1600x900');
+  if (!covers.mainBanner) logMissingCover(id, 'mainBanner');
+  return true;
+};
+
+const mapNote = (raw: RawNote | undefined, fallbackBg: string, index: number): Note | undefined => {
+  if (!raw || raw.is_public === false) return undefined;
+  const id = ensureString(raw.id, `note-${index}`) || `note-${index}`;
+  const bookId = ensureString(raw.book_id, '');
+  const html = raw.note_text ?? undefined;
+  let bgImageUrl: string | undefined;
+
+  const metadata = raw.metadata;
+  if (metadata && typeof metadata === 'object') {
+    const candidates = [
+      (metadata as Record<string, unknown>).bgImageUrl,
+      (metadata as Record<string, unknown>).backgroundImage,
+      (metadata as Record<string, unknown>).background,
+      (metadata as Record<string, unknown>).image,
+    ];
+    for (const candidate of candidates) {
+      if (typeof candidate === 'string' && /^https?:\/\//i.test(candidate)) {
+        bgImageUrl = candidate;
+        break;
+      }
     }
   }
 
-  return Array.from(byId.values());
+  return {
+    id,
+    bookId,
+    html,
+    bgImageUrl: bgImageUrl ?? fallbackBg,
+  };
+};
+
+const mapRowToBook = (row: RawBook, index: number, notes: NotesMap): Book | null => {
+  const id = ensureString(row.id, `placeholder-${index + 1}`);
+  const title = ensureString(row.title, '').trim();
+  if (!title) {
+    if (DEBUG) {
+      console.info('[books] skipping row without title', row);
+    }
+    return null;
+  }
+
+  const coverImages = parseCoverImages(row.cover_images ?? row.coverImages);
+
+  const covers: CoverUrls = {};
+  const portrait =
+    urlFromStorage(row.cover_url) ||
+    urlFromStorage(coverImages?.portrait_large) ||
+    urlFromStorage(coverImages?.portrait_medium) ||
+    urlFromStorage(coverImages?.portrait) ||
+    urlFromStorage(coverImages?.default);
+  if (portrait) covers['400x600'] = portrait;
+
+  const square =
+    urlFromStorage(coverImages?.square_large) ||
+    urlFromStorage(coverImages?.square_medium) ||
+    urlFromStorage(coverImages?.square);
+  if (square) covers['600x600'] = square;
+
+  const landscape =
+    urlFromStorage(coverImages?.landscape) ||
+    urlFromStorage(coverImages?.landscape_large) ||
+    urlFromStorage(coverImages?.library_hero) ||
+    urlFromStorage(row.library_hero ?? undefined);
+  if (landscape) covers['1600x900'] = landscape;
+
+  const mainBanner =
+    urlFromStorage(coverImages?.main_banner) ||
+    urlFromStorage(coverImages?.hero_main) ||
+    urlFromStorage(coverImages?.banner) ||
+    urlFromStorage(row.main_banner ?? row.hero_main ?? row.banner ?? undefined);
+  if (mainBanner) covers.mainBanner = mainBanner;
+
+  if (!ensureCovers(covers, id)) {
+    return null;
+  }
+
+  const note = notes.get(id) ?? null;
+
+  return {
+    id,
+    title,
+    authorName: ensureString(row.author ?? row.author_name, 'Неизвестный автор') || 'Неизвестный автор',
+    covers,
+    createdAt: parseDate(row.created_at ?? row.updated_at ?? new Date().toISOString()),
+    popularity: toNumber(row.popularity ?? row.likes_count ?? row.sales_count, 0),
+    hasMainBanner: Boolean(covers.mainBanner),
+    hasWideBanner: Boolean(covers['1600x900']),
+    note,
+    description: row.description ?? row.preview_text ?? null,
+  };
+};
+
+const createPlaceholderIterator = () => {
+  let index = 0;
+  return () => PLACEHOLDER_BOOKS[index++ % PLACEHOLDER_BOOKS.length];
+};
+
+const withTimeout = <T>(
+  factory: (signal: AbortSignal) => Promise<T>,
+  ms: number,
+  externalSignal?: AbortSignal
+): Promise<T> => {
+  const controller = new AbortController();
+  const timer = setTimeout(() => {
+    controller.abort(new TimeoutError(`Timed out after ${ms}ms`));
+  }, ms);
+
+  const onExternalAbort = () => {
+    controller.abort(externalSignal?.reason ?? new DOMException('Aborted', 'AbortError'));
+  };
+
+  if (externalSignal) {
+    if (externalSignal.aborted) {
+      onExternalAbort();
+    } else {
+      externalSignal.addEventListener('abort', onExternalAbort, { once: true });
+    }
+  }
+
+  return factory(controller.signal)
+    .catch((error) => {
+      if (controller.signal.aborted) {
+        const reason = controller.signal.reason;
+        if (reason instanceof TimeoutError) {
+          throw reason;
+        }
+        if (externalSignal?.aborted) {
+          throw externalSignal.reason ?? error;
+        }
+      }
+      throw error;
+    })
+    .finally(() => {
+      clearTimeout(timer);
+      if (externalSignal) {
+        (externalSignal as EventTarget).removeEventListener('abort', onExternalAbort as EventListener);
+      }
+    });
+};
+
+const fetchSharedNotes = async (limit: number, signal?: AbortSignal): Promise<NotesMap> => {
+  const map: NotesMap = new Map();
+  if (!isSupabaseConfigured) {
+    return map;
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('shared_notes')
+      .select('id, book_id, note_text, metadata, likes_count, is_public', { signal })
+      .eq('is_public', true)
+      .order('likes_count', { ascending: false })
+      .limit(limit);
+
+    if (error || !Array.isArray(data)) {
+      if (DEBUG) {
+        console.info('[books] shared_notes request failed', error);
+      }
+      return map;
+    }
+
+    data.forEach((item, index) => {
+      const note = mapNote(item, PLACEHOLDER_BACKGROUNDS[index % PLACEHOLDER_BACKGROUNDS.length], index);
+      const bookId = ensureString(item.book_id);
+      if (note && bookId) {
+        map.set(bookId, note);
+      }
+    });
+  } catch (error) {
+    if (DEBUG) {
+      console.info('[books] shared_notes fetch error', error);
+    }
+  }
+
+  return map;
+};
+
+const normalizeBooks = (rows: RawBook[], notes: NotesMap): Book[] => {
+  return rows
+    .map((row, index) => mapRowToBook(row, index, notes))
+    .filter((book): book is Book => Boolean(book));
+};
+
+const fetchFromSupabase = async (limit: number, signal?: AbortSignal): Promise<Book[]> => {
+  if (!isSupabaseConfigured) {
+    return [];
+  }
+
+  const notes = await fetchSharedNotes(limit, signal);
+
+  try {
+    const { data, error } = await supabase
+      .from('books')
+      .select(
+        'id, title, author, author_name, description, preview_text, cover_url, cover_images, created_at, updated_at, likes_count, sales_count, popularity, status, main_banner, hero_main, banner, library_hero',
+        { signal }
+      )
+      .in('status', ['approved', 'public_domain'])
+      .order('created_at', { ascending: false })
+      .limit(limit);
+
+    if (error) {
+      throw error;
+    }
+
+    if (!Array.isArray(data) || data.length === 0) {
+      return [];
+    }
+
+    const mapped = normalizeBooks(data, notes);
+    if (DEBUG) {
+      console.info('[books] supabase source', mapped.length);
+    }
+    return mapped;
+  } catch (error) {
+    if (DEBUG) {
+      console.info('[books] supabase fetch error', error);
+    }
+    return [];
+  }
+};
+
+let fetchHomeBooksFn: ((limit?: number) => Promise<LegacyBook[] | undefined>) | null = null;
+
+const getLegacyFetcher = async () => {
+  if (fetchHomeBooksFn) return fetchHomeBooksFn;
+  try {
+    const module = await import('@/lib/api/books.js');
+    fetchHomeBooksFn = module.fetchHomeBooks as (limit?: number) => Promise<LegacyBook[]>;
+  } catch (error) {
+    if (DEBUG) {
+      console.info('[books] unable to import legacy module', error);
+    }
+    fetchHomeBooksFn = null;
+  }
+  return fetchHomeBooksFn;
+};
+
+const fetchFromLegacy = async (limit: number, signal?: AbortSignal): Promise<Book[]> => {
+  const fetcher = await getLegacyFetcher();
+  if (!fetcher) return [];
+
+  if (signal?.aborted) {
+    return [];
+  }
+
+  let legacyBooks: LegacyBook[] = [];
+  try {
+    legacyBooks = (await fetcher(limit)) ?? [];
+  } catch (error) {
+    if (DEBUG) {
+      console.info('[books] legacy fetch failed', error);
+    }
+    return [];
+  }
+
+  const notes = new Map<string, Note>();
+  legacyBooks.forEach((book, index) => {
+    const raw = Array.isArray(book.notes) ? book.notes[0] : book.note;
+    const note = mapNote(raw ?? undefined, PLACEHOLDER_BACKGROUNDS[index % PLACEHOLDER_BACKGROUNDS.length], index);
+    const bookId = ensureString(book.id);
+    if (note && bookId) {
+      notes.set(bookId, note);
+    }
+  });
+
+  const mapped = normalizeBooks(legacyBooks, notes);
+  if (DEBUG) {
+    console.info('[books] legacy source', mapped.length);
+  }
+  return mapped.slice(0, limit);
+};
+
+const mergeWithPlaceholders = (books: Book[], limit: number): Book[] => {
+  if (books.length >= limit) {
+    return books;
+  }
+  const nextPlaceholder = createPlaceholderIterator();
+  const result = [...books];
+  while (result.length < limit) {
+    const placeholder = nextPlaceholder();
+    if (!result.some((book) => book.id === placeholder.id)) {
+      result.push(placeholder);
+    }
+  }
+  return result;
+};
+
+export const generatePlaceholders = (limit: number): Book[] => {
+  return mergeWithPlaceholders([], limit).slice(0, limit);
+};
+
+export type LoadBooksOptions = {
+  limit?: number;
+  signal?: AbortSignal;
+};
+
+export const loadBooks = async (options: LoadBooksOptions = {}): Promise<Book[]> => {
+  const { limit = 200, signal } = options;
+  const sources: Array<'supabase' | 'legacy'> = ['supabase', 'legacy'];
+  let books: Book[] = [];
+
+  for (const source of sources) {
+    if (signal?.aborted) break;
+    try {
+      if (source === 'supabase') {
+        books = await withTimeout((timeoutSignal) => fetchFromSupabase(limit, timeoutSignal), 4000, signal);
+      } else {
+        books = await withTimeout((timeoutSignal) => fetchFromLegacy(limit, timeoutSignal), 4000, signal);
+      }
+    } catch (error) {
+      if (DEBUG) {
+        console.info(`[books] ${source} timed out`, error);
+      }
+      books = [];
+    }
+    if (books.length > 0) {
+      if (DEBUG) {
+        console.info(`[books] using ${source} books`, books.length);
+      }
+      break;
+    }
+  }
+
+  if (signal?.aborted) {
+    return [];
+  }
+
+  if (!books.length) {
+    const placeholders = mergeWithPlaceholders([], limit);
+    if (DEBUG) {
+      console.info('[books] fallback to placeholders', placeholders.length);
+    }
+    return placeholders;
+  }
+
+  return books;
 };
 
 const countUsage = (entry: SeenEntry | undefined): number => {
@@ -317,7 +618,7 @@ export const canUse400 = (book: Book, seen: Seen): boolean => {
   if (entry?.s400) return false;
   const usage = countUsage(entry);
 
-  if (!entry) return true;
+  if (!entry) return Boolean(book.covers['400x600']);
 
   if (entry.wide) {
     return usage < 2;
@@ -370,30 +671,30 @@ const sortByPopularity = (books: Book[]): Book[] => {
   });
 };
 
+const createPromoClone = (slide: Extract<Slide, { type: 'promo' }>, index: number): Slide => ({
+  ...slide,
+  id: `${slide.id}-clone-${index}`,
+});
+
 export const buildTopSlider = (books: Book[], seen: Seen): Slide[] => {
-  const slides: Slide[] = [...PROMO_SLIDES];
-  const candidates = books.filter((book) => book.covers.mainBanner);
+  const slides: Slide[] = [];
+  slides.push(...PROMO_SLIDES);
+
+  const candidates = books.filter((book) => Boolean(book.covers.mainBanner));
+  const usedBookIds = new Set<string>();
+
   for (const book of candidates) {
-    if (slides.length >= 5) break;
+    if (slides.length >= 5 || usedBookIds.size >= 3) break;
     if (seen[book.id]?.main) continue;
     slides.push({ id: `book-${book.id}-slide`, type: 'book', book });
     markUsed(seen, book.id, 'main');
+    usedBookIds.add(book.id);
   }
 
-  if (slides.length < 5) {
-    for (const book of books) {
-      if (slides.length >= 5) break;
-      if (seen[book.id]?.main) continue;
-      if (!book.covers.mainBanner) continue;
-      slides.push({ id: `book-${book.id}-slide`, type: 'book', book });
-      markUsed(seen, book.id, 'main');
-    }
-  }
-
+  let cloneIndex = 0;
   while (slides.length < 5) {
-    const fallback = PLACEHOLDER_BOOKS[slides.length % PLACEHOLDER_BOOKS.length];
-    slides.push({ id: `placeholder-${slides.length}`, type: 'book', book: fallback });
-    markUsed(seen, fallback.id, 'main');
+    const promo = PROMO_SLIDES[slides.length % PROMO_SLIDES.length];
+    slides.push(createPromoClone(promo, cloneIndex++));
   }
 
   return slides.slice(0, 5);
@@ -423,19 +724,19 @@ export const buildNewArrivals = (
     }
   }
 
-  const combined = [...first400, ...second400];
-  let placeholderIndex = 0;
+  const nextPlaceholder = createPlaceholderIterator();
   while (first400.length < 20) {
-    const placeholder = PLACEHOLDER_BOOKS[placeholderIndex++ % PLACEHOLDER_BOOKS.length];
-    if (combined.some((book) => book.id === placeholder.id)) continue;
+    const placeholder = nextPlaceholder();
     if (!canUse400(placeholder, seen)) continue;
+    if (first400.some((book) => book.id === placeholder.id)) continue;
     first400.push(placeholder);
     markUsed(seen, placeholder.id, 's400');
   }
   while (second400.length < 20) {
-    const placeholder = PLACEHOLDER_BOOKS[placeholderIndex++ % PLACEHOLDER_BOOKS.length];
-    if ([...combined, ...second400].some((book) => book.id === placeholder.id)) continue;
+    const placeholder = nextPlaceholder();
     if (!canUse400(placeholder, seen)) continue;
+    if (second400.some((book) => book.id === placeholder.id)) continue;
+    if (first400.some((book) => book.id === placeholder.id)) continue;
     second400.push(placeholder);
     markUsed(seen, placeholder.id, 's400');
   }
@@ -453,9 +754,9 @@ export const buildWideBanners = (books: Book[], seen: Seen): Book[] => {
     markUsed(seen, book.id, 'wide');
   }
 
-  let placeholderIndex = 0;
+  const nextPlaceholder = createPlaceholderIterator();
   while (picked.length < 5) {
-    const placeholder = PLACEHOLDER_BOOKS[placeholderIndex++ % PLACEHOLDER_BOOKS.length];
+    const placeholder = nextPlaceholder();
     if (!placeholder.covers['1600x900']) continue;
     if (seen[placeholder.id]?.wide) continue;
     picked.push(placeholder);
@@ -475,9 +776,9 @@ export const buildSquare600 = (books: Book[], seen: Seen, limit = 15): Book[] =>
     markUsed(seen, book.id, 's600');
   }
 
-  let placeholderIndex = 0;
+  const nextPlaceholder = createPlaceholderIterator();
   while (picked.length < limit) {
-    const placeholder = PLACEHOLDER_BOOKS[placeholderIndex++ % PLACEHOLDER_BOOKS.length];
+    const placeholder = nextPlaceholder();
     if (!placeholder.covers['600x600']) continue;
     if (!canUse600(placeholder, seen)) continue;
     picked.push(placeholder);
@@ -496,39 +797,43 @@ export const buildFeatured400 = (books: Book[], seen: Seen): Book | null => {
     }
   }
 
-  for (const placeholder of PLACEHOLDER_BOOKS) {
+  const nextPlaceholder = createPlaceholderIterator();
+  while (true) {
+    const placeholder = nextPlaceholder();
     if (canUse400(placeholder, seen)) {
       markUsed(seen, placeholder.id, 's400');
       return placeholder;
     }
   }
-
-  return null;
 };
 
 export const buildReadersChoice = (books: Book[], seen: Seen, pairs = 5): Book[][] => {
   const sorted = sortByPopularity(filterAvailable(books, (book) => Boolean(book.covers['600x600'])));
   const result: Book[][] = [];
+  const usedIds = new Set<string>();
 
   for (const book of sorted) {
     if (result.length >= pairs) break;
     if (!canUse600(book, seen)) continue;
-    // Find companion
+    if (usedIds.has(book.id)) continue;
+
     const companion = sorted.find((candidate) => {
       if (candidate.id === book.id) return false;
-      if (result.some((pair) => pair.some((item) => item.id === candidate.id))) return false;
+      if (usedIds.has(candidate.id)) return false;
       return canUse600(candidate, seen);
     });
     if (!companion) continue;
     markUsed(seen, book.id, 's600');
     markUsed(seen, companion.id, 's600');
+    usedIds.add(book.id);
+    usedIds.add(companion.id);
     result.push([book, companion]);
   }
 
-  let index = 0;
+  const nextPlaceholder = createPlaceholderIterator();
   while (result.length < pairs) {
-    const first = PLACEHOLDER_BOOKS[index++ % PLACEHOLDER_BOOKS.length];
-    const second = PLACEHOLDER_BOOKS[index++ % PLACEHOLDER_BOOKS.length];
+    const first = nextPlaceholder();
+    const second = nextPlaceholder();
     if (!first.covers['600x600'] || !second.covers['600x600']) continue;
     if (!canUse600(first, seen) || !canUse600(second, seen)) continue;
     markUsed(seen, first.id, 's600');
@@ -549,10 +854,11 @@ export const buildEditorsChoice = (books: Book[], seen: Seen, limit = 12): Book[
     markUsed(seen, book.id, 's400');
   }
 
-  let index = 0;
+  const nextPlaceholder = createPlaceholderIterator();
   while (picked.length < limit) {
-    const placeholder = PLACEHOLDER_BOOKS[index++ % PLACEHOLDER_BOOKS.length];
+    const placeholder = nextPlaceholder();
     if (!canUse400(placeholder, seen)) continue;
+    if (picked.some((book) => book.id === placeholder.id)) continue;
     picked.push(placeholder);
     markUsed(seen, placeholder.id, 's400');
   }
@@ -560,84 +866,4 @@ export const buildEditorsChoice = (books: Book[], seen: Seen, limit = 12): Book[
   return picked.slice(0, limit);
 };
 
-const fetchSupabaseNotes = async (): Promise<Record<string, Note>> => {
-  if (!isSupabaseConfigured) {
-    return {};
-  }
-
-  try {
-    const { data, error } = await supabase.from('book_notes').select('id, book_id, html, bg_image_url, metadata');
-    if (error || !Array.isArray(data)) {
-      return {};
-    }
-
-    return data.reduce<Record<string, Note>>((acc, item, index) => {
-      const bookId = ensureString(item.book_id, ensureString(item.id));
-      if (!bookId) return acc;
-      const metadata = (item.metadata ?? {}) as Record<string, unknown>;
-      const bgImageUrl = ensureString(
-        item.bg_image_url ?? (metadata?.bgImageUrl as string | undefined) ?? PLACEHOLDER_BG[index % PLACEHOLDER_BG.length]
-      );
-
-      acc[bookId] = {
-        id: ensureString(item.id, `${bookId}-note`),
-        bookId,
-        html: item.html ?? undefined,
-        bgImageUrl,
-      };
-      return acc;
-    }, {});
-  } catch (error) {
-    console.warn('[books] failed to load notes from supabase', error);
-    return {};
-  }
-};
-
-const hydrateWithNotes = (books: Book[], notes: Record<string, Note>): Book[] => {
-  return books.map((book) => {
-    const note = notes[book.id];
-    if (!note) return book;
-    return { ...book, note };
-  });
-};
-
-type FetchHomeBooks = typeof import('@/lib/api/books.js')['fetchHomeBooks'];
-
-let fetchHomeBooksFn: FetchHomeBooks | null = null;
-
-const getFetchHomeBooks = async (): Promise<FetchHomeBooks> => {
-  if (fetchHomeBooksFn) {
-    return fetchHomeBooksFn;
-  }
-
-  const module = await import('@/lib/api/books.js');
-  fetchHomeBooksFn = module.fetchHomeBooks;
-  return fetchHomeBooksFn;
-};
-
-export const loadBooks = async (): Promise<Book[]> => {
-  let rawBooks: RawBook[] = [];
-  try {
-    const fetchHomeBooks = await getFetchHomeBooks();
-    const legacyBooks = await fetchHomeBooks();
-    if (Array.isArray(legacyBooks)) {
-      rawBooks = legacyBooks;
-    }
-  } catch (error) {
-    console.warn('[books] failed to load legacy home books', error);
-    rawBooks = [];
-  }
-
-  let normalized = rawBooks.map((book, index) => normalizeBook(book, index));
-  if (normalized.length === 0) {
-    normalized = [...PLACEHOLDER_BOOKS];
-  }
-
-  const notes = await fetchSupabaseNotes();
-  const hydrated = hydrateWithNotes(normalized, notes);
-
-  return mergePlaceholders(hydrated);
-};
-
 export const createSeen = (): Seen => ({});
-
