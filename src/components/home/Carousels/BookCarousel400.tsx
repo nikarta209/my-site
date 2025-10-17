@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { KeyboardEvent } from 'react';
 import type { Book } from '@/api/books';
 import clsx from 'clsx';
@@ -15,38 +15,48 @@ export function BookCarousel400({ id, title, books }: BookCarousel400Props) {
   const observerRef = useRef<IntersectionObserver | null>(null);
   const [activeIndex, setActiveIndex] = useState(0);
 
-  useEffect(() => {
-    const viewport = viewportRef.current;
-    if (!viewport) return undefined;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const visible = entries
-          .filter((entry) => entry.isIntersecting)
-          .map((entry) => Number(entry.target.getAttribute('data-index') ?? '0'))
-          .sort((a, b) => a - b);
-        if (visible.length > 0) {
-          setActiveIndex(visible[0]);
-        }
-      },
-      { root: viewport, threshold: 0.6 }
-    );
-    observerRef.current = observer;
-
-    return () => {
-      observer.disconnect();
-      observerRef.current = null;
-    };
+  const onIntersect = useCallback((entries: IntersectionObserverEntry[]) => {
+    const visible = entries
+      .filter((entry) => entry.isIntersecting)
+      .map((entry) => Number(entry.target.getAttribute('data-index') ?? '0'))
+      .sort((a, b) => a - b);
+    if (visible.length > 0) {
+      setActiveIndex(visible[0]);
+    }
   }, []);
 
   useEffect(() => {
+    const viewport = viewportRef.current;
+    if (!viewport) return undefined;
+
+    let observer = observerRef.current;
+    if (!observer || observer.root !== viewport) {
+      observer?.disconnect();
+      observer = new IntersectionObserver(onIntersect, { root: viewport, threshold: 0.6 });
+      observerRef.current = observer;
+    }
+
+    observer.takeRecords();
+    observer.disconnect();
+
     itemRefs.current = itemRefs.current.slice(0, books.length);
-    const observer = observerRef.current;
-    if (!observer) return;
-    itemRefs.current.forEach((item) => item && observer.observe(item));
+    itemRefs.current.forEach((item) => {
+      if (item) {
+        observer.observe(item);
+      }
+    });
+
     return () => {
-      itemRefs.current.forEach((item) => item && observer.unobserve(item));
+      observer.disconnect();
     };
-  }, [books]);
+  }, [books, onIntersect]);
+
+  useEffect(() => () => {
+    if (observerRef.current) {
+      observerRef.current.disconnect();
+      observerRef.current = null;
+    }
+  }, []);
 
   const scrollToIndex = (nextIndex: number) => {
     const clamped = Math.max(0, Math.min(books.length - 1, nextIndex));

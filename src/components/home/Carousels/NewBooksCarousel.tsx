@@ -1,55 +1,75 @@
-import React from 'react';
+import { useMemo } from 'react';
 import type { PublicBook } from '@/api/books';
+import { BookCarousel400 } from './BookCarousel400';
+
+type CarouselBook = PublicBook & {
+  covers: {
+    '400x600'?: string | null;
+    '600x600'?: string | null;
+    '1600x900'?: string | null;
+    mainBanner?: string | null;
+  };
+  authorName: string;
+  description?: string | null;
+};
 
 interface NewBooksCarouselProps {
-  books: PublicBook[];
+  books: CarouselBook[];
 }
 
 const PLACEHOLDER_COVER = '/assets/cover-placeholder.png';
+const PLACEHOLDER_BANNER = '/assets/banner-placeholder.jpg';
+const TARGET_ITEMS = 20;
+
+let placeholderSeed = 0;
+
+function generatePlaceholders(count: number): CarouselBook[] {
+  return Array.from({ length: Math.max(0, count) }, (_, index) => {
+    placeholderSeed += 1;
+    const id = `placeholder-new-${index}-${placeholderSeed}`;
+    return {
+      id,
+      title: 'Скоро новинки',
+      author: null,
+      author_name: null,
+      created_at: null,
+      updated_at: null,
+      cover_images: null,
+      likes_count: null,
+      sales_count: null,
+      rating: null,
+      is_editors_pick: null,
+      status: null,
+      covers: {
+        '400x600': PLACEHOLDER_COVER,
+        '600x600': PLACEHOLDER_COVER,
+        '1600x900': PLACEHOLDER_BANNER,
+        mainBanner: PLACEHOLDER_BANNER,
+      },
+      authorName: 'KASBOOK',
+      description: 'Мы подбираем лучшие новинки для вас — скоро здесь появятся новые карточки.',
+    } satisfies CarouselBook;
+  });
+}
 
 const NewBooksCarousel: React.FC<NewBooksCarouselProps> = ({ books }) => {
-  if (!books || books.length === 0) {
-    return null;
-  }
+  const preparedBooks = useMemo(() => {
+    const unique: CarouselBook[] = [];
+    const seen = new Set<string>();
+    books.forEach((book) => {
+      if (seen.has(book.id)) return;
+      seen.add(book.id);
+      unique.push(book);
+    });
+    if (unique.length >= TARGET_ITEMS) {
+      return unique.slice(0, TARGET_ITEMS);
+    }
+    return [...unique, ...generatePlaceholders(TARGET_ITEMS - unique.length)];
+  }, [books]);
 
-  return (
-    <section className="space-y-4">
-      <h2 className="text-2xl font-semibold">Новинки</h2>
-      <div className="no-scrollbar flex gap-4 overflow-x-auto pb-2">
-        {books.map((book) => {
-          const coverSrc =
-            book.cover_images?.square ||
-            book.cover_images?.default ||
-            PLACEHOLDER_COVER;
-
-          return (
-            <a
-              key={book.id}
-              href={`/books/${book.id}`}
-              className="w-40 flex-shrink-0"
-            >
-              <div className="overflow-hidden rounded-lg border border-border bg-card shadow-sm">
-                <div className="aspect-[3/4] w-full overflow-hidden">
-                  <img
-                    src={coverSrc}
-                    alt={book.title}
-                    className="h-full w-full object-cover"
-                    loading="lazy"
-                  />
-                </div>
-                <div className="space-y-1 p-3">
-                  <p className="text-sm font-medium line-clamp-2">{book.title}</p>
-                  <p className="text-xs text-muted-foreground line-clamp-1">
-                    {book.author || book.author_name || 'Неизвестный автор'}
-                  </p>
-                </div>
-              </div>
-            </a>
-          );
-        })}
-      </div>
-    </section>
-  );
+  return <BookCarousel400 id="new-books" title="Новинки" books={preparedBooks} />;
 };
+
+export type { CarouselBook as NewCarouselBook };
 
 export default NewBooksCarousel;

@@ -1,12 +1,43 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { KeyboardEvent } from 'react';
-import type { Slide } from '@/api/books';
 import clsx from 'clsx';
 
 const AUTOPLAY_INTERVAL = 8000;
 
+export type TopSliderBook = {
+  id: string;
+  title: string;
+  authorName: string;
+  description?: string | null;
+  covers: {
+    mainBanner?: string | null;
+    '1600x900'?: string | null;
+    '600x600'?: string | null;
+    '400x600'?: string | null;
+  };
+};
+
+export type PromoSlide = {
+  id: string;
+  type: 'promo';
+  title: string;
+  description: string;
+  image: string;
+  href?: string;
+};
+
+export type BookSlide = {
+  id: string;
+  type: 'book';
+  book: TopSliderBook;
+};
+
+export type TopSliderSlide = PromoSlide | BookSlide;
+
+const FALLBACK_BANNER = '/assets/banner-placeholder.jpg';
+
 type TopSliderProps = {
-  slides: Slide[];
+  slides: TopSliderSlide[];
 };
 
 export function TopSlider({ slides }: TopSliderProps) {
@@ -17,6 +48,10 @@ export function TopSlider({ slides }: TopSliderProps) {
 
   const orderedSlides = useMemo(() => (slides.length ? slides : []), [slides]);
   const firstSlideId = orderedSlides[0]?.id;
+
+  useEffect(() => {
+    setActive(0);
+  }, [firstSlideId]);
 
   useEffect(() => {
     const handleVisibility = () => {
@@ -177,7 +212,7 @@ export function TopSlider({ slides }: TopSliderProps) {
 }
 
 type SlideProps = {
-  slide: Slide;
+  slide: TopSliderSlide;
   isFirst?: boolean;
 };
 
@@ -191,6 +226,7 @@ const SlideArtwork = ({ slide, isFirst = false }: SlideProps) => {
           className="h-full w-full object-cover"
           loading={isFirst ? 'eager' : 'lazy'}
           decoding="async"
+          style={{ contain: 'content', willChange: 'transform' }}
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
       </div>
@@ -198,7 +234,7 @@ const SlideArtwork = ({ slide, isFirst = false }: SlideProps) => {
   }
 
   const { book } = slide;
-  const cover = book.covers.mainBanner ?? book.covers['1600x900'] ?? book.covers['400x600'];
+  const cover = book.covers.mainBanner ?? book.covers['1600x900'] ?? book.covers['400x600'] ?? FALLBACK_BANNER;
   return (
     <div className="relative w-full max-w-[360px] overflow-hidden rounded-3xl border border-indigo-400/30 bg-indigo-500/20 shadow-lg">
       <img
@@ -207,11 +243,12 @@ const SlideArtwork = ({ slide, isFirst = false }: SlideProps) => {
         className="h-full w-full object-cover"
         loading={isFirst ? 'eager' : 'lazy'}
         decoding="async"
+        style={{ contain: 'content', willChange: 'transform' }}
       />
       <div className="absolute inset-0 bg-gradient-to-t from-slate-950/70 via-slate-900/20 to-transparent" />
       <div className="absolute bottom-4 left-4 right-4 text-left text-sm text-white/90">
         <p className="font-semibold uppercase tracking-wide text-indigo-200">Главный баннер</p>
-        <p>{book.description?.slice(0, 80)}</p>
+        <p>{book.description?.slice(0, 80) || 'Откройте новое издание на этой неделе.'}</p>
       </div>
     </div>
   );
@@ -242,7 +279,9 @@ const SlideContent = ({ slide }: SlideProps) => {
       <p className="text-xs uppercase tracking-[0.3em] text-indigo-300">Выбор недели</p>
       <h2 className="text-3xl font-semibold leading-tight md:text-4xl">{book.title}</h2>
       <p className="text-base text-indigo-100/90">{book.authorName}</p>
-      <p className="text-base text-slate-200/80 md:text-lg line-clamp-4">{book.description}</p>
+      <p className="text-base text-slate-200/80 md:text-lg line-clamp-4">
+        {book.description ?? 'Эта книга уже доступна в библиотеке KASBOOK.'}
+      </p>
       <div className="mt-2 flex flex-wrap gap-2">
         {book.covers['400x600'] && (
           <span className="rounded-full bg-white/15 px-3 py-1 text-xs text-indigo-100">Обложка 400×600</span>
