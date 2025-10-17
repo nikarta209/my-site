@@ -8,9 +8,11 @@ import {
 } from '../api/books';
 import { TopSlider, type TopSliderSlide, type PromoSlide } from '../components/home/TopSlider';
 import NewBooksCarousel, { type NewCarouselBook } from '../components/home/Carousels/NewBooksCarousel';
-import PopularBooksCarousel from '../components/home/Carousels/PopularBooksCarousel';
-import TwinNoteBlocks, { type TwinNoteItem } from '../components/home/ReadersChoice/TwinNoteBlocks';
+import Carousel400Section from '../components/home/Carousels/Carousel400Section';
+import Carousel600Section from '../components/home/Carousels/Carousel600Section';
 import WideBanners1600 from '../components/home/Carousels/WideBanners1600';
+import TwinNoteBlocks, { type TwinNoteItem } from '../components/home/ReadersChoice/TwinNoteBlocks';
+import { TabsNav, type TabKey } from '../components/home/TabsNav';
 
 type CoverMap = {
   '400x600'?: string | null;
@@ -52,11 +54,18 @@ const PROMO_SLIDES: PromoSlide[] = [
   },
 ];
 
-const MAX_SECTION_OCCURRENCES = 2;
-const MAX_NEW_BOOKS = 20;
-const MAX_POPULAR_BOOKS = 20;
+const MAX_SLIDER_BOOKS = 3;
 const MAX_BANNERS = 5;
+const MAX_PRIMARY_400 = 20;
+const MAX_SECONDARY_400 = 20;
+const MAX_EXTRA_400 = 12;
+const MAX_SQUARE_600 = 15;
 const MAX_NOTES = 10;
+
+const HOME_TABS: { key: TabKey; label: string; description: string }[] = [
+  { key: 'novelties', label: 'Новинки', description: 'Свежие поступления и релизы' },
+  { key: 'taste', label: 'На ваш вкус', description: 'Популярные заметки читателей' },
+];
 
 const HomePage: React.FC = () => {
   const [newBooks, setNewBooks] = useState<PublicBook[]>([]);
@@ -88,7 +97,9 @@ const HomePage: React.FC = () => {
     };
   }, []);
 
-  const { slides, wideBanners, newSection, popularSection, twinNotes } = useMemo(() => {
+  const [activeTab, setActiveTab] = useState<TabKey>('novelties');
+
+  const { slides, sections } = useMemo(() => {
     const normalizeBook = (book: PublicBook): HomeBook => {
       const rawCovers = book.cover_images ?? {};
       const covers: CoverMap = {
@@ -156,44 +167,94 @@ const HomePage: React.FC = () => {
     const normalizedEditors = editorPicks.map(normalizeBook);
     const normalizedBanners = bannerBooks.map(normalizeBook);
 
-    const occurrences = new Map<string, number>();
+    type SectionFormat = 'slider' | '400x600' | '600x600' | '1600x900';
 
-    const registerBook = (book: HomeBook) => {
-      if (book.id.startsWith('placeholder-')) {
-        return true;
+    type UsageRecord = {
+      count: number;
+      formats: Set<SectionFormat>;
+    };
+
+    const cloneUsage = (usage: Map<string, UsageRecord>) => {
+      const clone = new Map<string, UsageRecord>();
+      usage.forEach((record, key) => {
+        clone.set(key, { count: record.count, formats: new Set(record.formats) });
+      });
+      return clone;
+    };
+
+    const useWithFormat = (
+      book: HomeBook,
+      format: SectionFormat,
+      usage: Map<string, UsageRecord>
+    ) => {
+      let record = usage.get(book.id);
+      if (!record) {
+        record = { count: 0, formats: new Set<SectionFormat>() };
+        usage.set(book.id, record);
       }
-      const current = occurrences.get(book.id) ?? 0;
-      if (current >= MAX_SECTION_OCCURRENCES) {
-        return false;
+
+      const hasSlider = record.formats.has('slider');
+      const has400 = record.formats.has('400x600');
+      const has600 = record.formats.has('600x600');
+      const has1600 = record.formats.has('1600x900');
+      const hasLargeCover = Boolean(book.covers['1600x900']);
+
+      if (format === 'slider') {
+        if (record.count > 0) {
+          return false;
+        }
+      } else if (record.count === 0) {
+        // always allow the first appearance for non-slider formats
+      } else {
+        if (record.count >= 2) {
+          return false;
+        }
+        if (hasSlider) {
+          if (format === '400x600' || format === '600x600') {
+            if (has400 || has600) {
+              return false;
+            }
+          } else {
+            return false;
+          }
+        } else if (has1600) {
+          if (format !== '400x600' || has400) {
+            return false;
+          }
+        } else if (format === '1600x900') {
+          if (has600) {
+            return false;
+          }
+          if (has400 && !hasLargeCover) {
+            return false;
+          }
+        } else if (has400 || has600) {
+          // already shown in a small format
+          if (format === '1600x900' && hasLargeCover && !has600) {
+            // allow 1600 after 400
+          } else {
+            return false;
+          }
+        }
       }
-      occurrences.set(book.id, current + 1);
+
+      record.count += 1;
+      record.formats.add(format);
       return true;
     };
 
-    const pickBooks = (source: HomeBook[], limit: number) => {
-      const selection: HomeBook[] = [];
-      const seen = new Set<string>();
-      for (const book of source) {
-        if (selection.length >= limit) break;
-        if (seen.has(book.id)) continue;
-        if (!registerBook(book)) continue;
-        selection.push(book);
-        seen.add(book.id);
-      }
-      return selection;
-    };
+    const baseUsage = new Map<string, UsageRecord>();
 
     const sliderCandidates: HomeBook[] = [];
     const sliderSources = [normalizedBanners, normalizedEditors, normalizedNew, normalizedPopular];
     for (const source of sliderSources) {
       for (const book of source) {
-        if (sliderCandidates.length >= 3) break;
+        if (sliderCandidates.length >= MAX_SLIDER_BOOKS) break;
         if (!book.covers.mainBanner) continue;
-        if (sliderCandidates.find((candidate) => candidate.id === book.id)) continue;
-        if (!registerBook(book)) continue;
+        if (!useWithFormat(book, 'slider', baseUsage)) continue;
         sliderCandidates.push(book);
       }
-      if (sliderCandidates.length >= 3) break;
+      if (sliderCandidates.length >= MAX_SLIDER_BOOKS) break;
     }
 
     const composeSlides = (books: HomeBook[]): TopSliderSlide[] => {
@@ -226,50 +287,158 @@ const HomePage: React.FC = () => {
 
     const slides = composeSlides(sliderCandidates);
 
-    const wideBanners = pickBooks(normalizedBanners, MAX_BANNERS);
-    const newSection = pickBooks(normalizedNew, MAX_NEW_BOOKS);
-    const popularSection = pickBooks(normalizedPopular, MAX_POPULAR_BOOKS);
+    const sliderUsage = cloneUsage(baseUsage);
 
-    const twinNotes: TwinNoteItem[] = [];
-    const notedBooks = new Set<string>();
-
-    const collectNotes = (source: HomeBook[]) => {
-      for (const book of source) {
-        if (twinNotes.length >= MAX_NOTES) break;
-        if (notedBooks.has(book.id)) continue;
-        if (!book.notes.length) continue;
-        const current = occurrences.get(book.id) ?? 0;
-        if (current >= MAX_SECTION_OCCURRENCES) continue;
-        const note = book.notes.find((entry) => entry.html);
-        if (!note) continue;
-        twinNotes.push({
-          id: note.id,
-          note,
-          book,
-        });
-        occurrences.set(book.id, current + 1);
-        notedBooks.add(book.id);
+    const collectFromSources = (
+      sources: HomeBook[][],
+      limit: number,
+      format: SectionFormat,
+      usage: Map<string, UsageRecord>,
+      predicate: (book: HomeBook) => boolean = () => true
+    ) => {
+      const selection: HomeBook[] = [];
+      const seen = new Set<string>();
+      for (const source of sources) {
+        for (const book of source) {
+          if (selection.length >= limit) break;
+          if (seen.has(book.id)) continue;
+          if (!predicate(book)) continue;
+          if (!useWithFormat(book, format, usage)) continue;
+          selection.push(book);
+          seen.add(book.id);
+        }
+        if (selection.length >= limit) break;
       }
+      return selection;
     };
 
-    collectNotes(normalizedEditors);
-    if (twinNotes.length < MAX_NOTES) {
-      collectNotes(normalizedNew);
-    }
-    if (twinNotes.length < MAX_NOTES) {
-      collectNotes(normalizedPopular);
-    }
+    const buildNovelties = () => {
+      const usage = cloneUsage(sliderUsage);
+      const primary400 = collectFromSources(
+        [normalizedNew],
+        MAX_PRIMARY_400,
+        '400x600',
+        usage,
+        (book) => Boolean(book.covers['400x600'])
+      );
+      const secondary400 = collectFromSources(
+        [normalizedPopular, normalizedEditors, normalizedNew],
+        MAX_SECONDARY_400,
+        '400x600',
+        usage,
+        (book) => Boolean(book.covers['400x600'])
+      );
+      const wideBanners = collectFromSources(
+        [normalizedBanners, normalizedEditors, normalizedPopular],
+        MAX_BANNERS,
+        '1600x900',
+        usage,
+        (book) => Boolean(book.covers['1600x900'])
+      );
+      const square600 = collectFromSources(
+        [normalizedEditors, normalizedPopular, normalizedNew],
+        MAX_SQUARE_600,
+        '600x600',
+        usage,
+        (book) => Boolean(book.covers['600x600'])
+      );
+      const extra400 = collectFromSources(
+        [normalizedNew, normalizedPopular, normalizedEditors],
+        MAX_EXTRA_400,
+        '400x600',
+        usage,
+        (book) => Boolean(book.covers['400x600'])
+      );
 
-    return { slides, wideBanners, newSection, popularSection, twinNotes };
+      return { primary400, secondary400, wideBanners, square600, extra400 };
+    };
+
+    const buildTaste = () => {
+      const usage = cloneUsage(sliderUsage);
+      const items: TwinNoteItem[] = [];
+      const noted = new Set<string>();
+
+      const collectNotes = (source: HomeBook[]) => {
+        for (const book of source) {
+          if (items.length >= MAX_NOTES) break;
+          if (noted.has(book.id)) continue;
+          if (!book.notes.length) continue;
+          if (!book.covers['600x600']) continue;
+          const note = book.notes.find((entry) => entry.html);
+          if (!note) continue;
+          if (!useWithFormat(book, '600x600', usage)) continue;
+          items.push({ id: note.id, note, book });
+          noted.add(book.id);
+        }
+      };
+
+      collectNotes(normalizedPopular);
+      if (items.length < MAX_NOTES) {
+        collectNotes(normalizedNew);
+      }
+      if (items.length < MAX_NOTES) {
+        collectNotes(normalizedEditors);
+      }
+
+      return { notes: items };
+    };
+
+    return { slides, sections: { novelties: buildNovelties(), taste: buildTaste() } };
   }, [bannerBooks, editorPicks, newBooks, popularBooks]);
 
+  const novelties = sections.novelties;
+  const taste = sections.taste;
+
   return (
-    <div className="homepage space-y-12 pb-16">
+    <div className="homepage space-y-10 pb-16">
       <TopSlider slides={slides} />
-      <WideBanners1600 books={wideBanners} />
-      <NewBooksCarousel books={newSection} />
-      <PopularBooksCarousel books={popularSection} />
-      <TwinNoteBlocks notes={twinNotes} />
+      <div className="space-y-10">
+        <TabsNav tabs={HOME_TABS} activeKey={activeTab} onChange={setActiveTab} />
+        {activeTab === 'novelties' ? (
+          <div
+            id="home-tabpanel-novelties"
+            role="tabpanel"
+            aria-labelledby="home-tab-novelties"
+            className="space-y-12"
+          >
+            <NewBooksCarousel books={novelties.primary400} />
+            <Carousel400Section
+              id="novelties-curated"
+              title="Подборка новинок"
+              books={novelties.secondary400}
+              target={MAX_SECONDARY_400}
+              placeholderTitle="Ещё новинки в пути"
+              placeholderDescription="Команда KASBOOK готовит новые поступления — следите за обновлениями."
+            />
+            <WideBanners1600 books={novelties.wideBanners} />
+            <Carousel600Section
+              id="novelties-square"
+              title="Квадратные премьеры"
+              books={novelties.square600}
+              target={MAX_SQUARE_600}
+              placeholderTitle="Эксклюзивы скоро здесь"
+              placeholderDescription="Новые премиальные квадратные обложки появятся в этой секции скоро."
+            />
+            <Carousel400Section
+              id="novelties-extra"
+              title="Ещё подборки"
+              books={novelties.extra400}
+              target={MAX_EXTRA_400}
+              placeholderTitle="Подборка готовится"
+              placeholderDescription="Мы собираем для вас дополнительные рекомендации."
+            />
+          </div>
+        ) : (
+          <div
+            id="home-tabpanel-taste"
+            role="tabpanel"
+            aria-labelledby="home-tab-taste"
+            className="space-y-12"
+          >
+            <TwinNoteBlocks notes={taste.notes} />
+          </div>
+        )}
+      </div>
     </div>
   );
 };
