@@ -138,7 +138,7 @@ export function TopSlider({ slides }: TopSliderProps) {
 
   return (
     <section
-      className="relative mx-auto w-full max-w-6xl px-3"
+      className="relative mx-auto w-full px-3 md:w-[80vw] md:max-w-[1280px]"
       onMouseEnter={pauseManually}
       onMouseLeave={resumeManually}
       onFocusCapture={pauseManually}

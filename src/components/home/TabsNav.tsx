@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef } from 'react';
 import type { KeyboardEvent } from 'react';
 import clsx from 'clsx';
 
-type TabKey = 'novelties' | 'readers' | 'taste' | 'editors';
+type TabKey = 'novelties' | 'taste';
 
 type TabItem = {
   key: TabKey;

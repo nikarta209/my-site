@@ -5,10 +5,10 @@ const subscriptionEnabled = process.env.NEXT_PUBLIC_FEATURE_SUBSCRIPTION === 'tr
 test.describe('Home experience', () => {
   test('hero tabs switch and show content', async ({ page }) => {
     await page.goto('/');
-    await page.getByRole('tab', { name: /Стань автором|Become an author/i }).click();
-    await expect(page.getByRole('heading', { level: 2, name: /Kasbook/i })).toBeVisible();
-    await page.getByRole('tab', { name: /Хиты продаж|Bestsellers/i }).nth(0).click();
-    await expect(page.getByRole('tabpanel')).toBeVisible();
+    await page.getByRole('tab', { name: /На ваш вкус/i }).click();
+    await expect(page.getByRole('heading', { level: 2, name: /На ваш вкус/i })).toBeVisible();
+    await page.getByRole('tab', { name: /Новинки/i }).click();
+    await expect(page.getByRole('heading', { level: 3, name: /Новинки/i })).toBeVisible();
   });
 
   test('subscription banner respects feature flag', async ({ page }) => {
