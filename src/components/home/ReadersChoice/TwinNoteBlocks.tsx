@@ -6,6 +6,7 @@ const AUTOPLAY_INTERVAL = 15000;
 
 type TwinNoteBlocksProps = {
   pairs: Book[][];
+  fallbackImages?: string[];
 };
 
 const stripHtml = (html?: string | null): string => {
@@ -17,12 +18,16 @@ const noteText = (book: Book): string => {
   return stripHtml(book.note?.html) || book.description || `${book.title} — ${book.authorName}`;
 };
 
-export function TwinNoteBlocks({ pairs }: TwinNoteBlocksProps) {
+export function TwinNoteBlocks({ pairs, fallbackImages }: TwinNoteBlocksProps) {
   const [active, setActive] = useState(0);
   const [isPaused, setPaused] = useState(false);
   const manualPauseRef = useRef(false);
 
   const orderedPairs = useMemo(() => (pairs.length ? pairs : []), [pairs]);
+  const fallbackQueue = useMemo(
+    () => (fallbackImages || []).filter((src): src is string => typeof src === 'string' && src.length > 0),
+    [fallbackImages]
+  );
 
   useEffect(() => {
     const handleVisibility = () => {
@@ -131,8 +136,15 @@ export function TwinNoteBlocks({ pairs }: TwinNoteBlocksProps) {
         tabIndex={0}
         onKeyDown={handleKeyDown}
       >
-        {currentPair.map((book) => {
-          const background = book.note?.bgImageUrl ?? book.covers['1600x900'] ?? book.covers['400x600'] ?? '';
+        {currentPair.map((book, index) => {
+          const fallbackImage = fallbackQueue.length ? fallbackQueue[index % fallbackQueue.length] : undefined;
+          const background =
+            book.note?.bgImageUrl ??
+            book.noteImages?.[0] ??
+            fallbackImage ??
+            book.covers['1600x900'] ??
+            book.covers['400x600'] ??
+            '';
           const text = noteText(book);
           return (
             <article
@@ -144,9 +156,10 @@ export function TwinNoteBlocks({ pairs }: TwinNoteBlocksProps) {
                   src={book.covers['600x600'] ?? book.covers['400x600'] ?? background}
                   alt={book.title}
                   loading="lazy"
+                  decoding="async"
                   className="h-full w-full object-cover"
                 />
-                <div className="absolute bottom-4 left-4 right-4 rounded-2xl bg-background/80 px-4 py-2 shadow-lg">
+                <div className="pointer-events-none absolute bottom-4 left-4 right-4 rounded-2xl bg-background/80 px-4 py-2 shadow-lg">
                   <p className="text-sm font-semibold text-foreground">{book.title}</p>
                   <p className="text-xs text-muted-foreground">{book.authorName}</p>
                 </div>

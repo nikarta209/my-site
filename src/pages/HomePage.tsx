@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import {
   buildEditorsChoice,
@@ -9,8 +9,11 @@ import {
   buildTopSlider,
   buildWideBanners,
   createSeen,
+  generatePlaceholders,
+  getHomeMedia,
   loadBooks,
   type Book,
+  type HomeMedia,
   type Slide,
 } from '@/api/books';
 import { TopSlider } from '@/components/home/TopSlider';
@@ -44,36 +47,104 @@ const initialContent: DerivedContent = {
 
 export default function HomePage() {
   const [books, setBooks] = useState<Book[]>([]);
+  const [homeMedia, setHomeMedia] = useState<HomeMedia | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<TabKey>('novelties');
   const { t } = useTranslation();
+
+  const deriveMediaFromBooks = useCallback((items: Book[]): HomeMedia => {
+    const slider: string[] = [];
+    const banners: string[] = [];
+    const notes: string[] = [];
+    const pushUnique = (collection: string[], value?: string) => {
+      if (!value) return;
+      if (!collection.includes(value)) {
+        collection.push(value);
+      }
+    };
+
+    items.forEach((book) => {
+      pushUnique(slider, book.covers.mainBanner ?? book.covers['1600x900'] ?? book.covers['400x600']);
+      pushUnique(banners, book.covers['1600x900'] ?? book.covers.mainBanner ?? book.covers['400x600']);
+      book.noteImages?.forEach((image) => pushUnique(notes, image));
+    });
+
+    return {
+      topSlider: slider.slice(0, 6),
+      wideBanners: banners.slice(0, 6),
+      notes: notes.slice(0, 2),
+    };
+  }, []);
 
   useEffect(() => {
     const controller = new AbortController();
     setLoading(true);
 
-    loadBooks({ signal: controller.signal })
-      .then((data) => {
+    const fallbackBooks = generatePlaceholders(40);
+
+    const raceWithTimeout = <T,>(factory: () => Promise<T>, fallback: T, timeoutMs: number): Promise<T> => {
+      if (controller.signal.aborted) {
+        return Promise.resolve(fallback);
+      }
+      return new Promise<T>((resolve, reject) => {
+        const timer = window.setTimeout(() => resolve(fallback), timeoutMs);
+        factory()
+          .then((value) => {
+            window.clearTimeout(timer);
+            resolve(value);
+          })
+          .catch((error) => {
+            window.clearTimeout(timer);
+            if (controller.signal.aborted) {
+              reject(controller.signal.reason ?? error);
+            } else {
+              resolve(fallback);
+            }
+          });
+      });
+    };
+
+    const load = async () => {
+      try {
+        const loadedBooks = await raceWithTimeout(
+          () => loadBooks({ signal: controller.signal }),
+          fallbackBooks,
+          5000
+        );
+        const resolvedBooks = Array.isArray(loadedBooks) && loadedBooks.length > 0 ? loadedBooks : fallbackBooks;
         if (controller.signal.aborted) return;
-        setBooks(Array.isArray(data) ? data : []);
-      })
-      .catch((error) => {
+        setBooks(resolvedBooks);
+
+        const mediaFallback = deriveMediaFromBooks(resolvedBooks);
+        const media = await raceWithTimeout(
+          () => getHomeMedia({ signal: controller.signal, books: resolvedBooks }),
+          mediaFallback,
+          4000
+        );
+        if (!controller.signal.aborted) {
+          setHomeMedia(media);
+        }
+      } catch (error) {
         if (controller.signal.aborted) return;
         if (import.meta.env?.DEV) {
-          console.error('[home] failed to load books', error);
+          console.error('[home] failed to load homepage data', error);
         }
-        setBooks([]);
-      })
-      .finally(() => {
+        setBooks(fallbackBooks);
+        setHomeMedia(deriveMediaFromBooks(fallbackBooks));
+      } finally {
         if (!controller.signal.aborted) {
           setLoading(false);
         }
-      });
+      }
+    };
+
+    load();
 
     return () => {
       controller.abort();
     };
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deriveMediaFromBooks]);
 
   const content = useMemo<DerivedContent>(() => {
     if (!books.length) {
@@ -130,7 +201,7 @@ export default function HomePage() {
             </div>
           </TabPanel>
           <TabPanel tab="readers" activeTab={activeTab}>
-            <TwinNoteBlocks pairs={content.readersChoice} />
+            <TwinNoteBlocks pairs={content.readersChoice} fallbackImages={homeMedia?.notes} />
           </TabPanel>
           <TabPanel tab="taste" activeTab={activeTab}>
             <div className="rounded-3xl border border-dashed border-border/60 bg-card/40 p-8 text-center text-sm text-muted-foreground">
