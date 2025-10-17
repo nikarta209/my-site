@@ -1,4 +1,91 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+vi.mock('@/api/supabaseClient', () => {
+  type Row = Record<string, any>;
+  let tables: Record<string, Row[]> = {
+    v_books_public: [],
+    shared_notes: [],
+    system_config: [],
+  };
+  const selectCalls: Array<{ table: string; columns: string }> = [];
+
+  const createBuilder = (table: string) => {
+    let rows = [...(tables[table] ?? [])];
+    const builder: any = {
+      select(columns: string) {
+        selectCalls.push({ table, columns });
+        return builder;
+      },
+      eq(column: string, value: unknown) {
+        rows = rows.filter((row) => row?.[column] === value);
+        return builder;
+      },
+      order(column: string, options?: { ascending?: boolean }) {
+        const ascending = options?.ascending ?? true;
+        rows = [...rows].sort((a, b) => {
+          const aValue = a?.[column];
+          const bValue = b?.[column];
+          if (aValue === bValue) return 0;
+          if (aValue === undefined || aValue === null) return ascending ? 1 : -1;
+          if (bValue === undefined || bValue === null) return ascending ? -1 : 1;
+          if (aValue > bValue) return ascending ? 1 : -1;
+          if (aValue < bValue) return ascending ? -1 : 1;
+          return 0;
+        });
+        return builder;
+      },
+      limit(count: number) {
+        return Promise.resolve({ data: rows.slice(0, count), error: null });
+      },
+      maybeSingle() {
+        return Promise.resolve({ data: rows[0] ?? null, error: null });
+      },
+      single() {
+        return Promise.resolve({ data: rows[0] ?? null, error: null });
+      },
+      in() {
+        return builder;
+      },
+      contains() {
+        return builder;
+      },
+    };
+    return builder;
+  };
+
+  const supabase = {
+    from(table: string) {
+      return createBuilder(table);
+    },
+    storage: {
+      from() {
+        return {
+          getPublicUrl(path: string) {
+            const sanitized = typeof path === 'string' ? path.replace(/^\/+/, '') : '';
+            return { data: { publicUrl: sanitized ? `https://storage.local/${sanitized}` : null } };
+          },
+        };
+      },
+    },
+  } as any;
+
+  supabase.__setTable = (table: string, rows: Row[]) => {
+    tables[table] = rows;
+  };
+  supabase.__reset = () => {
+    tables = { v_books_public: [], shared_notes: [], system_config: [] };
+    selectCalls.length = 0;
+  };
+  supabase.__getSelectCalls = () => [...selectCalls];
+
+  return {
+    supabase,
+    default: supabase,
+    isSupabaseConfigured: true,
+    supabaseStorageBucket: 'books',
+  };
+});
+
 import {
   buildEditorsChoice,
   buildFeatured400,
@@ -11,10 +98,14 @@ import {
   canUse600,
   createSeen,
   generatePlaceholders,
+  getHomeMedia,
+  getNewest,
+  loadBooks,
   markUsed,
   type Book,
   type Slide,
 } from '@/api/books';
+import { supabase } from '@/api/supabaseClient';
 
 const createBook = (id: string, overrides: Partial<Book> = {}): Book => {
   const base: Book = {
@@ -57,6 +148,10 @@ const generateBooks = (count: number): Book[] =>
       popularity: 200 - index,
     })
   );
+
+beforeEach(() => {
+  (supabase as any).__reset?.();
+});
 
 describe('usage helpers', () => {
   it('marks usage per kind', () => {
@@ -105,6 +200,78 @@ describe('usage helpers', () => {
     markUsed(seen, book.id, 'wide');
     expect(canUse400(book, seen)).toBe(false);
     expect(canUse600(book, seen)).toBe(false);
+  });
+});
+
+describe('supabase adapters', () => {
+  it('selects only supported columns from view', async () => {
+    const now = new Date().toISOString();
+    (supabase as any).__setTable('v_books_public', [
+      {
+        id: '1',
+        title: 'Test book',
+        author_name: 'Author',
+        created_at: now,
+        updated_at: now,
+        cover_images: {
+          portrait_large: 'covers/portrait_large/test.jpg',
+          square: 'covers/square/test.jpg',
+          landscape: 'covers/landscape/test.jpg',
+        },
+        likes_count: 5,
+        sales_count: 10,
+        rating: 4.5,
+        is_editors_pick: true,
+        description: 'Demo description',
+      },
+    ]);
+    (supabase as any).__setTable('shared_notes', []);
+
+    const books = await getNewest(3);
+    expect(books).toHaveLength(1);
+
+    const selectCalls: Array<{ table: string; columns: string }> = (supabase as any).__getSelectCalls();
+    const viewCall = selectCalls.find((call) => call.table === 'v_books_public');
+    expect(viewCall).toBeTruthy();
+    expect(viewCall?.columns).toBeDefined();
+    expect(viewCall?.columns).not.toMatch(/main_banner|library_hero|slug/);
+  });
+
+  it('falls back to placeholders when view is empty', async () => {
+    (supabase as any).__setTable('v_books_public', []);
+    const books = await loadBooks({ limit: 5 });
+    expect(books).toHaveLength(5);
+    expect(books.every((book) => book.id.startsWith('placeholder-'))).toBe(true);
+  });
+
+  it('limits overall appearances per book across sections', () => {
+    const books = generateBooks(40);
+    const seen = createSeen();
+
+    buildTopSlider(books, seen);
+    buildWideBanners(books, seen);
+    buildNewArrivals(books, seen);
+    buildSquare600(books, seen, 15);
+    buildFeatured400(books, seen);
+    buildReadersChoice(books, seen, 5);
+    buildEditorsChoice(books, seen, 12);
+
+    const usageCounts = Object.values(seen).map((entry) =>
+      Object.values(entry ?? {}).filter(Boolean).length
+    );
+    expect(Math.max(...usageCounts)).toBeLessThanOrEqual(2);
+  });
+
+  it('builds home media using note images when config empty', async () => {
+    const bookWithNotes: Book = createBook('note-book', {
+      noteImages: [
+        'https://storage.local/covers/notes_1/n1.jpg',
+        'https://storage.local/covers/notes_2/n2.jpg',
+      ],
+    });
+    const media = await getHomeMedia({ books: [bookWithNotes] });
+    expect(media.notes).toContain('https://storage.local/covers/notes_1/n1.jpg');
+    expect(media.notes.length).toBeGreaterThanOrEqual(2);
   });
 });
 

@@ -1,4 +1,4 @@
-import { supabase, isSupabaseConfigured } from '@/api/supabaseClient';
+import { supabase, isSupabaseConfigured, supabaseStorageBucket } from '@/api/supabaseClient';
 
 const DEBUG = typeof import.meta !== 'undefined' && import.meta.env?.VITE_DEBUG_HOME === '1';
 
@@ -26,7 +26,14 @@ export type Book = {
   hasMainBanner?: boolean;
   hasWideBanner?: boolean;
   note?: Note | null;
+  noteImages?: string[];
   description?: string | null;
+};
+
+export type HomeMedia = {
+  topSlider: string[];
+  wideBanners: string[];
+  notes: string[];
 };
 
 type SeenEntry = { main?: boolean; wide?: boolean; s400?: boolean; s600?: boolean };
@@ -109,6 +116,12 @@ const PLACEHOLDER_COVERS = [
   'https://images.unsplash.com/photo-1434030216411-0b793f4b4173?auto=format&fit=crop&w=600&q=80',
 ];
 
+const PLACEHOLDER_HOME_MEDIA: HomeMedia = {
+  topSlider: PLACEHOLDER_BACKGROUNDS.slice(0, 3),
+  wideBanners: PLACEHOLDER_BACKGROUNDS.slice(0, 5),
+  notes: PLACEHOLDER_BACKGROUNDS.slice(0, 2),
+};
+
 const ensureString = (value: unknown, fallback = ''): string => {
   if (typeof value === 'string') return value;
   if (typeof value === 'number') return String(value);
@@ -134,7 +147,21 @@ const toNumber = (raw: unknown, fallback = 0): number => {
   return fallback;
 };
 
+const toTimestamp = (raw: unknown): number => {
+  if (typeof raw === 'string' && raw) {
+    const parsed = Date.parse(raw);
+    if (!Number.isNaN(parsed)) return parsed;
+  }
+  return 0;
+};
+
 const PLACEHOLDER_POOL_SIZE = 120;
+
+const BOOKS_VIEW = 'v_books_public';
+const BOOK_SELECT_COLUMNS =
+  'id,title,author,author_name,created_at,updated_at,cover_images,likes_count,sales_count,rating,is_editors_pick,description';
+const BOOK_SELECT_FALLBACK =
+  'id,title,author,author_name,created_at,updated_at,cover_images,likes_count,sales_count,rating,is_editors_pick';
 
 const PLACEHOLDER_BOOKS: Book[] = Array.from({ length: PLACEHOLDER_POOL_SIZE }, (_, index) => {
   const id = `placeholder-${index + 1}`;
@@ -169,6 +196,7 @@ const PLACEHOLDER_BOOKS: Book[] = Array.from({ length: PLACEHOLDER_POOL_SIZE }, 
     hasMainBanner: true,
     hasWideBanner: true,
     note,
+    noteImages: [cover, square, wide],
     description: PLACEHOLDER_TEXT,
   };
 });
@@ -189,15 +217,17 @@ type RawBook = {
   author_name?: string | null;
   created_at?: string | null;
   updated_at?: string | null;
-  cover_url?: string | null;
   cover_images?: unknown;
   coverImages?: unknown;
+  cover_url?: string | null;
+  main_banner?: string | null;
   hero_main?: string | null;
   banner?: string | null;
-  main_banner?: string | null;
   library_hero?: string | null;
   likes_count?: number | null;
   sales_count?: number | null;
+  rating?: number | null;
+  is_editors_pick?: boolean | null;
   popularity?: number | null;
   description?: string | null;
   preview_text?: string | null;
@@ -229,7 +259,7 @@ const parseCoverImages = (raw: unknown): Record<string, string> | undefined => {
   return undefined;
 };
 
-const storageBucket = 'books';
+const storageBucket = supabaseStorageBucket || 'books';
 
 const urlFromStorage = (path: string | null | undefined): string | undefined => {
   const value = ensureString(path).trim();
@@ -291,6 +321,54 @@ const mapNote = (raw: RawNote | undefined, fallbackBg: string, index: number): N
   };
 };
 
+const gatherNoteImages = (coverImages?: Record<string, string>): string[] => {
+  if (!coverImages) return [];
+  const candidates = [
+    coverImages.notes_1,
+    coverImages.notes1,
+    coverImages.notes_one,
+    coverImages.notesFirst,
+    coverImages.notes_2,
+    coverImages.notes2,
+    coverImages.notes_two,
+    coverImages.notesSecond,
+  ];
+  const urls: string[] = [];
+  for (const candidate of candidates) {
+    const url = urlFromStorage(candidate ?? undefined);
+    if (url && !urls.includes(url)) {
+      urls.push(url);
+    }
+  }
+  return urls;
+};
+
+const pickFirst = (...values: Array<string | null | undefined>): string | undefined => {
+  for (const value of values) {
+    const url = urlFromStorage(value ?? undefined);
+    if (url) return url;
+  }
+  return undefined;
+};
+
+const createFallbackNote = (id: string, index: number, covers: CoverUrls, noteImages: string[]): Note => {
+  const bgCandidates = [
+    noteImages[0],
+    noteImages[1],
+    covers['1600x900'],
+    covers['600x600'],
+    covers['400x600'],
+    PLACEHOLDER_BACKGROUNDS[index % PLACEHOLDER_BACKGROUNDS.length],
+  ];
+  const bgImageUrl = bgCandidates.find(Boolean) ?? PLACEHOLDER_BACKGROUNDS[0];
+  return {
+    id: `${id}-note-fallback-${index}`,
+    bookId: id,
+    html: PLACEHOLDER_NOTES[index % PLACEHOLDER_NOTES.length],
+    bgImageUrl,
+  };
+};
+
 const mapRowToBook = (row: RawBook, index: number, notes: NotesMap): Book | null => {
   const id = ensureString(row.id, `placeholder-${index + 1}`);
   const title = ensureString(row.title, '').trim();
@@ -304,39 +382,48 @@ const mapRowToBook = (row: RawBook, index: number, notes: NotesMap): Book | null
   const coverImages = parseCoverImages(row.cover_images ?? row.coverImages);
 
   const covers: CoverUrls = {};
-  const portrait =
-    urlFromStorage(row.cover_url) ||
-    urlFromStorage(coverImages?.portrait_large) ||
-    urlFromStorage(coverImages?.portrait_medium) ||
-    urlFromStorage(coverImages?.portrait) ||
-    urlFromStorage(coverImages?.default);
+  const portrait = pickFirst(
+    row.cover_url,
+    coverImages?.portrait_large,
+    coverImages?.portraitMedium,
+    coverImages?.portrait_medium,
+    coverImages?.portrait,
+    coverImages?.default
+  );
   if (portrait) covers['400x600'] = portrait;
 
-  const square =
-    urlFromStorage(coverImages?.square_large) ||
-    urlFromStorage(coverImages?.square_medium) ||
-    urlFromStorage(coverImages?.square);
+  const square = pickFirst(coverImages?.square_large, coverImages?.square_medium, coverImages?.square);
   if (square) covers['600x600'] = square;
 
-  const landscape =
-    urlFromStorage(coverImages?.landscape) ||
-    urlFromStorage(coverImages?.landscape_large) ||
-    urlFromStorage(coverImages?.library_hero) ||
-    urlFromStorage(row.library_hero ?? undefined);
+  const landscape = pickFirst(
+    coverImages?.landscape,
+    coverImages?.landscape_large,
+    coverImages?.library_hero,
+    row.library_hero,
+    row.banner,
+    row.hero_main,
+    row.main_banner
+  );
   if (landscape) covers['1600x900'] = landscape;
 
-  const mainBanner =
-    urlFromStorage(coverImages?.main_banner) ||
-    urlFromStorage(coverImages?.hero_main) ||
-    urlFromStorage(coverImages?.banner) ||
-    urlFromStorage(row.main_banner ?? row.hero_main ?? row.banner ?? undefined);
+  const mainBanner = pickFirst(
+    coverImages?.library_hero,
+    row.library_hero,
+    coverImages?.landscape,
+    row.main_banner,
+    row.hero_main,
+    row.banner,
+    coverImages?.portrait_large,
+    row.cover_url
+  );
   if (mainBanner) covers.mainBanner = mainBanner;
 
   if (!ensureCovers(covers, id)) {
     return null;
   }
 
-  const note = notes.get(id) ?? null;
+  const noteImages = gatherNoteImages(coverImages);
+  const note = notes.get(id) ?? createFallbackNote(id, index, covers, noteImages);
 
   return {
     id,
@@ -348,6 +435,7 @@ const mapRowToBook = (row: RawBook, index: number, notes: NotesMap): Book | null
     hasMainBanner: Boolean(covers.mainBanner),
     hasWideBanner: Boolean(covers['1600x900']),
     note,
+    noteImages,
     description: row.description ?? row.preview_text ?? null,
   };
 };
@@ -443,43 +531,256 @@ const normalizeBooks = (rows: RawBook[], notes: NotesMap): Book[] => {
     .filter((book): book is Book => Boolean(book));
 };
 
-const fetchFromSupabase = async (limit: number, signal?: AbortSignal): Promise<Book[]> => {
+type ConfigureQuery = (builder: any) => any;
+
+type FetchBooksParams = {
+  limit: number;
+  signal?: AbortSignal;
+  configure?: ConfigureQuery;
+};
+
+const fetchBooksFromView = async ({ limit, signal, configure }: FetchBooksParams): Promise<RawBook[]> => {
   if (!isSupabaseConfigured) {
     return [];
   }
 
-  const notes = await fetchSharedNotes(limit, signal);
+  const run = async (columns: string) => {
+    let builder: any = supabase.from(BOOKS_VIEW).select(columns, { signal });
+    if (configure) {
+      builder = configure(builder);
+    }
+    return builder.limit(limit);
+  };
 
   try {
-    const { data, error } = await supabase
-      .from('books')
-      .select(
-        'id, title, author, author_name, description, preview_text, cover_url, cover_images, created_at, updated_at, likes_count, sales_count, popularity, status, main_banner, hero_main, banner, library_hero',
-        { signal }
-      )
-      .in('status', ['approved', 'public_domain'])
-      .order('created_at', { ascending: false })
-      .limit(limit);
-
+    const { data, error } = await run(BOOK_SELECT_COLUMNS);
     if (error) {
-      throw error;
-    }
-
-    if (!Array.isArray(data) || data.length === 0) {
+      if (DEBUG) {
+        console.info('[books] view query failed', error);
+      }
+      if (error.message && /column/i.test(error.message)) {
+        const fallback = await run(BOOK_SELECT_FALLBACK);
+        if (fallback.error) {
+          if (DEBUG) {
+            console.info('[books] fallback view query failed', fallback.error);
+          }
+          return [];
+        }
+        return Array.isArray(fallback.data) ? (fallback.data as RawBook[]) : [];
+      }
       return [];
     }
-
-    const mapped = normalizeBooks(data, notes);
-    if (DEBUG) {
-      console.info('[books] supabase source', mapped.length);
-    }
-    return mapped;
+    return Array.isArray(data) ? (data as RawBook[]) : [];
   } catch (error) {
+    if (signal?.aborted) {
+      return [];
+    }
     if (DEBUG) {
-      console.info('[books] supabase fetch error', error);
+      console.info('[books] unexpected view query error', error);
     }
     return [];
   }
+};
+
+type BookFetchOptions = {
+  signal?: AbortSignal;
+  notes?: NotesMap;
+};
+
+const ensureNotes = async (limit: number, options: BookFetchOptions): Promise<NotesMap> => {
+  if (options.notes) return options.notes;
+  return fetchSharedNotes(limit, options.signal);
+};
+
+export const getNewest = async (limit: number, options: BookFetchOptions = {}): Promise<Book[]> => {
+  const notes = await ensureNotes(limit, options);
+  const rows = await fetchBooksFromView({
+    limit,
+    signal: options.signal,
+    configure: (builder) => builder.order('created_at', { ascending: false }),
+  });
+  if (!rows.length) {
+    return [];
+  }
+  return normalizeBooks(rows, notes);
+};
+
+export const getEditorsPick = async (limit: number, options: BookFetchOptions = {}): Promise<Book[]> => {
+  const notes = await ensureNotes(limit, options);
+  const rows = await fetchBooksFromView({
+    limit,
+    signal: options.signal,
+    configure: (builder) =>
+      builder
+        .eq('is_editors_pick', true)
+        .order('created_at', { ascending: false }),
+  });
+  if (!rows.length) {
+    return [];
+  }
+  return normalizeBooks(rows, notes);
+};
+
+const comparePopular = (a: RawBook, b: RawBook) => {
+  const salesDiff = toNumber(b.sales_count, 0) - toNumber(a.sales_count, 0);
+  if (salesDiff !== 0) return salesDiff;
+  const likesDiff = toNumber(b.likes_count, 0) - toNumber(a.likes_count, 0);
+  if (likesDiff !== 0) return likesDiff;
+  const ratingDiff = toNumber(b.rating, 0) - toNumber(a.rating, 0);
+  if (ratingDiff !== 0) return ratingDiff;
+  const dateDiff = toTimestamp(b.created_at ?? b.updated_at) - toTimestamp(a.created_at ?? a.updated_at);
+  return dateDiff;
+};
+
+export const getPopular = async (limit: number, options: BookFetchOptions = {}): Promise<Book[]> => {
+  const fetchLimit = Math.max(limit, 40);
+  const notes = await ensureNotes(fetchLimit, options);
+  const rows = await fetchBooksFromView({
+    limit: fetchLimit,
+    signal: options.signal,
+    configure: (builder) => builder.order('created_at', { ascending: false }),
+  });
+  if (!rows.length) {
+    return [];
+  }
+  const sorted = [...rows].sort(comparePopular).slice(0, limit);
+  return normalizeBooks(sorted, notes);
+};
+
+type HomeMediaOptions = {
+  signal?: AbortSignal;
+  books?: Book[];
+};
+
+const uniquePush = (target: string[], value?: string) => {
+  if (!value) return;
+  if (!target.includes(value)) {
+    target.push(value);
+  }
+};
+
+const normalizeMediaPaths = (values: unknown): string[] => {
+  if (!Array.isArray(values)) return [];
+  const result: string[] = [];
+  values.forEach((value) => {
+    const url = urlFromStorage(ensureString(value));
+    uniquePush(result, url);
+  });
+  return result;
+};
+
+const parseHomeMediaValue = (raw: unknown): HomeMedia => {
+  if (!raw || typeof raw !== 'object') {
+    return { topSlider: [], wideBanners: [], notes: [] };
+  }
+  const record = raw as Record<string, unknown>;
+  const topSlider = normalizeMediaPaths(record.top_slider ?? record.topSlider ?? record.slider);
+  const wideBanners = normalizeMediaPaths(record.wide_banners ?? record.wideBanners ?? record.banners);
+
+  let notes: string[] = [];
+  if (Array.isArray(record.notes)) {
+    notes = normalizeMediaPaths(record.notes);
+  } else if (record.notes && typeof record.notes === 'object') {
+    const noteObj = record.notes as Record<string, unknown>;
+    notes = normalizeMediaPaths([noteObj.note1, noteObj.note2, noteObj.first, noteObj.second].filter(Boolean));
+  }
+
+  return { topSlider, wideBanners, notes };
+};
+
+const buildMediaFromBooks = (books: Book[]): HomeMedia => {
+  const topSlider: string[] = [];
+  const wideBanners: string[] = [];
+  const notes: string[] = [];
+
+  books.forEach((book) => {
+    uniquePush(topSlider, book.covers.mainBanner ?? book.covers['1600x900'] ?? book.covers['400x600']);
+    uniquePush(wideBanners, book.covers['1600x900'] ?? book.covers.mainBanner ?? book.covers['400x600']);
+    if (Array.isArray(book.noteImages)) {
+      book.noteImages.forEach((image) => uniquePush(notes, image));
+    }
+  });
+
+  return { topSlider, wideBanners, notes };
+};
+
+const mergeHomeMedia = (...sources: HomeMedia[]): HomeMedia => {
+  const merged: HomeMedia = { topSlider: [], wideBanners: [], notes: [] };
+  sources.forEach((source) => {
+    source.topSlider.forEach((item) => uniquePush(merged.topSlider, item));
+    source.wideBanners.forEach((item) => uniquePush(merged.wideBanners, item));
+    source.notes.forEach((item) => uniquePush(merged.notes, item));
+  });
+  return merged;
+};
+
+const ensureHomeMedia = (media: HomeMedia): HomeMedia => {
+  const ensured: HomeMedia = {
+    topSlider: media.topSlider.length ? media.topSlider : [...PLACEHOLDER_HOME_MEDIA.topSlider],
+    wideBanners: media.wideBanners.length ? media.wideBanners : [...PLACEHOLDER_HOME_MEDIA.wideBanners],
+    notes: media.notes.length ? media.notes : [],
+  };
+
+  if (ensured.notes.length < 2) {
+    const additional = [...ensured.wideBanners, ...ensured.topSlider, ...PLACEHOLDER_HOME_MEDIA.notes];
+    for (const candidate of additional) {
+      uniquePush(ensured.notes, candidate);
+      if (ensured.notes.length >= 2) break;
+    }
+  }
+
+  return {
+    topSlider: ensured.topSlider.slice(0, 6),
+    wideBanners: ensured.wideBanners.slice(0, 6),
+    notes: ensured.notes.slice(0, 2),
+  };
+};
+
+export const getHomeMedia = async (options: HomeMediaOptions = {}): Promise<HomeMedia> => {
+  if (!isSupabaseConfigured) {
+    const mediaFromBooks = buildMediaFromBooks(options.books ?? []);
+    return ensureHomeMedia(mergeHomeMedia(mediaFromBooks, PLACEHOLDER_HOME_MEDIA));
+  }
+
+  let configMedia: HomeMedia = { topSlider: [], wideBanners: [], notes: [] };
+  try {
+    const { data, error } = await supabase
+      .from('system_config')
+      .select('value', { signal: options.signal })
+      .eq('key', 'home_media')
+      .maybeSingle();
+    if (!error && data?.value) {
+      configMedia = parseHomeMediaValue(data.value);
+    } else if (DEBUG && error) {
+      console.info('[books] home_media config fetch failed', error);
+    }
+  } catch (error) {
+    if (options.signal?.aborted) {
+      return PLACEHOLDER_HOME_MEDIA;
+    }
+    if (DEBUG) {
+      console.info('[books] home_media config error', error);
+    }
+  }
+
+  let booksForFallback = options.books ?? [];
+  if (!booksForFallback.length) {
+    try {
+      booksForFallback = await getNewest(12, { signal: options.signal });
+    } catch (error) {
+      if (DEBUG) {
+        console.info('[books] unable to fetch books for media fallback', error);
+      }
+    }
+  }
+
+  const mediaFromBooks = buildMediaFromBooks(booksForFallback);
+  const merged = mergeHomeMedia(configMedia, mediaFromBooks);
+  return ensureHomeMedia(merged);
+};
+
+const fetchFromSupabase = async (limit: number, signal?: AbortSignal): Promise<Book[]> => {
+  return getNewest(limit, { signal });
 };
 
 let fetchHomeBooksFn: ((limit?: number) => Promise<LegacyBook[] | undefined>) | null = null;
@@ -559,28 +860,63 @@ export type LoadBooksOptions = {
 
 export const loadBooks = async (options: LoadBooksOptions = {}): Promise<Book[]> => {
   const { limit = 200, signal } = options;
-  const sources: Array<'supabase' | 'legacy'> = ['supabase', 'legacy'];
+  const fetchLimit = Math.max(limit, 120);
   let books: Book[] = [];
 
-  for (const source of sources) {
-    if (signal?.aborted) break;
+  if (isSupabaseConfigured && !signal?.aborted) {
     try {
-      if (source === 'supabase') {
-        books = await withTimeout((timeoutSignal) => fetchFromSupabase(limit, timeoutSignal), 4000, signal);
-      } else {
-        books = await withTimeout((timeoutSignal) => fetchFromLegacy(limit, timeoutSignal), 4000, signal);
-      }
+      const notes: NotesMap =
+        (await withTimeout(
+          (timeoutSignal) => fetchSharedNotes(fetchLimit, timeoutSignal),
+          3500,
+          signal
+        ).catch(() => undefined)) ?? new Map();
+
+      const [newest, editors, popular] = await Promise.all([
+        withTimeout((timeoutSignal) => getNewest(fetchLimit, { signal: timeoutSignal, notes }), 4000, signal).catch(
+          () => []
+        ),
+        withTimeout(
+          (timeoutSignal) => getEditorsPick(Math.min(fetchLimit, 80), { signal: timeoutSignal, notes }),
+          4000,
+          signal
+        ).catch(() => []),
+        withTimeout((timeoutSignal) => getPopular(fetchLimit, { signal: timeoutSignal, notes }), 4000, signal).catch(
+          () => []
+        ),
+      ]);
+
+      const unique: Book[] = [];
+      const seenIds = new Set<string>();
+      const pushUnique = (items: Book[]) => {
+        items.forEach((book) => {
+          if (!book || seenIds.has(book.id)) return;
+          seenIds.add(book.id);
+          unique.push(book);
+        });
+      };
+
+      pushUnique(newest);
+      pushUnique(editors);
+      pushUnique(popular);
+
+      books = unique;
     } catch (error) {
       if (DEBUG) {
-        console.info(`[books] ${source} timed out`, error);
+        console.info('[books] combined supabase fetch failed', error);
       }
       books = [];
     }
-    if (books.length > 0) {
+  }
+
+  if (!books.length && !signal?.aborted) {
+    try {
+      books = await withTimeout((timeoutSignal) => fetchFromLegacy(fetchLimit, timeoutSignal), 4000, signal);
+    } catch (error) {
       if (DEBUG) {
-        console.info(`[books] using ${source} books`, books.length);
+        console.info('[books] legacy source timed out', error);
       }
-      break;
+      books = [];
     }
   }
 
@@ -593,10 +929,11 @@ export const loadBooks = async (options: LoadBooksOptions = {}): Promise<Book[]>
     if (DEBUG) {
       console.info('[books] fallback to placeholders', placeholders.length);
     }
-    return placeholders;
+    return placeholders.slice(0, limit);
   }
 
-  return books;
+  const result = books.length > limit ? books.slice(0, limit) : mergeWithPlaceholders(books, limit).slice(0, limit);
+  return result;
 };
 
 const countUsage = (entry: SeenEntry | undefined): number => {

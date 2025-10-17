@@ -11,6 +11,7 @@ type WideBannersProps = {
 export function WideBanners1600({ id, books }: WideBannersProps) {
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const itemRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const observerRef = useRef<IntersectionObserver | null>(null);
   const [activeIndex, setActiveIndex] = useState(0);
 
   useEffect(() => {
@@ -28,10 +29,22 @@ export function WideBanners1600({ id, books }: WideBannersProps) {
       },
       { root: viewport, threshold: 0.5 }
     );
+    observerRef.current = observer;
+    return () => {
+      observer.disconnect();
+      observerRef.current = null;
+    };
+  }, []);
 
+  useEffect(() => {
+    itemRefs.current = itemRefs.current.slice(0, books.length);
+    const observer = observerRef.current;
+    if (!observer) return;
     itemRefs.current.forEach((item) => item && observer.observe(item));
-    return () => observer.disconnect();
-  }, [books.length]);
+    return () => {
+      itemRefs.current.forEach((item) => item && observer.unobserve(item));
+    };
+  }, [books]);
 
   const scrollToIndex = (nextIndex: number) => {
     const clamped = Math.max(0, Math.min(books.length - 1, nextIndex));
@@ -101,7 +114,7 @@ export function WideBanners1600({ id, books }: WideBannersProps) {
             data-index={index}
             role="group"
             aria-roledescription="slide"
-            aria-label={`${book.title} — ${book.authorName}`}
+            aria-label={`${book.id.startsWith('placeholder-') ? 'Заглушка: ' : ''}${book.title} — ${book.authorName}`}
             aria-selected={activeIndex === index}
             className="snap-start"
           >
@@ -111,9 +124,10 @@ export function WideBanners1600({ id, books }: WideBannersProps) {
                   src={book.covers['1600x900'] ?? book.covers['400x600'] ?? ''}
                   alt={book.title}
                   loading="lazy"
+                  decoding="async"
                   className="h-full w-full object-cover"
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-background/80 via-background/10 to-transparent" />
+                <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-background/80 via-background/10 to-transparent" />
               </div>
               <div className="grid gap-2 bg-background/95 p-6 md:grid-cols-[2fr_1fr] md:items-center">
                 <div className="space-y-2">
