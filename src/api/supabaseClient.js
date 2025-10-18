@@ -16,8 +16,8 @@ const getEnvValue = (...keys) => {
 
 const SUPABASE_URL = getEnvValue('VITE_SUPABASE_URL', 'SUPABASE_URL');
 const SUPABASE_ANON_KEY = getEnvValue('VITE_SUPABASE_ANON_KEY', 'SUPABASE_ANON_KEY');
-const STORAGE_BUCKET = import.meta.env.VITE_SUPABASE_STORAGE_BUCKET || 'books';
-const EDGE_FUNCTION_URL = import.meta.env.VITE_SUPABASE_EDGE_FUNCTION_URL || null;
+const STORAGE_BUCKET = getEnvValue('VITE_SUPABASE_STORAGE_BUCKET', 'SUPABASE_STORAGE_BUCKET') || 'books';
+const EDGE_FUNCTION_URL = getEnvValue('VITE_SUPABASE_EDGE_FUNCTION_URL', 'SUPABASE_EDGE_FUNCTION_URL') || null;
 
 const createNoopQueryBuilder = (error) => {
   const builder = {
