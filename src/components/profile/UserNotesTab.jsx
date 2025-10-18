@@ -27,25 +27,39 @@ export default function UserNotesTab({ user }) {
       // Загружаем все заметки пользователя
       const userBookData = await UserBookData.filter({ user_email: authUser.email });
       
-      // Фильтруем только те записи, где есть заметки
-      const notesWithBooks = [];
-      for (const data of userBookData) {
-        if (data.notes && data.notes.length > 0) {
+      const notesWithContent = userBookData.filter(
+        data => Array.isArray(data.notes) && data.notes.length > 0
+      );
+
+      const bookCache = new Map();
+      await Promise.all(
+        notesWithContent.map(async data => {
+          if (bookCache.has(data.book_id)) return;
+
           try {
             const book = await Book.get(data.book_id);
             if (book) {
-              notesWithBooks.push({
-                ...data,
-                book: book,
-                notes: data.notes || []
-              });
+              bookCache.set(data.book_id, book);
             }
           } catch (error) {
             console.warn(`Не удалось загрузить книгу ${data.book_id}:`, error);
           }
-        }
-      }
-      
+        })
+      );
+
+      const notesWithBooks = notesWithContent
+        .map(data => {
+          const book = bookCache.get(data.book_id);
+          if (!book) return null;
+
+          return {
+            ...data,
+            book,
+            notes: data.notes || []
+          };
+        })
+        .filter(Boolean);
+
       setUserNotes(notesWithBooks);
 
       // Загружаем количество опубликованных заметок сегодня
