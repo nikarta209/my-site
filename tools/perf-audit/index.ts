@@ -75,6 +75,13 @@ interface RouteChangeTiming {
   timestamp: number;
 }
 
+interface BundleCoverageBreakdown {
+  totalBytes: number;
+  usedBytes: number;
+  unusedBytes: number;
+  unusedPercent: number;
+}
+
 interface BundleSizeSummary {
   totalBytes: number;
   scripts: number;
@@ -82,6 +89,10 @@ interface BundleSizeSummary {
   images: number;
   fonts: number;
   other: number;
+  coverage?: {
+    scripts: BundleCoverageBreakdown;
+    styles: BundleCoverageBreakdown;
+  };
 }
 
 interface CoverageSummary {
@@ -476,7 +487,8 @@ function summariseCoverage(entries: Array<{ url: string; functions: Array<{ rang
   let usedBytes = 0;
 
   for (const entry of entries) {
-    const source = sources.get(entry.url) ?? '';
+    const identifier = entry.url || (entry as any).scriptId || '';
+    const source = sources.get(identifier) ?? '';
     const fileBytes = Buffer.byteLength(source, 'utf8');
     let fileUsed = 0;
     for (const fn of entry.functions ?? []) {
@@ -487,7 +499,7 @@ function summariseCoverage(entries: Array<{ url: string; functions: Array<{ rang
     totalBytes += fileBytes;
     usedBytes += fileUsed;
     files.push({
-      url: entry.url,
+      url: entry.url || identifier,
       totalBytes: fileBytes,
       usedBytes: fileUsed,
       unusedBytes: Math.max(fileBytes - fileUsed, 0),
@@ -798,30 +810,72 @@ function mergeImageDiagnostics(images: ImageDiagnostic[], requests: Map<string, 
   });
 }
 
-async function gatherCoverage(session: CDPSession): Promise<{ js: CoverageSummary; css: CoverageSummary }> {
-  await session.send('Profiler.enable');
+async function resetCoverageTracking(session: CDPSession): Promise<void> {
+  await session.send('CSS.stopRuleUsageTracking').catch(() => {});
+  await session.send('Profiler.stopPreciseCoverage').catch(() => {});
+}
+
+async function startCoverageTracking(session: CDPSession): Promise<void> {
+  await resetCoverageTracking(session);
   await session.send('Profiler.startPreciseCoverage', { callCount: true, detailed: true });
-  await session.send('CSS.enable');
   await session.send('CSS.startRuleUsageTracking');
+}
 
-  const sources = new Map<string, string>();
-  const handleScriptParsed = (event: any) => {
-    if (event.url && event.scriptSource) {
-      sources.set(event.url, event.scriptSource);
-    }
-  };
-  session.on('Debugger.scriptParsed', handleScriptParsed);
+async function gatherCoverage(session: CDPSession): Promise<{ js: CoverageSummary; css: CoverageSummary }> {
+  let jsCoverage: any = { result: [] };
+  let cssCoverage: any = { ruleUsage: [] };
+  try {
+    const [jsResult, cssResult] = await Promise.all([
+      session.send('Profiler.takePreciseCoverage'),
+      session.send('CSS.stopRuleUsageTracking'),
+    ]);
+    jsCoverage = jsResult;
+    cssCoverage = cssResult;
+  } finally {
+    await session.send('Profiler.stopPreciseCoverage').catch(() => {});
+  }
 
-  const jsCoveragePromise = session.send('Profiler.takePreciseCoverage');
-  const cssCoveragePromise = session.send('CSS.stopRuleUsageTracking');
+  const jsEntries: Array<any> = (jsCoverage as any).result ?? [];
+  const cssUsage: Array<any> = (cssCoverage as any).ruleUsage ?? [];
 
-  const [jsCoverage, cssCoverage] = await Promise.all([jsCoveragePromise, cssCoveragePromise]);
-  await session.send('Profiler.stopPreciseCoverage');
-  session.off('Debugger.scriptParsed', handleScriptParsed);
+  const jsSources = new Map<string, string>();
+  await Promise.all(
+    jsEntries
+      .filter((entry) => entry?.scriptId)
+      .map(async (entry) => {
+        const key = entry.url || entry.scriptId;
+        if (!key || jsSources.has(key)) {
+          return;
+        }
+        try {
+          const { scriptSource } = await session.send('Debugger.getScriptSource', {
+            scriptId: entry.scriptId,
+          });
+          jsSources.set(key, scriptSource ?? '');
+        } catch (error) {
+          jsSources.set(key, '');
+        }
+      }),
+  );
 
-  const jsSummary = summariseCoverage((jsCoverage as any).result ?? [], sources);
+  const cssSources = new Map<string, string>();
+  await Promise.all(
+    Array.from(new Set(cssUsage.map((rule) => rule?.styleSheetId).filter(Boolean))).map(async (styleSheetId) => {
+      if (!styleSheetId || cssSources.has(styleSheetId)) {
+        return;
+      }
+      try {
+        const { text } = await session.send('CSS.getStyleSheetText', { styleSheetId });
+        cssSources.set(styleSheetId, text ?? '');
+      } catch (error) {
+        cssSources.set(styleSheetId, '');
+      }
+    }),
+  );
+
+  const jsSummary = summariseCoverage(jsEntries, jsSources);
   const cssSummary = summariseCoverage(
-    ((cssCoverage as any).ruleUsage ?? []).map((rule: any) => ({
+    cssUsage.map((rule: any) => ({
       url: rule.styleSheetId,
       functions: [
         {
@@ -835,7 +889,7 @@ async function gatherCoverage(session: CDPSession): Promise<{ js: CoverageSummar
         },
       ],
     })),
-    sources,
+    cssSources,
   );
 
   return { js: jsSummary, css: cssSummary };
@@ -1101,6 +1155,27 @@ async function auditProfile(options: CLIOptions, profile: ThrottlingProfileConfi
         );
         const coverage = await gatherCoverage(session);
         const bundle = computeBundleSummary(run.networkRequests);
+        const coverageWithPercent = {
+          js: addCoveragePercentages(coverage.js),
+          css: addCoveragePercentages(coverage.css),
+        };
+        const bundleWithCoverage: BundleSizeSummary = {
+          ...bundle,
+          coverage: {
+            scripts: {
+              totalBytes: coverageWithPercent.js.totalBytes,
+              usedBytes: coverageWithPercent.js.usedBytes,
+              unusedBytes: coverageWithPercent.js.unusedBytes,
+              unusedPercent: coverageWithPercent.js.unusedPercent,
+            },
+            styles: {
+              totalBytes: coverageWithPercent.css.totalBytes,
+              usedBytes: coverageWithPercent.css.usedBytes,
+              unusedBytes: coverageWithPercent.css.unusedBytes,
+              unusedPercent: coverageWithPercent.css.unusedPercent,
+            },
+          },
+        };
         const networkLogs = Array.from(run.networkRequests.values());
         const routeChanges = [...run.routeChanges];
         const lcpAfterNavigation = await captureLcp();
@@ -1117,11 +1192,8 @@ async function auditProfile(options: CLIOptions, profile: ThrottlingProfileConfi
         await page.screenshot({ path: screenshotPath, fullPage: true });
 
         const bundles: BundlesSection = {
-          summary: bundle,
-          coverage: {
-            js: addCoveragePercentages(coverage.js),
-            css: addCoveragePercentages(coverage.css),
-          },
+          summary: bundleWithCoverage,
+          coverage: coverageWithPercent,
         };
 
         const metrics: MetricsSection = {
@@ -1187,6 +1259,7 @@ async function auditProfile(options: CLIOptions, profile: ThrottlingProfileConfi
         return pageResult;
       } catch (error) {
         console.warn(`Failed to finalize navigation for ${run.url}:`, error);
+        await resetCoverageTracking(session);
         return null;
       } finally {
         clearRun();
@@ -1204,6 +1277,7 @@ async function auditProfile(options: CLIOptions, profile: ThrottlingProfileConfi
       }
       totalNavigations += 1;
       try {
+        await startCoverageTracking(session);
         await action();
         await page.waitForLoadState('networkidle', { timeout: options.timeoutMs }).catch(() => {});
         await page.waitForTimeout(1000);
@@ -1215,6 +1289,7 @@ async function auditProfile(options: CLIOptions, profile: ThrottlingProfileConfi
         return result;
       } catch (error) {
         console.warn(`Navigation error for ${url}:`, error);
+        await resetCoverageTracking(session);
         clearRun();
         return null;
       }
