@@ -34,6 +34,18 @@ npm install
 
 > If npm registry access is restricted in your environment you may need to install dependencies locally or configure an internal mirror.
 
+## Performance audit CLI dependencies
+
+The optional performance audit tooling under `tools/perf-audit/` relies on `lighthouse` and `chrome-launcher`. These packages are
+not part of the default dependency set so they do not block CI environments without browser access. Install them locally before
+running the CLI:
+
+```bash
+npm install -D lighthouse chrome-launcher
+```
+
+The CLI now detects when the packages are missing and will instruct you to install them instead of failing silently.
+
 ## Run the development server
 
 ```bash
