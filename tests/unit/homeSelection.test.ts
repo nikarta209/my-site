@@ -101,6 +101,7 @@ describe('books api helpers', () => {
     expect(call.steps).toEqual(
       expect.arrayContaining([
         { method: 'select', args: [BOOK_FIELDS] },
+        { method: 'in', args: ['status', ['approved', 'public_domain']] },
         { method: 'order', args: ['sales_count', { ascending: false, nullsLast: true }] },
       ]),
     );
@@ -114,6 +115,7 @@ describe('books api helpers', () => {
     expect(call.steps).toEqual(
       expect.arrayContaining([
         { method: 'select', args: [BOOK_FIELDS] },
+        { method: 'in', args: ['status', ['approved', 'public_domain']] },
         { method: 'eq', args: ['is_editors_pick', true] },
       ]),
     );
@@ -127,6 +129,7 @@ describe('books api helpers', () => {
     expect(call.steps).toEqual(
       expect.arrayContaining([
         { method: 'select', args: [BOOK_FIELDS] },
+        { method: 'in', args: ['status', ['approved', 'public_domain']] },
         { method: 'not', args: ['cover_images->>main_banner', 'is', null] },
         { method: 'order', args: ['created_at', { ascending: false }] },
         { method: 'limit', args: [5] },

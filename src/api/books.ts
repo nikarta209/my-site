@@ -60,6 +60,7 @@ export function fetchPopularBooks(): SupabaseBookResponse {
   return supabase
     .from(BOOKS_VIEW)
     .select(BOOK_FIELDS)
+    .in('status', ['approved', 'public_domain'])
     .order('sales_count', { ascending: false, nullsLast: true });
 }
 
@@ -68,6 +69,7 @@ export function fetchEditorsPicks(): SupabaseBookResponse {
   return supabase
     .from(BOOKS_VIEW)
     .select(BOOK_FIELDS)
+    .in('status', ['approved', 'public_domain'])
     .eq('is_editors_pick', true);
 }
 
@@ -76,6 +78,7 @@ export function fetchSingleEditorsPick(): SupabaseSingleBookResponse {
   return supabase
     .from(BOOKS_VIEW)
     .select(BOOK_FIELDS)
+    .in('status', ['approved', 'public_domain'])
     .eq('is_editors_pick', true)
     .limit(1)
     .maybeSingle();
@@ -86,6 +89,7 @@ export function fetchBannerBooks(limit = 5): SupabaseBookResponse {
   return supabase
     .from(BOOKS_VIEW)
     .select(BOOK_FIELDS)
+    .in('status', ['approved', 'public_domain'])
     .not('cover_images->>main_banner', 'is', null)
     .order('created_at', { ascending: false })
     .limit(limit);

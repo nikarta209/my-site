@@ -68,7 +68,13 @@ const WideBanners1600: React.FC<WideBannersProps> = ({ books }) => {
       <div className="no-scrollbar flex gap-8 overflow-x-auto pb-6">
         {preparedBooks.map((book) => {
           const isPlaceholder = book.id.startsWith('placeholder-');
-          const bannerSrc = book.covers['1600x900'] ?? book.covers.mainBanner ?? PLACEHOLDER_BANNER;
+          const bannerSrc =
+            book.covers['1600x900'] ??
+            book.covers.mainBanner ??
+            book.covers['600x600'] ??
+            book.covers['400x600'] ??
+            book.covers.default ??
+            PLACEHOLDER_BANNER;
           return (
             <a
               key={book.id}

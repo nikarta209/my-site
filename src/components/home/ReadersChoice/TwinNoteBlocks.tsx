@@ -132,8 +132,21 @@ const TwinNoteBlocks: React.FC<TwinNoteBlocksProps> = ({ notes }) => {
               <div className="grid h-full gap-6 md:grid-cols-2">
                 {pair.map((item) => {
                   const { note, book } = item;
-                  const cover = book?.covers['600x600'] ?? PLACEHOLDER_COVER;
-                  const background = note.bgImageUrl ?? book?.covers['1600x900'] ?? PLACEHOLDER_NOTE;
+                  const cover =
+                    book?.covers['600x600'] ??
+                    book?.covers['400x600'] ??
+                    book?.covers['1600x900'] ??
+                    book?.covers.mainBanner ??
+                    book?.covers.default ??
+                    PLACEHOLDER_COVER;
+                  const background =
+                    note.bgImageUrl ??
+                    book?.covers['1600x900'] ??
+                    book?.covers.mainBanner ??
+                    book?.covers['600x600'] ??
+                    book?.covers['400x600'] ??
+                    book?.covers.default ??
+                    PLACEHOLDER_NOTE;
                   return (
                     <article
                       key={item.id}

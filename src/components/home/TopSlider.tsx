@@ -219,7 +219,7 @@ type SlideProps = {
 const SlideArtwork = ({ slide, isFirst = false }: SlideProps) => {
   if (slide.type === 'promo') {
     return (
-      <div className="relative w-full max-w-[320px] overflow-hidden rounded-2xl border border-white/20 bg-white/5 shadow-lg">
+      <div className="relative w-full overflow-hidden rounded-2xl bg-white/5 shadow-lg md:flex-1">
         <img
           src={slide.image}
           alt={slide.title}
@@ -234,9 +234,15 @@ const SlideArtwork = ({ slide, isFirst = false }: SlideProps) => {
   }
 
   const { book } = slide;
-  const cover = book.covers.mainBanner ?? book.covers['1600x900'] ?? book.covers['400x600'] ?? FALLBACK_BANNER;
+  const cover =
+    book.covers.mainBanner ??
+    book.covers['1600x900'] ??
+    book.covers['600x600'] ??
+    book.covers['400x600'] ??
+    book.covers.default ??
+    FALLBACK_BANNER;
   return (
-    <div className="relative w-full max-w-[360px] overflow-hidden rounded-3xl border border-indigo-400/30 bg-indigo-500/20 shadow-lg">
+    <div className="relative w-full overflow-hidden rounded-3xl bg-indigo-500/20 shadow-lg md:flex-1">
       <img
         src={cover}
         alt={book.title}
