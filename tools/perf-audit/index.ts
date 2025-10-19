@@ -4,8 +4,41 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import process from 'node:process';
 import { chromium, devices, Page, CDPSession } from 'playwright';
-import lighthouse from 'lighthouse';
-import chromeLauncher from 'chrome-launcher';
+
+let cachedLighthouse: unknown;
+let cachedChromeLauncher: unknown;
+
+async function loadOptionalDependency<T = unknown>(specifier: string): Promise<T> {
+  try {
+    return (await import(specifier)) as T;
+  } catch (error) {
+    const installHint = 'npm install -D lighthouse chrome-launcher';
+    const reason = error instanceof Error ? error.message : String(error);
+    throw new Error(
+      `The performance audit CLI requires the optional dependency "${specifier}". ` +
+        `Install it locally before running the tool:\n  ${installHint}\n\nOriginal error: ${reason}`,
+    );
+  }
+}
+
+async function getLighthouse(): Promise<unknown> {
+  if (!cachedLighthouse) {
+    const module = await loadOptionalDependency<unknown>('lighthouse');
+    if (typeof module === 'object' && module && 'default' in module) {
+      cachedLighthouse = (module as { default: unknown }).default;
+    } else {
+      cachedLighthouse = module;
+    }
+  }
+  return cachedLighthouse;
+}
+
+async function getChromeLauncher(): Promise<unknown> {
+  if (!cachedChromeLauncher) {
+    cachedChromeLauncher = await loadOptionalDependency('chrome-launcher');
+  }
+  return cachedChromeLauncher;
+}
 
 interface CLIOptions {
   targetUrl: string;
@@ -896,7 +929,15 @@ async function gatherCoverage(session: CDPSession): Promise<{ js: CoverageSummar
 }
 
 async function runLighthouseAudit(url: string, profile: ThrottlingProfileConfig): Promise<LighthouseCoreMetrics & { rawReport: unknown }> {
-  const chrome = await chromeLauncher.launch({
+  const launcher = (await getChromeLauncher()) as {
+    launch(options: unknown): Promise<{ port: number; kill(): Promise<void> }>;
+  };
+  const lighthouse = (await getLighthouse()) as (
+    url: string,
+    options: Record<string, unknown>,
+  ) => Promise<{ lhr: Record<string, unknown> }>;
+
+  const chrome = await launcher.launch({
     chromeFlags: ['--headless=new', '--no-sandbox', '--disable-gpu'],
   });
 
