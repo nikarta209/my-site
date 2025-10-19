@@ -119,6 +119,94 @@ interface NavigationMetrics {
   imageDiagnostics: ImageDiagnostic[];
 }
 
+interface CoverageSummaryWithPercentages extends CoverageSummary {
+  usedPercent: number;
+  unusedPercent: number;
+}
+
+interface NetworkDomainSummary {
+  domain: string;
+  requestCount: number;
+  transferBytes: number;
+  isThirdParty: boolean;
+}
+
+interface NetworkRequestInsight {
+  url: string;
+  method: string;
+  status: number | undefined;
+  domain: string;
+  transferBytes: number;
+  durationMs: number;
+  isThirdParty: boolean;
+}
+
+interface NetworkSection {
+  summary: {
+    totalRequests: number;
+    totalTransferBytes: number;
+    firstPartyRequests: number;
+    thirdPartyRequests: number;
+  };
+  byDomain: NetworkDomainSummary[];
+  slowest: NetworkRequestInsight[];
+  largest: NetworkRequestInsight[];
+  requests: NetworkLogEntry[];
+}
+
+interface BundlesSection {
+  summary: BundleSizeSummary;
+  coverage: {
+    js: CoverageSummaryWithPercentages;
+    css: CoverageSummaryWithPercentages;
+  };
+}
+
+interface MetricsSection {
+  lighthouse: LighthouseCoreMetrics & { rawReport: unknown };
+  dom: DOMStatistics;
+  performance: {
+    navigationTimings: unknown[];
+    paintTimings: unknown[];
+    longTasks: LongTaskEntry[];
+    layoutShifts: unknown[];
+    repaintCount: number;
+    lcpAfterNavigation: number | null;
+  };
+}
+
+interface AnimationsSection {
+  total: number;
+  longest: AnimationMetadata[];
+  details: AnimationMetadata[];
+}
+
+interface ImagesSection {
+  total: number;
+  responsive: number;
+  lazy: number;
+  largestByBytes: ImageDiagnostic[];
+  diagnostics: ImageDiagnostic[];
+}
+
+interface CriticalPathSection {
+  lcp: {
+    lighthouse: number | null;
+    observed: number | null;
+    screenshotPath: string;
+  };
+  longTasks: LongTaskEntry[];
+  layoutShifts: unknown[];
+  paints: unknown[];
+}
+
+interface NavigationSection {
+  finalUrl: string;
+  history: RouteChangeTiming[];
+  timings: unknown[];
+  paints: unknown[];
+}
+
 interface NetworkLogEntry {
   requestId: string;
   url: string;
@@ -136,20 +224,19 @@ interface PageRunResult {
   url: string;
   profileId: string;
   sequence: number;
-  metricsPath: string;
-  lighthouse: LighthouseCoreMetrics & { rawReport: unknown };
-  navigation: NavigationMetrics;
-  bundle: BundleSizeSummary;
-  coverage: {
-    js: CoverageSummary;
-    css: CoverageSummary;
+  artifacts: {
+    metricsPath: string;
+    harPath: string;
+    lcpScreenshot: string;
   };
+  metrics: MetricsSection;
+  network: NetworkSection;
+  bundles: BundlesSection;
+  animations: AnimationsSection;
+  images: ImagesSection;
+  criticalPath: CriticalPathSection;
+  navigation: NavigationSection;
   cdpLogs: Record<string, unknown[]>;
-  routeChanges: RouteChangeTiming[];
-  harPath: string;
-  lcpScreenshot: string;
-  networkLogs: NetworkLogEntry[];
-  lcpAfterNavigation: number | null;
 }
 
 interface ProfileReport {
@@ -415,6 +502,169 @@ function summariseCoverage(entries: Array<{ url: string; functions: Array<{ rang
   };
 }
 
+function addCoveragePercentages(summary: CoverageSummary): CoverageSummaryWithPercentages {
+  const usedPercent = summary.totalBytes ? (summary.usedBytes / summary.totalBytes) * 100 : 0;
+  const unusedPercent = summary.totalBytes ? (summary.unusedBytes / summary.totalBytes) * 100 : 0;
+  return {
+    ...summary,
+    usedPercent: Number.isFinite(usedPercent) ? Number(usedPercent.toFixed(2)) : 0,
+    unusedPercent: Number.isFinite(unusedPercent) ? Number(unusedPercent.toFixed(2)) : 0,
+  };
+}
+
+function getDomainFromUrl(url: string): string | null {
+  try {
+    return new URL(url).hostname;
+  } catch (error) {
+    return null;
+  }
+}
+
+function isThirdParty(url: string, firstPartyOrigin: string): boolean {
+  try {
+    return new URL(url).origin !== firstPartyOrigin;
+  } catch (error) {
+    return false;
+  }
+}
+
+function toNetworkInsight(
+  entry: NetworkLogEntry,
+  firstPartyOrigin: string,
+): NetworkRequestInsight {
+  const end = entry.endTime ?? entry.startTime ?? 0;
+  const start = entry.startTime ?? 0;
+  const durationMs = (end - start) * 1000;
+  const domain = getDomainFromUrl(entry.url) ?? 'unknown';
+  return {
+    url: entry.url,
+    method: entry.method,
+    status: entry.responseStatus,
+    domain,
+    transferBytes: entry.encodedDataLength ?? 0,
+    durationMs: Number.isFinite(durationMs) ? Number(durationMs.toFixed(2)) : 0,
+    isThirdParty: isThirdParty(entry.url, firstPartyOrigin),
+  };
+}
+
+function buildNetworkSection(
+  networkLogs: NetworkLogEntry[],
+  firstPartyOrigin: string,
+): NetworkSection {
+  const insights = networkLogs.map((entry) => toNetworkInsight(entry, firstPartyOrigin));
+  const summary = insights.reduce(
+    (acc, insight) => {
+      acc.totalRequests += 1;
+      acc.totalTransferBytes += insight.transferBytes;
+      if (insight.isThirdParty) {
+        acc.thirdPartyRequests += 1;
+      } else {
+        acc.firstPartyRequests += 1;
+      }
+      return acc;
+    },
+    {
+      totalRequests: 0,
+      totalTransferBytes: 0,
+      firstPartyRequests: 0,
+      thirdPartyRequests: 0,
+    },
+  );
+
+  const byDomainMap = new Map<string, NetworkDomainSummary>();
+  for (const insight of insights) {
+    const existing = byDomainMap.get(insight.domain);
+    if (existing) {
+      existing.requestCount += 1;
+      existing.transferBytes += insight.transferBytes;
+    } else {
+      byDomainMap.set(insight.domain, {
+        domain: insight.domain,
+        requestCount: 1,
+        transferBytes: insight.transferBytes,
+        isThirdParty: insight.isThirdParty,
+      });
+    }
+  }
+
+  const byDomain = Array.from(byDomainMap.values()).sort((a, b) => b.transferBytes - a.transferBytes);
+
+  const slowest = [...insights]
+    .filter((item) => item.durationMs > 0)
+    .sort((a, b) => b.durationMs - a.durationMs)
+    .slice(0, 5);
+
+  const largest = [...insights]
+    .sort((a, b) => b.transferBytes - a.transferBytes)
+    .slice(0, 5);
+
+  return {
+    summary,
+    byDomain,
+    slowest,
+    largest,
+    requests: networkLogs,
+  };
+}
+
+function buildAnimationsSection(animations: AnimationMetadata[]): AnimationsSection {
+  const longest = [...animations]
+    .sort((a, b) => (typeof b.duration === 'number' ? b.duration : 0) - (typeof a.duration === 'number' ? a.duration : 0))
+    .slice(0, 5);
+
+  return {
+    total: animations.length,
+    longest,
+    details: animations,
+  };
+}
+
+function buildImagesSection(images: ImageDiagnostic[]): ImagesSection {
+  const largestByBytes = [...images]
+    .filter((image) => (image.byteSize ?? 0) > 0)
+    .sort((a, b) => (b.byteSize ?? 0) - (a.byteSize ?? 0))
+    .slice(0, 5);
+
+  return {
+    total: images.length,
+    responsive: images.filter((image) => image.isResponsive).length,
+    lazy: images.filter((image) => image.isLazy).length,
+    largestByBytes,
+    diagnostics: images,
+  };
+}
+
+function buildCriticalPathSection(
+  navigation: NavigationMetrics,
+  lighthouse: LighthouseCoreMetrics,
+  lcpAfterNavigation: number | null,
+  lcpScreenshot: string,
+): CriticalPathSection {
+  return {
+    lcp: {
+      lighthouse: lighthouse.lcp ?? null,
+      observed: lcpAfterNavigation,
+      screenshotPath: lcpScreenshot,
+    },
+    longTasks: navigation.longTasks,
+    layoutShifts: navigation.layoutShifts,
+    paints: navigation.paintTimings,
+  };
+}
+
+function buildNavigationSection(
+  routeChanges: RouteChangeTiming[],
+  navigation: NavigationMetrics,
+  finalUrl: string,
+): NavigationSection {
+  return {
+    finalUrl,
+    history: routeChanges,
+    timings: navigation.navigationTimings,
+    paints: navigation.paintTimings,
+  };
+}
+
 function buildHar(pages: RouteChangeTiming[], requests: Map<string, NetworkLogEntry>, targetUrl: string): unknown {
   const startedDateTime = new Date().toISOString();
   const harPages = pages.map((page, index) => ({
@@ -620,20 +870,21 @@ function computeRecommendations(profiles: ProfileReport[]): string[] {
   const recommendations = new Set<string>();
   for (const profile of profiles) {
     for (const page of profile.pages) {
-      const { lighthouse, navigation } = page;
+      const { lighthouse } = page.metrics;
+      const { performance } = page.metrics;
       if ((lighthouse.lcp ?? 0) > 2500) {
         recommendations.add('Improve Largest Contentful Paint by optimizing hero media and critical rendering path.');
       }
       if ((lighthouse.cls ?? 0) > 0.1) {
         recommendations.add('Reduce layout shifts by reserving space for dynamic content and fonts.');
       }
-      if ((navigation.longTasks ?? []).some((task) => task.duration > 200)) {
+      if ((performance.longTasks ?? []).some((task) => task.duration > 200)) {
         recommendations.add('Break up long tasks to keep main thread responsive and lower INP.');
       }
-      if (page.coverage.js.unusedBytes > page.coverage.js.totalBytes * 0.3) {
+      if (page.bundles.coverage.js.unusedBytes > page.bundles.coverage.js.totalBytes * 0.3) {
         recommendations.add('Ship less JavaScript by code-splitting and removing unused modules.');
       }
-      if (page.coverage.css.unusedBytes > page.coverage.css.totalBytes * 0.5) {
+      if (page.bundles.coverage.css.unusedBytes > page.bundles.coverage.css.totalBytes * 0.5) {
         recommendations.add('Eliminate unused CSS and prefer critical CSS inlining.');
       }
     }
@@ -662,6 +913,23 @@ function normalizeUrl(input: string): string {
   } catch (error) {
     return input;
   }
+}
+
+function formatBytes(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes <= 0) {
+    return '0 B';
+  }
+  const units = ['B', 'KB', 'MB', 'GB'];
+  const exponent = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+  const value = bytes / Math.pow(1024, exponent);
+  return `${value.toFixed(exponent === 0 ? 0 : 2)} ${units[exponent]}`;
+}
+
+function formatMs(value: number | null | undefined): string {
+  if (value === null || value === undefined || !Number.isFinite(value)) {
+    return 'n/a';
+  }
+  return `${value.toFixed(0)} ms`;
 }
 
 async function auditProfile(options: CLIOptions, profile: ThrottlingProfileConfig): Promise<ProfileReport> {
@@ -826,8 +1094,11 @@ async function auditProfile(options: CLIOptions, profile: ThrottlingProfileConfi
 
     const finalizeRun = async (run: ActiveRun): Promise<PageRunResult | null> => {
       try {
-        const navigation = await collectNavigationMetrics(page);
-        navigation.imageDiagnostics = mergeImageDiagnostics(navigation.imageDiagnostics, run.networkRequests);
+        const navigationMetrics = await collectNavigationMetrics(page);
+        navigationMetrics.imageDiagnostics = mergeImageDiagnostics(
+          navigationMetrics.imageDiagnostics,
+          run.networkRequests,
+        );
         const coverage = await gatherCoverage(session);
         const bundle = computeBundleSummary(run.networkRequests);
         const networkLogs = Array.from(run.networkRequests.values());
@@ -845,37 +1116,70 @@ async function auditProfile(options: CLIOptions, profile: ThrottlingProfileConfi
         fs.writeFileSync(harPath, JSON.stringify(harContent, null, 2), 'utf-8');
         await page.screenshot({ path: screenshotPath, fullPage: true });
 
+        const bundles: BundlesSection = {
+          summary: bundle,
+          coverage: {
+            js: addCoveragePercentages(coverage.js),
+            css: addCoveragePercentages(coverage.css),
+          },
+        };
+
+        const metrics: MetricsSection = {
+          lighthouse,
+          dom: navigationMetrics.domStats,
+          performance: {
+            navigationTimings: navigationMetrics.navigationTimings,
+            paintTimings: navigationMetrics.paintTimings,
+            longTasks: navigationMetrics.longTasks,
+            layoutShifts: navigationMetrics.layoutShifts,
+            repaintCount: navigationMetrics.repaintCount,
+            lcpAfterNavigation,
+          },
+        };
+
+        const networkSection = buildNetworkSection(networkLogs, targetOrigin);
+        const animationsSection = buildAnimationsSection(navigationMetrics.animationDetails);
+        const imagesSection = buildImagesSection(navigationMetrics.imageDiagnostics);
+        const criticalPathSection = buildCriticalPathSection(
+          navigationMetrics,
+          lighthouse,
+          lcpAfterNavigation,
+          screenshotPath,
+        );
+        const navigationSection = buildNavigationSection(routeChanges, navigationMetrics, page.url());
+
         const pageResult: PageRunResult = {
           url: run.url,
           profileId: profile.id,
           sequence: run.id,
-          metricsPath,
-          lighthouse,
-          navigation,
-          bundle,
-          coverage,
+          artifacts: {
+            metricsPath,
+            harPath,
+            lcpScreenshot: screenshotPath,
+          },
+          metrics,
+          network: networkSection,
+          bundles,
+          animations: animationsSection,
+          images: imagesSection,
+          criticalPath: criticalPathSection,
+          navigation: navigationSection,
           cdpLogs: run.cdpLogs,
-          routeChanges,
-          harPath,
-          lcpScreenshot: screenshotPath,
-          networkLogs,
-          lcpAfterNavigation,
         };
 
         const metricsPayload = {
           url: pageResult.url,
           profileId: pageResult.profileId,
           sequence: pageResult.sequence,
-          lighthouse: pageResult.lighthouse,
+          artifacts: pageResult.artifacts,
+          metrics: pageResult.metrics,
+          network: pageResult.network,
+          bundles: pageResult.bundles,
+          animations: pageResult.animations,
+          images: pageResult.images,
+          criticalPath: pageResult.criticalPath,
           navigation: pageResult.navigation,
-          bundle: pageResult.bundle,
-          coverage: pageResult.coverage,
           cdpLogs: pageResult.cdpLogs,
-          routeChanges: pageResult.routeChanges,
-          networkLogs: pageResult.networkLogs,
-          lcpAfterNavigation: pageResult.lcpAfterNavigation,
-          harPath: pageResult.harPath,
-          lcpScreenshot: pageResult.lcpScreenshot,
         };
         fs.writeFileSync(metricsPath, JSON.stringify(metricsPayload, null, 2), 'utf-8');
         pages.push(pageResult);
@@ -1031,31 +1335,177 @@ function generateMarkdownReport(report: AuditReport): string {
     for (const page of profile.pages) {
       lines.push(`### ${page.url}`);
       lines.push('');
+      lines.push('#### Core Web Metrics');
+      lines.push('');
       lines.push('| Metric | Value |');
       lines.push('| --- | ---: |');
-      lines.push(`| TTFB | ${page.lighthouse.ttfb?.toFixed?.(0) ?? 'n/a'} ms |`);
-      lines.push(`| FCP | ${page.lighthouse.fcp?.toFixed?.(0) ?? 'n/a'} ms |`);
-      lines.push(`| LCP | ${page.lighthouse.lcp?.toFixed?.(0) ?? 'n/a'} ms |`);
-      lines.push(`| CLS | ${page.lighthouse.cls?.toFixed?.(3) ?? 'n/a'} |`);
-      lines.push(`| INP/FID | ${page.lighthouse.inp?.toFixed?.(0) ?? 'n/a'} ms |`);
-      lines.push(`| TTI | ${page.lighthouse.tti?.toFixed?.(0) ?? 'n/a'} ms |`);
-      lines.push(`| Speed Index | ${page.lighthouse.speedIndex?.toFixed?.(0) ?? 'n/a'} ms |`);
-      lines.push(`| TBT | ${page.lighthouse.tbt?.toFixed?.(0) ?? 'n/a'} ms |`);
+      lines.push(`| TTFB | ${formatMs(page.metrics.lighthouse.ttfb)} |`);
+      lines.push(`| FCP | ${formatMs(page.metrics.lighthouse.fcp)} |`);
+      lines.push(`| LCP | ${formatMs(page.metrics.lighthouse.lcp)} |`);
+      lines.push(`| CLS | ${page.metrics.lighthouse.cls?.toFixed?.(3) ?? 'n/a'} |`);
+      lines.push(`| INP/FID | ${formatMs(page.metrics.lighthouse.inp ?? page.metrics.lighthouse.fid ?? null)} |`);
+      lines.push(`| TTI | ${formatMs(page.metrics.lighthouse.tti)} |`);
+      lines.push(`| Speed Index | ${formatMs(page.metrics.lighthouse.speedIndex)} |`);
+      lines.push(`| TBT | ${formatMs(page.metrics.lighthouse.tbt)} |`);
       lines.push('');
-      lines.push('#### Bundle Summary');
+
+      lines.push('#### Performance & Critical Path');
+      lines.push('');
+      lines.push('| Detail | Value |');
+      lines.push('| --- | --- |');
+      lines.push(`| LCP (Lighthouse) | ${formatMs(page.criticalPath.lcp.lighthouse)} |`);
+      lines.push(`| LCP (Observed) | ${formatMs(page.criticalPath.lcp.observed)} |`);
+      lines.push(`| Repaint Count | ${page.metrics.performance.repaintCount} |`);
+      const longTasksOver200 = page.metrics.performance.longTasks.filter((task) => task.duration > 200).length;
+      lines.push(`| Long Tasks >200ms | ${longTasksOver200} |`);
+      lines.push('');
+      if (page.metrics.performance.longTasks.length) {
+        lines.push('Top Long Tasks');
+        lines.push('');
+        lines.push('| Start (ms) | Duration (ms) |');
+        lines.push('| ---: | ---: |');
+        for (const task of page.metrics.performance.longTasks.slice(0, 5)) {
+          lines.push(`| ${task.startTime.toFixed(1)} | ${task.duration.toFixed(1)} |`);
+        }
+        lines.push('');
+      }
+
+      lines.push('#### DOM Overview');
+      lines.push('');
+      lines.push('| Metric | Value |');
+      lines.push('| --- | ---: |');
+      lines.push(`| Nodes | ${page.metrics.dom.nodeCount} |`);
+      lines.push(`| Elements | ${page.metrics.dom.elementCount} |`);
+      lines.push(`| Text Nodes | ${page.metrics.dom.textNodeCount} |`);
+      lines.push(`| Max Depth | ${page.metrics.dom.depth} |`);
+      lines.push(`| Interactive Elements | ${page.metrics.dom.interactiveElements} |`);
+      lines.push(`| Forms | ${page.metrics.dom.forms} |`);
+      lines.push(`| Scripts | ${page.metrics.dom.scripts} |`);
+      lines.push(`| Stylesheets | ${page.metrics.dom.stylesheets} |`);
+      lines.push(`| Images | ${page.metrics.dom.images} |`);
+      lines.push(`| Iframes | ${page.metrics.dom.iframes} |`);
+      lines.push('');
+
+      lines.push('#### Bundles & Coverage');
       lines.push('');
       lines.push('| Type | Bytes |');
       lines.push('| --- | ---: |');
-      lines.push(`| Total | ${page.bundle.totalBytes} |`);
-      lines.push(`| Scripts | ${page.bundle.scripts} |`);
-      lines.push(`| Styles | ${page.bundle.styles} |`);
-      lines.push(`| Images | ${page.bundle.images} |`);
-      lines.push(`| Fonts | ${page.bundle.fonts} |`);
-      lines.push(`| Other | ${page.bundle.other} |`);
+      lines.push(`| Total | ${formatBytes(page.bundles.summary.totalBytes)} |`);
+      lines.push(`| Scripts | ${formatBytes(page.bundles.summary.scripts)} |`);
+      lines.push(`| Styles | ${formatBytes(page.bundles.summary.styles)} |`);
+      lines.push(`| Images | ${formatBytes(page.bundles.summary.images)} |`);
+      lines.push(`| Fonts | ${formatBytes(page.bundles.summary.fonts)} |`);
+      lines.push(`| Other | ${formatBytes(page.bundles.summary.other)} |`);
       lines.push('');
-      lines.push(`- HAR: \`${page.harPath}\``);
-      lines.push(`- LCP Screenshot: \`${page.lcpScreenshot}\``);
-      lines.push(`- Metrics JSON: \`${page.metricsPath}\``);
+      lines.push('| Coverage | Used % | Unused % | Total Bytes |');
+      lines.push('| --- | ---: | ---: | ---: |');
+      lines.push(
+        `| JavaScript | ${page.bundles.coverage.js.usedPercent}% | ${page.bundles.coverage.js.unusedPercent}% | ${formatBytes(page.bundles.coverage.js.totalBytes)} |`,
+      );
+      lines.push(
+        `| CSS | ${page.bundles.coverage.css.usedPercent}% | ${page.bundles.coverage.css.unusedPercent}% | ${formatBytes(page.bundles.coverage.css.totalBytes)} |`,
+      );
+      lines.push('');
+
+      lines.push('#### Network Overview');
+      lines.push('');
+      lines.push('| Metric | Value |');
+      lines.push('| --- | ---: |');
+      lines.push(`| Total Requests | ${page.network.summary.totalRequests} |`);
+      lines.push(`| Transfer Size | ${formatBytes(page.network.summary.totalTransferBytes)} |`);
+      lines.push(`| First-party Requests | ${page.network.summary.firstPartyRequests} |`);
+      lines.push(`| Third-party Requests | ${page.network.summary.thirdPartyRequests} |`);
+      lines.push('');
+
+      if (page.network.byDomain.length) {
+        lines.push('##### Requests by Domain');
+        lines.push('');
+        lines.push('| Domain | Requests | Transfer | Party |');
+        lines.push('| --- | ---: | ---: | --- |');
+        for (const domain of page.network.byDomain) {
+          lines.push(
+            `| ${domain.domain} | ${domain.requestCount} | ${formatBytes(domain.transferBytes)} | ${domain.isThirdParty ? '3P' : '1P'} |`,
+          );
+        }
+        lines.push('');
+      }
+
+      if (page.network.slowest.length) {
+        lines.push('##### Slowest Requests');
+        lines.push('');
+        lines.push('| URL | Duration | Size |');
+        lines.push('| --- | ---: | ---: |');
+        for (const request of page.network.slowest) {
+          lines.push(`| ${request.url} | ${formatMs(request.durationMs)} | ${formatBytes(request.transferBytes)} |`);
+        }
+        lines.push('');
+      }
+
+      if (page.network.largest.length) {
+        lines.push('##### Largest Requests');
+        lines.push('');
+        lines.push('| URL | Duration | Size |');
+        lines.push('| --- | ---: | ---: |');
+        for (const request of page.network.largest) {
+          lines.push(`| ${request.url} | ${formatMs(request.durationMs)} | ${formatBytes(request.transferBytes)} |`);
+        }
+        lines.push('');
+      }
+
+      lines.push('#### Images');
+      lines.push('');
+      lines.push('| Metric | Value |');
+      lines.push('| --- | ---: |');
+      lines.push(`| Total Images | ${page.images.total} |`);
+      lines.push(`| Responsive Sources | ${page.images.responsive} |`);
+      lines.push(`| Lazy-loaded | ${page.images.lazy} |`);
+      lines.push('');
+      if (page.images.largestByBytes.length) {
+        lines.push('Largest Images');
+        lines.push('');
+        lines.push('| Src | Bytes | Displayed Size | Natural Size |');
+        lines.push('| --- | ---: | --- | --- |');
+        for (const image of page.images.largestByBytes) {
+          lines.push(
+            `| ${image.src} | ${formatBytes(image.byteSize ?? 0)} | ${image.displayedWidth}×${image.displayedHeight} | ${image.naturalWidth}×${image.naturalHeight} |`,
+          );
+        }
+        lines.push('');
+      }
+
+      lines.push('#### Animations');
+      lines.push('');
+      lines.push(`- Total animations: ${page.animations.total}`);
+      if (page.animations.longest.length) {
+        lines.push('');
+        lines.push('| Name | Duration (ms) | Delay (ms) | Iterations | State |');
+        lines.push('| --- | ---: | ---: | --- | --- |');
+        for (const animation of page.animations.longest) {
+          const duration = typeof animation.duration === 'number' ? animation.duration : 0;
+          const delay = typeof animation.delay === 'number' ? animation.delay : 0;
+          lines.push(
+            `| ${animation.name ?? '(anonymous)'} | ${duration.toFixed(1)} | ${delay.toFixed(1)} | ${animation.iterationCount} | ${animation.playState} |`,
+          );
+        }
+        lines.push('');
+      }
+
+      lines.push('#### Navigation');
+      lines.push('');
+      lines.push(`- Final URL: ${page.navigation.finalUrl}`);
+      if (page.navigation.history.length > 1) {
+        lines.push('- Route changes:');
+        for (const change of page.navigation.history) {
+          lines.push(`  - ${new Date(change.timestamp).toISOString()}: ${change.url}`);
+        }
+      }
+      lines.push('');
+
+      lines.push('#### Artifacts');
+      lines.push('');
+      lines.push(`- HAR: \`${page.artifacts.harPath}\``);
+      lines.push(`- LCP Screenshot: \`${page.artifacts.lcpScreenshot}\``);
+      lines.push(`- Metrics JSON: \`${page.artifacts.metricsPath}\``);
       lines.push('');
     }
   }
@@ -1094,11 +1544,15 @@ async function main() {
 
   for (const profile of profileReports) {
     for (const page of profile.pages) {
-      if (page.lighthouse.lcp) {
-        summary.slowestLcp = summary.slowestLcp ? Math.max(summary.slowestLcp, page.lighthouse.lcp) : page.lighthouse.lcp;
+      if (page.metrics.lighthouse.lcp) {
+        summary.slowestLcp = summary.slowestLcp
+          ? Math.max(summary.slowestLcp, page.metrics.lighthouse.lcp)
+          : page.metrics.lighthouse.lcp;
       }
-      if (page.bundle.totalBytes) {
-        summary.heaviestPage = summary.heaviestPage ? Math.max(summary.heaviestPage, page.bundle.totalBytes) : page.bundle.totalBytes;
+      if (page.bundles.summary.totalBytes) {
+        summary.heaviestPage = summary.heaviestPage
+          ? Math.max(summary.heaviestPage, page.bundles.summary.totalBytes)
+          : page.bundles.summary.totalBytes;
       }
     }
   }
