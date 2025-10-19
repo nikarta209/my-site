@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { KeyboardEvent } from 'react';
+import { Link } from 'react-router-dom';
 import type { Book } from '@/api/books';
 import clsx from 'clsx';
 
@@ -119,23 +120,20 @@ export function BookCarousel600({ id, title, books }: BookCarousel600Props) {
         tabIndex={0}
         onKeyDown={onKeyDown}
       >
-        {books.map((book, index) => (
-          <div
-            key={book.id}
-            ref={(element) => {
-              itemRefs.current[index] = element;
-            }}
-            data-index={index}
-            role="group"
-            aria-roledescription="slide"
-            aria-label={`${book.id.startsWith('placeholder-') ? 'Заглушка: ' : ''}${book.title} — ${book.authorName}`}
-            aria-selected={activeIndex === index}
-            className="snap-start"
-          >
+        {books.map((book, index) => {
+          const isPlaceholder = book.id.startsWith('placeholder-');
+          const coverSrc =
+            book.covers['600x600'] ??
+            book.covers['400x600'] ??
+            book.covers['1600x900'] ??
+            book.covers.mainBanner ??
+            book.covers.default ??
+            '';
+          const card = (
             <article className="flex w-[240px] flex-col gap-3 md:w-[280px]" style={{ contain: 'content' }}>
               <div className="overflow-hidden rounded-3xl border border-border/60 bg-muted" style={{ willChange: 'transform' }}>
                 <img
-                  src={book.covers['600x600'] ?? book.covers['400x600'] ?? book.covers['1600x900'] ?? ''}
+                  src={coverSrc}
                   alt={book.title}
                   loading="lazy"
                   decoding="async"
@@ -147,8 +145,34 @@ export function BookCarousel600({ id, title, books }: BookCarousel600Props) {
                 <p className="text-xs text-muted-foreground line-clamp-1">{book.authorName}</p>
               </div>
             </article>
-          </div>
-        ))}
+          );
+
+          return (
+            <div
+              key={book.id}
+              ref={(element) => {
+                itemRefs.current[index] = element;
+              }}
+              data-index={index}
+              role="group"
+              aria-roledescription="slide"
+              aria-label={`${isPlaceholder ? 'Заглушка: ' : ''}${book.title} — ${book.authorName}`}
+              aria-selected={activeIndex === index}
+              className="snap-start"
+            >
+              {isPlaceholder ? (
+                card
+              ) : (
+                <Link
+                  to={`/books/${book.id}`}
+                  className="block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
+                >
+                  {card}
+                </Link>
+              )}
+            </div>
+          );
+        })}
       </div>
 
       <div className="flex items-center justify-center gap-2">

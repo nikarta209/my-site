@@ -19,6 +19,7 @@ type CoverMap = {
   '600x600'?: string | null;
   '1600x900'?: string | null;
   mainBanner?: string | null;
+  default?: string | null;
 };
 
 type HomeNote = {
@@ -102,13 +103,20 @@ const HomePage: React.FC = () => {
   const { slides, sections } = useMemo(() => {
     const normalizeBook = (book: PublicBook): HomeBook => {
       const rawCovers = book.cover_images ?? {};
+      const coverRecord = rawCovers as Record<string, string | null | undefined>;
       const covers: CoverMap = {
-        '400x600': (rawCovers as Record<string, string | null | undefined>)['400x600'] ?? null,
-        '600x600': (rawCovers as Record<string, string | null | undefined>)['600x600'] ?? null,
-        '1600x900': (rawCovers as Record<string, string | null | undefined>)['1600x900'] ?? null,
+        '400x600': coverRecord['400x600'] ?? coverRecord['400_600'] ?? null,
+        '600x600': coverRecord['600x600'] ?? coverRecord['600_600'] ?? null,
+        '1600x900': coverRecord['1600x900'] ?? coverRecord['1600_900'] ?? null,
         mainBanner:
-          (rawCovers as Record<string, string | null | undefined>).mainBanner ??
-          (rawCovers as Record<string, string | null | undefined>).main_banner ??
+          coverRecord.mainBanner ??
+          coverRecord.main_banner ??
+          coverRecord['1600x900'] ??
+          null,
+        default:
+          coverRecord.default ??
+          coverRecord.cover ??
+          coverRecord.square ??
           null,
       };
 
@@ -182,6 +190,48 @@ const HomePage: React.FC = () => {
       return clone;
     };
 
+    const getCoverForFormat = (book: HomeBook, format: SectionFormat | 'slider') => {
+      switch (format) {
+        case 'slider':
+          return (
+            book.covers.mainBanner ??
+            book.covers['1600x900'] ??
+            book.covers['600x600'] ??
+            book.covers['400x600'] ??
+            book.covers.default ??
+            null
+          );
+        case '400x600':
+          return (
+            book.covers['400x600'] ??
+            book.covers['600x600'] ??
+            book.covers['1600x900'] ??
+            book.covers.mainBanner ??
+            book.covers.default ??
+            null
+          );
+        case '600x600':
+          return (
+            book.covers['600x600'] ??
+            book.covers['400x600'] ??
+            book.covers['1600x900'] ??
+            book.covers.mainBanner ??
+            book.covers.default ??
+            null
+          );
+        case '1600x900':
+        default:
+          return (
+            book.covers['1600x900'] ??
+            book.covers.mainBanner ??
+            book.covers['600x600'] ??
+            book.covers['400x600'] ??
+            book.covers.default ??
+            null
+          );
+      }
+    };
+
     const useWithFormat = (
       book: HomeBook,
       format: SectionFormat,
@@ -193,49 +243,12 @@ const HomePage: React.FC = () => {
         usage.set(book.id, record);
       }
 
-      const hasSlider = record.formats.has('slider');
-      const has400 = record.formats.has('400x600');
-      const has600 = record.formats.has('600x600');
-      const has1600 = record.formats.has('1600x900');
-      const hasLargeCover = Boolean(book.covers['1600x900']);
+      if (format === 'slider' && record.count > 0) {
+        return false;
+      }
 
-      if (format === 'slider') {
-        if (record.count > 0) {
-          return false;
-        }
-      } else if (record.count === 0) {
-        // always allow the first appearance for non-slider formats
-      } else {
-        if (record.count >= 2) {
-          return false;
-        }
-        if (hasSlider) {
-          if (format === '400x600' || format === '600x600') {
-            if (has400 || has600) {
-              return false;
-            }
-          } else {
-            return false;
-          }
-        } else if (has1600) {
-          if (format !== '400x600' || has400) {
-            return false;
-          }
-        } else if (format === '1600x900') {
-          if (has600) {
-            return false;
-          }
-          if (has400 && !hasLargeCover) {
-            return false;
-          }
-        } else if (has400 || has600) {
-          // already shown in a small format
-          if (format === '1600x900' && hasLargeCover && !has600) {
-            // allow 1600 after 400
-          } else {
-            return false;
-          }
-        }
+      if (record.formats.has(format)) {
+        return false;
       }
 
       record.count += 1;
@@ -250,7 +263,7 @@ const HomePage: React.FC = () => {
     for (const source of sliderSources) {
       for (const book of source) {
         if (sliderCandidates.length >= MAX_SLIDER_BOOKS) break;
-        if (!book.covers.mainBanner) continue;
+        if (!getCoverForFormat(book, 'slider')) continue;
         if (!useWithFormat(book, 'slider', baseUsage)) continue;
         sliderCandidates.push(book);
       }
@@ -303,6 +316,7 @@ const HomePage: React.FC = () => {
           if (selection.length >= limit) break;
           if (seen.has(book.id)) continue;
           if (!predicate(book)) continue;
+          if (!getCoverForFormat(book, format)) continue;
           if (!useWithFormat(book, format, usage)) continue;
           selection.push(book);
           seen.add(book.id);
@@ -319,35 +333,35 @@ const HomePage: React.FC = () => {
         MAX_PRIMARY_400,
         '400x600',
         usage,
-        (book) => Boolean(book.covers['400x600'])
+        () => true
       );
       const secondary400 = collectFromSources(
         [normalizedPopular, normalizedEditors, normalizedNew],
         MAX_SECONDARY_400,
         '400x600',
         usage,
-        (book) => Boolean(book.covers['400x600'])
+        () => true
       );
       const wideBanners = collectFromSources(
         [normalizedBanners, normalizedEditors, normalizedPopular],
         MAX_BANNERS,
         '1600x900',
         usage,
-        (book) => Boolean(book.covers['1600x900'])
+        () => true
       );
       const square600 = collectFromSources(
         [normalizedEditors, normalizedPopular, normalizedNew],
         MAX_SQUARE_600,
         '600x600',
         usage,
-        (book) => Boolean(book.covers['600x600'])
+        () => true
       );
       const extra400 = collectFromSources(
         [normalizedNew, normalizedPopular, normalizedEditors],
         MAX_EXTRA_400,
         '400x600',
         usage,
-        (book) => Boolean(book.covers['400x600'])
+        () => true
       );
 
       return { primary400, secondary400, wideBanners, square600, extra400 };
@@ -363,7 +377,7 @@ const HomePage: React.FC = () => {
           if (items.length >= MAX_NOTES) break;
           if (noted.has(book.id)) continue;
           if (!book.notes.length) continue;
-          if (!book.covers['600x600']) continue;
+          if (!getCoverForFormat(book, '600x600')) continue;
           const note = book.notes.find((entry) => entry.html);
           if (!note) continue;
           if (!useWithFormat(book, '600x600', usage)) continue;
