@@ -135,6 +135,8 @@ interface NetworkLogEntry {
 interface PageRunResult {
   url: string;
   profileId: string;
+  sequence: number;
+  metricsPath: string;
   lighthouse: LighthouseCoreMetrics & { rawReport: unknown };
   navigation: NavigationMetrics;
   bundle: BundleSizeSummary;
@@ -146,6 +148,8 @@ interface PageRunResult {
   routeChanges: RouteChangeTiming[];
   harPath: string;
   lcpScreenshot: string;
+  networkLogs: NetworkLogEntry[];
+  lcpAfterNavigation: number | null;
 }
 
 interface ProfileReport {
@@ -551,17 +555,19 @@ async function gatherCoverage(session: CDPSession): Promise<{ js: CoverageSummar
   await session.send('CSS.startRuleUsageTracking');
 
   const sources = new Map<string, string>();
-  session.on('Debugger.scriptParsed', (event) => {
+  const handleScriptParsed = (event: any) => {
     if (event.url && event.scriptSource) {
       sources.set(event.url, event.scriptSource);
     }
-  });
+  };
+  session.on('Debugger.scriptParsed', handleScriptParsed);
 
   const jsCoveragePromise = session.send('Profiler.takePreciseCoverage');
   const cssCoveragePromise = session.send('CSS.stopRuleUsageTracking');
 
   const [jsCoverage, cssCoverage] = await Promise.all([jsCoveragePromise, cssCoveragePromise]);
   await session.send('Profiler.stopPreciseCoverage');
+  session.off('Debugger.scriptParsed', handleScriptParsed);
 
   const jsSummary = summariseCoverage((jsCoverage as any).result ?? [], sources);
   const cssSummary = summariseCoverage(
@@ -641,10 +647,32 @@ function ensureDir(dir: string): void {
   }
 }
 
+function slugifyForFilename(input: string): string {
+  return input
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/gi, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 120);
+}
+
+function normalizeUrl(input: string): string {
+  try {
+    const { origin, pathname, search } = new URL(input);
+    return `${origin}${pathname}${search}`;
+  } catch (error) {
+    return input;
+  }
+}
+
 async function auditProfile(options: CLIOptions, profile: ThrottlingProfileConfig): Promise<ProfileReport> {
   console.log(`▶️ Starting profile: ${profile.name}`);
   const pages: PageRunResult[] = [];
   const { targetUrl } = options;
+  const normalizedTarget = normalizeUrl(targetUrl);
+  const targetOrigin = new URL(targetUrl).origin;
+  const discovered = new Set<string>([normalizedTarget]);
+  const visited = new Set<string>();
+  const urlQueue: string[] = [normalizedTarget];
 
   const browser = await chromium.launch({ headless: true, args: ['--disable-dev-shm-usage'] });
   try {
@@ -656,22 +684,54 @@ async function auditProfile(options: CLIOptions, profile: ThrottlingProfileConfi
     const page = await context.newPage();
     const session = await context.newCDPSession(page);
 
-    const cdpLogs: Record<string, unknown[]> = {
-      Performance: [],
-      Network: [],
-      Page: [],
-      Runtime: [],
-    };
-    const routeChanges: RouteChangeTiming[] = [];
-    const networkRequests = new Map<string, NetworkLogEntry>();
-
     await enableDomains(session, ['Performance', 'Network', 'Page', 'Runtime', 'Profiler', 'Debugger', 'CSS']);
     await applyThrottling(session, profile);
 
+    interface ActiveRun {
+      id: number;
+      url: string;
+      routeChanges: RouteChangeTiming[];
+      networkRequests: Map<string, NetworkLogEntry>;
+      cdpLogs: Record<string, unknown[]>;
+    }
+
+    let activeRun: ActiveRun | null = null;
+    let navigationSequence = 0;
+    let totalNavigations = 0;
+    let processedPages = 0;
+
+    const profileOutputDir = path.join(options.outputDir, profile.id);
+    ensureDir(profileOutputDir);
+
+    const createRun = (url: string): ActiveRun => {
+      navigationSequence += 1;
+      const run: ActiveRun = {
+        id: navigationSequence,
+        url,
+        routeChanges: [{ url, timestamp: Date.now() }],
+        networkRequests: new Map<string, NetworkLogEntry>(),
+        cdpLogs: {
+          Performance: [],
+          Network: [],
+          Page: [],
+          Runtime: [],
+        },
+      };
+      activeRun = run;
+      return run;
+    };
+
+    const clearRun = () => {
+      activeRun = null;
+    };
+
     session.on('Performance.metrics', (event) => {
-      cdpLogs.Performance.push(event);
+      if (activeRun) {
+        activeRun.cdpLogs.Performance.push(event);
+      }
     });
     session.on('Network.requestWillBeSent', (event: any) => {
+      if (!activeRun) return;
       const request: NetworkLogEntry = {
         requestId: event.requestId,
         url: event.request?.url ?? '',
@@ -679,87 +739,274 @@ async function auditProfile(options: CLIOptions, profile: ThrottlingProfileConfi
         requestHeaders: event.request?.headers ?? {},
         startTime: event.timestamp ?? Date.now() / 1000,
       };
-      networkRequests.set(event.requestId, request);
-      cdpLogs.Network.push(event);
+      activeRun.networkRequests.set(event.requestId, request);
+      activeRun.cdpLogs.Network.push(event);
     });
     session.on('Network.responseReceived', (event: any) => {
-      const request = networkRequests.get(event.requestId);
+      if (!activeRun) return;
+      const request = activeRun.networkRequests.get(event.requestId);
       if (request) {
         request.responseStatus = event.response?.status;
         request.responseHeaders = event.response?.headers ?? {};
         request.mimeType = event.response?.mimeType;
       }
-      cdpLogs.Network.push(event);
+      activeRun.cdpLogs.Network.push(event);
     });
     session.on('Network.loadingFinished', (event: any) => {
-      const request = networkRequests.get(event.requestId);
+      if (!activeRun) return;
+      const request = activeRun.networkRequests.get(event.requestId);
       if (request) {
         request.endTime = event.timestamp ?? request.startTime;
         request.encodedDataLength = event.encodedDataLength ?? 0;
       }
-      cdpLogs.Network.push(event);
+      activeRun.cdpLogs.Network.push(event);
     });
     session.on('Page.loadEventFired', (event) => {
-      cdpLogs.Page.push(event);
+      if (activeRun) {
+        activeRun.cdpLogs.Page.push(event);
+      }
     });
     session.on('Runtime.consoleAPICalled', (event) => {
-      cdpLogs.Runtime.push(event);
+      if (activeRun) {
+        activeRun.cdpLogs.Runtime.push(event);
+      }
     });
 
     page.on('framenavigated', (frame) => {
-      if (frame === page.mainFrame()) {
-        routeChanges.push({ url: frame.url(), timestamp: Date.now() });
+      if (frame === page.mainFrame() && activeRun) {
+        activeRun.routeChanges.push({ url: frame.url(), timestamp: Date.now() });
       }
     });
 
-    let attempts = 0;
-    while (attempts <= options.retries) {
+    const collectSameOriginLinks = async (): Promise<string[]> => {
       try {
-        await page.goto(targetUrl, { waitUntil: 'networkidle', timeout: options.timeoutMs });
-        break;
+        const urls = await page.$$eval('a[href]', (anchors: HTMLAnchorElement[]) => anchors.map((anchor) => anchor.href));
+        const seen = new Set<string>();
+        const results: string[] = [];
+        for (const href of urls) {
+          if (!href) continue;
+          try {
+            const candidate = new URL(href);
+            if (candidate.origin !== targetOrigin) continue;
+            if (seen.has(candidate.href)) continue;
+            seen.add(candidate.href);
+            results.push(candidate.href);
+          } catch (error) {
+            // ignore malformed URLs
+          }
+        }
+        return results;
       } catch (error) {
-        attempts += 1;
-        console.warn(`Navigation error (${attempts}/${options.retries}):`, error);
-        if (attempts > options.retries) {
-          throw error;
+        return [];
+      }
+    };
+
+    const enqueueDiscoveredLinks = (urls: string[]) => {
+      for (const link of urls) {
+        const normalized = normalizeUrl(link);
+        if (!discovered.has(normalized)) {
+          discovered.add(normalized);
+          urlQueue.push(normalized);
+        }
+      }
+    };
+
+    const captureLcp = async (): Promise<number | null> => {
+      try {
+        return await page.evaluate(() => {
+          const entries = performance.getEntriesByType('largest-contentful-paint') as PerformanceEntry[];
+          if (!entries.length) return null;
+          const last = entries[entries.length - 1] as any;
+          return last.renderTime ?? last.loadTime ?? last.startTime ?? null;
+        });
+      } catch (error) {
+        return null;
+      }
+    };
+
+    const finalizeRun = async (run: ActiveRun): Promise<PageRunResult | null> => {
+      try {
+        const navigation = await collectNavigationMetrics(page);
+        navigation.imageDiagnostics = mergeImageDiagnostics(navigation.imageDiagnostics, run.networkRequests);
+        const coverage = await gatherCoverage(session);
+        const bundle = computeBundleSummary(run.networkRequests);
+        const networkLogs = Array.from(run.networkRequests.values());
+        const routeChanges = [...run.routeChanges];
+        const lcpAfterNavigation = await captureLcp();
+        const lighthouse = await runLighthouseAudit(run.url, profile);
+
+        const slug = slugifyForFilename(`${run.id}-${normalizeUrl(run.url)}`) || `nav-${run.id}`;
+        const baseName = `${profile.id}-${slug}`;
+        const harPath = path.join(profileOutputDir, `${baseName}.har`);
+        const screenshotPath = path.join(profileOutputDir, `${baseName}-lcp.png`);
+        const metricsPath = path.join(profileOutputDir, `${baseName}-metrics.json`);
+
+        const harContent = buildHar(routeChanges, run.networkRequests, run.url);
+        fs.writeFileSync(harPath, JSON.stringify(harContent, null, 2), 'utf-8');
+        await page.screenshot({ path: screenshotPath, fullPage: true });
+
+        const pageResult: PageRunResult = {
+          url: run.url,
+          profileId: profile.id,
+          sequence: run.id,
+          metricsPath,
+          lighthouse,
+          navigation,
+          bundle,
+          coverage,
+          cdpLogs: run.cdpLogs,
+          routeChanges,
+          harPath,
+          lcpScreenshot: screenshotPath,
+          networkLogs,
+          lcpAfterNavigation,
+        };
+
+        const metricsPayload = {
+          url: pageResult.url,
+          profileId: pageResult.profileId,
+          sequence: pageResult.sequence,
+          lighthouse: pageResult.lighthouse,
+          navigation: pageResult.navigation,
+          bundle: pageResult.bundle,
+          coverage: pageResult.coverage,
+          cdpLogs: pageResult.cdpLogs,
+          routeChanges: pageResult.routeChanges,
+          networkLogs: pageResult.networkLogs,
+          lcpAfterNavigation: pageResult.lcpAfterNavigation,
+          harPath: pageResult.harPath,
+          lcpScreenshot: pageResult.lcpScreenshot,
+        };
+        fs.writeFileSync(metricsPath, JSON.stringify(metricsPayload, null, 2), 'utf-8');
+        pages.push(pageResult);
+
+        return pageResult;
+      } catch (error) {
+        console.warn(`Failed to finalize navigation for ${run.url}:`, error);
+        return null;
+      } finally {
+        clearRun();
+      }
+    };
+
+    const runNavigation = async (url: string, action: () => Promise<void>): Promise<PageRunResult | null> => {
+      if (totalNavigations >= options.maxNavigations) {
+        return null;
+      }
+      const run = createRun(url);
+      const normalized = normalizeUrl(url);
+      if (!visited.has(normalized)) {
+        visited.add(normalized);
+      }
+      totalNavigations += 1;
+      try {
+        await action();
+        await page.waitForLoadState('networkidle', { timeout: options.timeoutMs }).catch(() => {});
+        await page.waitForTimeout(1000);
+        const result = await finalizeRun(run);
+        if (result) {
+          const links = await collectSameOriginLinks();
+          enqueueDiscoveredLinks(links);
+        }
+        return result;
+      } catch (error) {
+        console.warn(`Navigation error for ${url}:`, error);
+        clearRun();
+        return null;
+      }
+    };
+
+    while (
+      urlQueue.length > 0 &&
+      processedPages < options.maxPages &&
+      totalNavigations < options.maxNavigations
+    ) {
+      const nextUrl = urlQueue.shift();
+      if (!nextUrl || visited.has(nextUrl)) {
+        continue;
+      }
+      processedPages += 1;
+
+      const gotoResult = await runNavigation(nextUrl, async () => {
+        let attempts = 0;
+        while (attempts <= options.retries) {
+          try {
+            await page.goto(nextUrl, { waitUntil: 'networkidle', timeout: options.timeoutMs });
+            break;
+          } catch (error) {
+            attempts += 1;
+            console.warn(`Navigation error (${attempts}/${options.retries}):`, error);
+            if (attempts > options.retries) {
+              throw error;
+            }
+          }
+        }
+      });
+
+      if (!gotoResult) {
+        continue;
+      }
+
+      if (totalNavigations >= options.maxNavigations) {
+        break;
+      }
+
+      const spaCandidates = await page.$$eval(
+        'a[href]',
+        (anchors: HTMLAnchorElement[], origin: string) => {
+          const seen = new Set<string>();
+          const results: Array<{ index: number; href: string }> = [];
+          anchors.forEach((anchor, index) => {
+            const href = anchor.href;
+            if (!href) return;
+            try {
+              const url = new URL(href);
+              if (url.origin !== origin) return;
+              if (seen.has(url.href)) return;
+              seen.add(url.href);
+              results.push({ index, href: url.href });
+            } catch (error) {
+              // ignore malformed URLs
+            }
+          });
+          return results;
+        },
+        targetOrigin,
+      );
+
+      for (const candidate of spaCandidates) {
+        if (totalNavigations >= options.maxNavigations) {
+          break;
+        }
+        const normalizedCandidate = normalizeUrl(candidate.href);
+        if (visited.has(normalizedCandidate)) {
+          continue;
+        }
+        await page.waitForTimeout(500);
+        await runNavigation(candidate.href, async () => {
+          const locator = page.locator('a[href]').nth(candidate.index);
+          const waitTimeout = Math.min(options.timeoutMs, 15000);
+          await Promise.all([
+            page
+              .waitForURL(
+                (url) => normalizeUrl(url.toString()) === normalizedCandidate,
+                { timeout: waitTimeout },
+              )
+              .catch(() => null),
+            locator.click({ timeout: options.timeoutMs }),
+          ]);
+        });
+
+        if (totalNavigations >= options.maxNavigations) {
+          break;
+        }
+
+        if (normalizeUrl(page.url()) !== nextUrl) {
+          await page.goto(nextUrl, { waitUntil: 'networkidle', timeout: options.timeoutMs }).catch(() => {});
+          await page.waitForTimeout(500);
         }
       }
     }
-
-    await page.waitForTimeout(2000);
-
-    const navigation = await collectNavigationMetrics(page);
-    navigation.imageDiagnostics = mergeImageDiagnostics(navigation.imageDiagnostics, networkRequests);
-
-    const coverage = await gatherCoverage(session);
-    const bundle = computeBundleSummary(networkRequests);
-
-    ensureDir(options.outputDir);
-    const safeProfile = profile.id;
-    const harPath = path.join(options.outputDir, `${safeProfile}.har`);
-    const screenshotPath = path.join(options.outputDir, `${safeProfile}-lcp.png`);
-
-    const harContent = buildHar(routeChanges, networkRequests, targetUrl);
-    fs.writeFileSync(harPath, JSON.stringify(harContent, null, 2), 'utf-8');
-
-    await page.screenshot({ path: screenshotPath, fullPage: true });
-
-    const lighthouse = await runLighthouseAudit(targetUrl, profile);
-
-    const pageResult: PageRunResult = {
-      url: targetUrl,
-      profileId: profile.id,
-      lighthouse,
-      navigation,
-      bundle,
-      coverage,
-      cdpLogs,
-      routeChanges,
-      harPath,
-      lcpScreenshot: screenshotPath,
-    };
-
-    pages.push(pageResult);
 
     await context.close();
   } finally {
@@ -768,6 +1015,7 @@ async function auditProfile(options: CLIOptions, profile: ThrottlingProfileConfi
 
   return { profile, pages };
 }
+
 
 function generateMarkdownReport(report: AuditReport): string {
   const lines: string[] = [];
@@ -807,6 +1055,7 @@ function generateMarkdownReport(report: AuditReport): string {
       lines.push('');
       lines.push(`- HAR: \`${page.harPath}\``);
       lines.push(`- LCP Screenshot: \`${page.lcpScreenshot}\``);
+      lines.push(`- Metrics JSON: \`${page.metricsPath}\``);
       lines.push('');
     }
   }
