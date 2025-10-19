@@ -5,6 +5,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ThumbsUp, Star } from 'lucide-react';
 import { Book, Review, User } from '@/api/entities';
+import { getCoverOrPlaceholder } from '@/lib/books/coverImages';
 
 export default function OverviewTab() {
     const [authors, setAuthors] = useState([]);
@@ -40,25 +41,33 @@ export default function OverviewTab() {
                     totalSales: author.total_sales || author.sales_count || 0
                 }));
 
-                const normalizedPopularBooks = (popularBooksData || []).map((book) => ({
-                    id: book.id,
-                    title: book.title,
-                    author: book.author || book.author_name || 'Неизвестный автор',
-                    cover_url: book.cover_url || `https://picsum.photos/200/300?random=${book.id}`,
-                    price_kas: book.price_kas || 0,
-                    likes: book.likes_count || 0,
-                    rating: book.rating || 0
-                }));
+                const normalizedPopularBooks = (popularBooksData || []).map((book) => {
+                    const fallback = `https://picsum.photos/seed/${book.id}/200/300`;
+                    return {
+                        id: book.id,
+                        title: book.title,
+                        author: book.author || book.author_name || 'Неизвестный автор',
+                        cover_images: book.cover_images || book.coverImages || {},
+                        coverImage: getCoverOrPlaceholder(book, fallback),
+                        price_kas: book.price_kas || 0,
+                        likes: book.likes_count || 0,
+                        rating: book.rating || 0
+                    };
+                });
 
-                const normalizedNewBooks = (newBooksData || []).map((book) => ({
-                    id: book.id,
-                    title: book.title,
-                    author: book.author || book.author_name || 'Неизвестный автор',
-                    cover_url: book.cover_url || `https://picsum.photos/200/300?random=new-${book.id}`,
-                    price_kas: book.price_kas || 0,
-                    likes: book.likes_count || 0,
-                    rating: book.rating || 0
-                }));
+                const normalizedNewBooks = (newBooksData || []).map((book) => {
+                    const fallback = `https://picsum.photos/seed/new-${book.id}/200/300`;
+                    return {
+                        id: book.id,
+                        title: book.title,
+                        author: book.author || book.author_name || 'Неизвестный автор',
+                        cover_images: book.cover_images || book.coverImages || {},
+                        coverImage: getCoverOrPlaceholder(book, fallback),
+                        price_kas: book.price_kas || 0,
+                        likes: book.likes_count || 0,
+                        rating: book.rating || 0
+                    };
+                });
 
                 const normalizedReviews = (reviewsData || []).map((review) => ({
                     id: review.id,

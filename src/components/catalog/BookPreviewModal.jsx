@@ -5,6 +5,7 @@ import { useTranslation } from '../i18n/SimpleI18n';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { ShoppingCart } from 'lucide-react';
+import { getCoverOrPlaceholder } from '@/lib/books/coverImages';
 
 export default function BookPreviewModal({ isOpen, onOpenChange, book, onAddToCart }) {
   const { t } = useTranslation();
@@ -16,7 +17,7 @@ export default function BookPreviewModal({ isOpen, onOpenChange, book, onAddToCa
       <DialogContent className="sm:max-w-[600px] p-0">
         <div className="flex">
           <div className="w-1/3 hidden sm:block">
-            <img src={book.cover_url || `https://picsum.photos/200/300?random=${book.id}`} alt={book.title} className="w-full h-full object-cover rounded-l-lg" />
+            <img src={getCoverOrPlaceholder(book, `https://picsum.photos/seed/${book.id}/200/300`)} alt={book.title} className="w-full h-full object-cover rounded-l-lg" />
           </div>
           <div className="flex-1 p-6 flex flex-col">
             <DialogHeader>

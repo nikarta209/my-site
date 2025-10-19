@@ -1,6 +1,7 @@
 import { supabase, isSupabaseConfigured } from '@/api/supabaseClient';
 import { logError } from '@/lib/logger';
 import { translateBookCollection } from '@/lib/i18n/bookTranslation';
+import { hasCoverImage } from '@/lib/books/coverImages';
 
 export const BOOK_FIELDS = [
   'id',
@@ -8,7 +9,6 @@ export const BOOK_FIELDS = [
   'slug',
   'author',
   'author_id',
-  'cover_url',
   'cover_images',
   'genre',
   'genres',
@@ -39,12 +39,7 @@ export const BOOK_FIELDS = [
 
 const ensureArray = (value) => (Array.isArray(value) ? value : []);
 
-const hasCover = (book) => {
-  if (!book) return false;
-  if (book.cover_url) return true;
-  const coverImages = book.cover_images || book.coverImages;
-  return Boolean(coverImages && Object.values(coverImages).some(Boolean));
-};
+const hasCover = (book) => hasCoverImage(book);
 
 const normalizeBook = (book) => {
   if (!book) return null;
@@ -107,7 +102,7 @@ export const fetchBestsellers = async (limit = 12) => {
 
   try {
     const { data, error: fallbackError } = await supabase
-      .from('books')
+      .from('v_books_public')
       .select(BOOK_FIELDS)
       .eq('status', 'approved')
       .order('sales_count', { ascending: false })
@@ -132,7 +127,7 @@ export const fetchHomeBooks = async () => {
 
   try {
     const { data, error } = await supabase
-      .from('books')
+      .from('v_books_public')
       .select(BOOK_FIELDS)
       .eq('status', 'approved');
 
@@ -194,7 +189,7 @@ export const fetchBooksByIds = async (ids = []) => {
 
   try {
     const { data, error } = await supabase
-      .from('books')
+      .from('v_books_public')
       .select(BOOK_FIELDS)
       .in('id', uniqueIds);
 

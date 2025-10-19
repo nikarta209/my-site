@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { createPageUrl } from '@/utils';
 import { useCart } from '@/components/cart/CartContext';
 import { useTranslation } from '@/components/i18n/SimpleI18n';
+import { getBookCoverUrl } from '@/lib/books/coverImages';
 
 const gradients = [
   'from-fuchsia-500/10 to-sky-500/10',
@@ -40,18 +41,7 @@ const pickGradient = (book) => {
   return gradients[seed % gradients.length];
 };
 
-const getCover = (book) => {
-  if (!book) return '';
-  const images = book.cover_images || book.coverImages || {};
-  return (
-    book.cover_url ||
-    images.portrait_large ||
-    images.square ||
-    images.default ||
-    images.landscape ||
-    ''
-  );
-};
+const getCover = (book) => getBookCoverUrl(book, { variant: 'portrait', fallback: null }) || '';
 
 export default function BookCard({ book, size = 's' }) {
   const { addToCart } = useCart();

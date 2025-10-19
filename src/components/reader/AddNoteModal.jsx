@@ -11,6 +11,7 @@ import { X, Save, Share, Image as ImageIcon, Crown } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth, useSubscription } from '../auth/Auth';
 import { createPageUrl } from '@/utils';
+import { getBookCoverUrl } from '@/lib/books/coverImages';
 
 const HIGHLIGHT_COLORS = [
   { value: 'yellow', label: 'Жёлтый', class: 'bg-yellow-200 text-yellow-800' },
@@ -40,10 +41,11 @@ export default function AddNoteModal({
     
     const covers = [];
     
-    if (book.cover_images?.default || book.cover_url) {
+    const defaultCover = getBookCoverUrl(book, { variant: 'portrait', fallback: null });
+    if (defaultCover) {
       covers.push({
         key: 'default',
-        url: book.cover_images?.default || book.cover_url,
+        url: defaultCover,
         label: 'Стандартная обложка'
       });
     }
@@ -94,7 +96,7 @@ export default function AddNoteModal({
       highlight_color: highlightColor,
       pageNumber: pageNumber,
       cover_type: selectedCover, // Kept as cover_type for sharing
-      cover_url: availableCovers.find(c => c.key === selectedCover)?.url
+      cover_image_url: availableCovers.find(c => c.key === selectedCover)?.url
     };
 
     onShare(sharedNoteData);

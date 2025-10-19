@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/carousel";
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
+import { getCoverOrPlaceholder } from '@/lib/books/coverImages';
 
 
 const TopBooksCarousel = ({ title, books, metric, metricLabel, icon, isLoading }) => {
@@ -36,7 +37,7 @@ const TopBooksCarousel = ({ title, books, metric, metricLabel, icon, isLoading }
               {books.map((book) => (
                 <CarouselItem key={book.id} className="pl-4 basis-1/2 sm:basis-1/3 md:basis-1/4 lg:basis-1/5">
                   <Link to={createPageUrl(`BookDetails?id=${book.id}`)} className="group">
-                    <img src={book.cover_url} alt={book.title} className="rounded-lg h-48 w-full object-cover transition-transform group-hover:scale-105" />
+                    <img src={getCoverOrPlaceholder(book, `https://picsum.photos/seed/${book.id}/300/400`)} alt={book.title} className="rounded-lg h-48 w-full object-cover transition-transform group-hover:scale-105" />
                     <h3 className="mt-2 text-sm font-semibold truncate group-hover:text-green-600">{book.title}</h3>
                     <p className="text-xs text-gray-500">{book[metric]} {metricLabel}</p>
                   </Link>

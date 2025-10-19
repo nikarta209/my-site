@@ -22,6 +22,7 @@ import { Separator } from '@/components/ui/separator';
 import { Loader2, Zap, Info, BookOpen } from 'lucide-react';
 import { toast } from 'sonner';
 import { Book, Purchase, ResaleListing } from '@/api/entities';
+import { getCoverOrPlaceholder } from '@/lib/books/coverImages';
 
 const mockNFTMint = {
   async mintNFT(bookId, ownerEmail, originalPurchaseId) {
@@ -299,7 +300,7 @@ export default function ListForResaleModal({ isOpen, onClose, user, onListingCre
                 <CardContent className="p-4 space-y-4">
                   <div className="flex gap-4">
                     <img
-                      src={selectedItem.book.cover_url || `https://picsum.photos/seed/${selectedItem.book.id}/200/280`}
+                      src={getCoverOrPlaceholder(selectedItem.book, `https://picsum.photos/seed/${selectedItem.book.id}/200/280`)}
                       alt={selectedItem.book.title}
                       className="w-24 h-32 rounded object-cover"
                     />

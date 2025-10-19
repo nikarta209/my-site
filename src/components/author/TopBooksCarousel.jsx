@@ -11,6 +11,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { Award, BarChart } from 'lucide-react';
+import { getCoverOrPlaceholder } from '@/lib/books/coverImages';
 
 export default function TopBooksCarousel({ books, title, metric, metricLabel, isLoading }) {
   if (isLoading) {
@@ -54,8 +55,8 @@ export default function TopBooksCarousel({ books, title, metric, metricLabel, is
                 <CarouselItem key={book.id} className="pl-4 basis-1/2 sm:basis-1/3 md:basis-1/4 lg:basis-1/5">
                   <Link to={createPageUrl(`BookDetails?id=${book.id}`)} className="group">
                     <div className="overflow-hidden rounded-lg">
-                      <img 
-                        src={book.cover_url} 
+                      <img
+                        src={getCoverOrPlaceholder(book, `https://picsum.photos/seed/${book.id}/300/450`)}
                         alt={book.title}
                         className="h-48 w-full object-cover transition-transform group-hover:scale-105"
                       />

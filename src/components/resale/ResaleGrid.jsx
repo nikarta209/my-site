@@ -6,6 +6,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Star, ShoppingCart, Eye, Zap, Award } from 'lucide-react';
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
+import { getCoverOrPlaceholder } from '@/lib/books/coverImages';
 
 // Расчёт роялти для отображения
 const calculateDisplayRoyalties = (price) => {
@@ -22,7 +23,7 @@ const ResaleCard = ({ listing, book, onBuy, currentUser }) => {
     <Card className="hover:shadow-lg transition-all duration-300 bg-white dark:bg-gray-800">
       <div className="relative">
         <img
-          src={book.cover_url || `https://picsum.photos/300/400?random=${book.id}`}
+          src={getCoverOrPlaceholder(book, `https://picsum.photos/seed/${book.id}/300/400`)}
           alt={book.title}
           className="w-full h-64 object-cover rounded-t-lg"
         />

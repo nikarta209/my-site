@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 import { CreditCard, Wallet, ArrowRight, AlertCircle } from 'lucide-react';
 import { useWallet } from '../web3/WalletConnect';
 import { getCoinGeckoPrice } from '../api/CoinGeckoAPI';
+import { getCoverOrPlaceholder } from '@/lib/books/coverImages';
 
 // NOWPayments API Mock
 const nowPaymentsAPI = {
@@ -175,7 +176,7 @@ export default function PaymentModal({ isOpen, onClose, book, onPaymentSuccess }
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
                 <img
-                  src={book.cover_url}
+                  src={getCoverOrPlaceholder(book, `https://picsum.photos/seed/${book.id}/200/280`)}
                   alt={book.title}
                   className="w-12 h-16 object-cover rounded"
                 />

@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import { useAuth } from '../auth/Auth';
 import { SharedNote, UserBookData } from '@/api/entities';
 import { getUserPurchases } from '../utils/supabase';
+import { getCoverOrPlaceholder } from '@/lib/books/coverImages';
 
 export default function LibraryTab() {
   const { user } = useAuth();
@@ -144,7 +145,7 @@ export default function LibraryTab() {
                         <Card className="h-full flex flex-col">
                             <CardContent className="p-4 flex-grow">
                                 <div className="flex gap-4">
-                                    <img src={book.cover_url} alt={book.title} className="w-24 h-36 object-cover rounded-md" />
+                                    <img src={getCoverOrPlaceholder(book, `https://picsum.photos/seed/${book.id}/240/360`)} alt={book.title} className="w-24 h-36 object-cover rounded-md" />
                                     <div className="flex-1">
                                         <h3 className="font-bold text-lg">{book.title}</h3>
                                         <p className="text-sm text-muted-foreground">{book.author}</p>

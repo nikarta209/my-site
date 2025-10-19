@@ -7,6 +7,7 @@ import { Star, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { useTranslation } from '../i18n/SimpleI18n';
+import { getCoverOrPlaceholder } from '@/lib/books/coverImages';
 
 export default function BookRecommendations({ currentBook, language }) {
   const [recommendations, setRecommendations] = useState([]);
@@ -132,7 +133,7 @@ export default function BookRecommendations({ currentBook, language }) {
               <Link to={createPageUrl(`BookDetails?id=${book.id}`)}>
                 <div className="relative overflow-hidden rounded-lg mb-3">
                   <img
-                    src={book.cover_url || `https://picsum.photos/300/400?random=${book.id}`}
+                    src={getCoverOrPlaceholder(book, `https://picsum.photos/seed/${book.id}/300/400`)}
                     alt={getTranslated(book, 'title')}
                     className="w-full h-48 object-cover transition-transform duration-300 group-hover:scale-105"
                   />

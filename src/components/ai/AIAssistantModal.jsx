@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 import { Book } from '@/api/entities';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
+import { getCoverOrPlaceholder } from '@/lib/books/coverImages';
 
 export default function AIAssistantModal({ isOpen, onClose }) {
   const [query, setQuery] = useState('');
@@ -152,7 +153,7 @@ export default function AIAssistantModal({ isOpen, onClose }) {
                     <CardContent className="p-4">
                       <div className="flex gap-3">
                         <img
-                          src={book.cover_url || `https://picsum.photos/80/120?random=${book.id}`}
+                          src={getCoverOrPlaceholder(book, `https://picsum.photos/seed/${book.id}/80/120`)}
                           alt={book.title}
                           className="w-16 h-24 object-cover rounded"
                         />

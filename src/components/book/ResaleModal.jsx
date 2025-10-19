@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { DollarSign, Zap, Info } from 'lucide-react';
 import { toast } from 'sonner';
+import { getCoverOrPlaceholder } from '@/lib/books/coverImages';
 
 export default function ResaleModal({ book, isOpen, onClose }) {
   const [resalePrice, setResalePrice] = useState('');
@@ -88,8 +89,8 @@ export default function ResaleModal({ book, isOpen, onClose }) {
           <Card>
             <CardContent className="p-4">
               <div className="flex gap-3">
-                <img 
-                  src={book.cover_url} 
+                <img
+                  src={getCoverOrPlaceholder(book, `https://picsum.photos/seed/${book.id}/160/200`)}
                   alt={book.title}
                   className="w-16 h-20 object-cover rounded"
                 />

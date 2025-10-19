@@ -10,6 +10,7 @@ import {
   Clock
 } from "lucide-react";
 import { useTranslation } from '../i18n/SimpleI18n';
+import { getCoverOrPlaceholder } from '@/lib/books/coverImages';
 
 export default function MyBooksList({ books, isLoading }) {
   const { t } = useTranslation();
@@ -42,7 +43,7 @@ export default function MyBooksList({ books, isLoading }) {
           ) : books.length > 0 ? (
             books.map(book => (
               <div key={book.id} className="flex items-center gap-4 p-3 rounded-lg bg-gray-50 dark:bg-gray-700/50">
-                <img src={book.cover_url} alt={book.title} className="w-12 h-16 object-cover rounded-md" />
+                <img src={getCoverOrPlaceholder(book, `https://picsum.photos/seed/${book.id}/300/450`)} alt={book.title} className="w-12 h-16 object-cover rounded-md" />
                 <div className="flex-grow">
                   <p className="font-semibold">{book.title}</p>
                   <p className="text-sm text-gray-500">{book.total_sales_count || 0} {t('author.books.sales', 'продаж')}</p>

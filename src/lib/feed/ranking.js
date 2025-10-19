@@ -1,4 +1,5 @@
 import { scoreByFreshness } from './utils';
+import { hasCoverImage } from '@/lib/books/coverImages';
 
 const ensureNumber = (value, fallback = 0) => {
   const number = Number(value);
@@ -20,13 +21,7 @@ const pickGenre = (book) => {
   return 'other';
 };
 
-const hasCover = (book) => {
-  if (!book) return false;
-  if (book.cover_url) return true;
-  const images = book.cover_images || book.coverImages;
-  if (!images) return false;
-  return Object.values(images).some(Boolean);
-};
+const hasCover = (book) => hasCoverImage(book);
 
 const weightedPick = (list) => {
   if (!Array.isArray(list) || list.length === 0) return null;

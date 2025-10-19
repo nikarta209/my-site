@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { getUserPurchases, getUserPreviews, uploadFile, updateBook } from '../components/utils/supabase';
 import { Book } from '@/api/entities'; // Добавим импорт Book
+import { getBookCoverUrl, getCoverOrPlaceholder } from '@/lib/books/coverImages';
 import { useCart } from '../components/cart/CartContext';
 import { useTranslation } from '../components/i18n/SimpleI18n';
 import { createPageUrl } from '@/utils';
@@ -321,7 +322,7 @@ function DashboardContent({ recentBooks, currentIndex, setCurrentIndex, isLoadin
     if (book.cover_images?.library_hero) return book.cover_images.library_hero;
     if (book.cover_images?.landscape) return book.cover_images.landscape;
     if (book.cover_images?.default) return book.cover_images.default;
-    return book.cover_url || null;
+    return getBookCoverUrl(book, { variant: 'libraryHero', fallback: null });
   }, []);
 
   useEffect(() => {
@@ -377,7 +378,7 @@ function DashboardContent({ recentBooks, currentIndex, setCurrentIndex, isLoadin
       currentBook.cover_images?.landscape ||
       currentBook.cover_images?.library_hero ||
       currentBook.cover_images?.default ||
-      currentBook.cover_url ||
+      getBookCoverUrl(currentBook, { variant: 'landscape', fallback: null }) ||
       null
     );
   }, [currentBook]);
@@ -674,7 +675,7 @@ function DashboardContent({ recentBooks, currentIndex, setCurrentIndex, isLoadin
             <div className="grid w-full gap-6 lg:grid-cols-[auto,1fr] lg:items-end">
               <div className="flex items-start gap-4">
                 <img
-                  src={currentBook.cover_images?.default || currentBook.cover_url || '/api/placeholder/144/216'}
+                  src={getCoverOrPlaceholder(currentBook, '/api/placeholder/144/216')}
                   alt={`Обложка книги «${currentBook.title}»`}
                   width={144}
                   height={216}
@@ -970,7 +971,7 @@ function CompactBookCard({ book, linkToReader }) {
       <div className="group cursor-pointer">
         <div className="aspect-[3/4] bg-muted overflow-hidden rounded shadow-sm hover:shadow-md transition-shadow">
           <img
-            src={book.cover_images?.default || book.cover_url || '/api/placeholder/120/160'}
+            src={getCoverOrPlaceholder(book, '/api/placeholder/120/160')}
             alt={book.title}
             className="w-full h-full object-cover"
             loading="lazy"
@@ -997,7 +998,7 @@ function BookCard({ book, linkToReader }) {
         <div className="relative mb-3">
           <Link to={destination}>
             <img
-              src={book.cover_images?.default || book.cover_url || '/api/placeholder/200/280'}
+              src={getCoverOrPlaceholder(book, '/api/placeholder/200/280')}
               alt={book.title}
               className="w-full aspect-[2/3] object-cover rounded"
             />

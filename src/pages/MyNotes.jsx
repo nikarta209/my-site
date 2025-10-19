@@ -38,6 +38,7 @@ import { useAuth } from '@/components/auth/Auth';
 import LibraryMenu from '@/components/library/LibraryMenu';
 import NoteCard from '@/components/notes/NoteCard';
 import { UserBookData, SharedNote, Book, NoteLike } from '@/api/entities';
+import { getBookCoverUrl } from '@/lib/books/coverImages';
 import { isSupabaseConfigured } from '@/api/supabaseClient';
 import { toast } from 'sonner';
 import { createPageUrl } from '@/utils';
@@ -63,17 +64,14 @@ const PERSONAL_GRADIENTS = [
 ];
 
 const resolveCoverImage = (source = {}, book = {}) => {
-  return (
-    source.coverUrl ||
-    source.cover_url ||
-    source.cover ||
-    book?.notes_cover_url ||
-    book?.cover_images?.library_hero ||
-    book?.cover_images?.landscape ||
-    book?.cover_images?.default ||
-    book?.cover_url ||
-    null
-  );
+  if (source.coverUrl || source.cover) {
+    return source.coverUrl || source.cover;
+  }
+
+  const noteSpecific = book?.notes_cover_url || book?.notesCoverUrl;
+  if (noteSpecific) return noteSpecific;
+
+  return getBookCoverUrl(book, { variant: 'notes', fallback: null }) || null;
 };
 
 const computeAccent = (identifier = '') => {
@@ -182,13 +180,13 @@ const buildMockData = (user) => {
       id: 'demo-book-1',
       title: 'Дюна',
       author: 'Фрэнк Герберт',
-      cover_url: 'https://images.unsplash.com/photo-1544937950-fa07a98d237f?w=300&h=420&fit=crop'
+      cover_images: { default: 'https://images.unsplash.com/photo-1544937950-fa07a98d237f?w=300&h=420&fit=crop' }
     },
     {
       id: 'demo-book-2',
       title: 'Три товарища',
       author: 'Эрих Мария Ремарк',
-      cover_url: 'https://images.unsplash.com/photo-1544717305-2782549b5136?w=300&h=420&fit=crop'
+      cover_images: { default: 'https://images.unsplash.com/photo-1544717305-2782549b5136?w=300&h=420&fit=crop' }
     }
   ];
 
@@ -269,7 +267,7 @@ const buildMockData = (user) => {
       bookId: mockBooks[0].id,
       bookTitle: mockBooks[0].title,
       bookAuthor: mockBooks[0].author,
-      coverUrl: mockBooks[0].cover_url,
+      coverUrl: getBookCoverUrl(mockBooks[0], { variant: 'portrait', fallback: null }),
       pageNumber: 42,
       createdAt: minusDays(1),
       updatedAt: minusDays(1),
@@ -286,7 +284,7 @@ const buildMockData = (user) => {
       bookId: mockBooks[1].id,
       bookTitle: mockBooks[1].title,
       bookAuthor: mockBooks[1].author,
-      coverUrl: mockBooks[1].cover_url,
+      coverUrl: getBookCoverUrl(mockBooks[1], { variant: 'portrait', fallback: null }),
       pageNumber: 150,
       createdAt: minusDays(4),
       updatedAt: minusDays(3),

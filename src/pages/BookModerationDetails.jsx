@@ -30,6 +30,7 @@ import { invalidateCache } from '@/components/utils/supabase';
 import { Link } from 'react-router-dom';
 import { Book } from '@/api/entities'; // ИСПРАВЛЕНИЕ: Прямой импорт сущности
 import { moderateBook } from '@/api/moderation';
+import { getCoverOrPlaceholder } from '@/lib/books/coverImages';
 
 const GROK_PROMPT = `Анализируй предоставленный текст книжного произведения по следующим критериям. Будь объективен, цитируй фрагменты для обоснования выводов и предоставь их для ручного анализа человеком. Если текст подозрительный по какому-либо критерию, укажи точные цитаты и страницы (если доступны). Выводы делай четкими: "соответствует" или "не соответствует" с объяснением. Основная цель - выявить потенциально вредоносный контент, который может нанести физический вред читателю.
 
@@ -378,7 +379,7 @@ export default function BookModerationDetails() {
               <CardContent className="p-6">
                 <div className="text-center mb-6">
                   <img
-                    src={book.cover_images?.default || book.cover_url || `https://picsum.photos/300/400?random=${book.id}`}
+                    src={getCoverOrPlaceholder(book, `https://picsum.photos/seed/${book.id}/300/400`)}
                     alt={book.title || 'Обложка книги'}
                     className="w-full max-w-sm mx-auto rounded-lg shadow-lg"
                   />

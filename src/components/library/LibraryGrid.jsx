@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/select";
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
+import { getCoverOrPlaceholder } from '@/lib/books/coverImages';
 
 export default function LibraryGrid({ books, bookProgress = {}, isLoading, showPurchaseOption = false, cachedBookIds }) {
   const { language, t } = useTranslation();
@@ -134,7 +135,7 @@ export default function LibraryGrid({ books, bookProgress = {}, isLoading, showP
           <Card key={book.id} className="hover:shadow-lg transition-shadow">
             <div className="relative">
               <img
-                src={book.cover_url || `https://picsum.photos/300/400?random=${book.id}`}
+                src={getCoverOrPlaceholder(book, `https://picsum.photos/seed/${book.id}/300/400`)}
                 alt={getTranslatedContent(book, 'title')}
                 className="w-full h-64 object-cover rounded-t-lg"
               />

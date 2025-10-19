@@ -6,6 +6,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { History, ArrowRight } from 'lucide-react';
+import { getCoverOrPlaceholder } from '@/lib/books/coverImages';
 
 export default function RecentActivity({ purchases, isLoading }) {
   const [books, setBooks] = useState({});
@@ -89,7 +90,7 @@ export default function RecentActivity({ purchases, isLoading }) {
                     <div key={purchase.id} className="flex items-center gap-4 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
                       <Link to={createPageUrl(`BookDetails?id=${book.id}`)}>
                         <img 
-                          src={book.cover_url || `https://picsum.photos/60/80?random=${book.id}`}
+                          src={getCoverOrPlaceholder(book, `https://picsum.photos/seed/${book.id}/60/80`)}
                           alt={book.title}
                           className="w-12 h-16 object-cover rounded-md"
                         />

@@ -4,7 +4,9 @@ import { rankAndSampleBooks, scoreBook } from './ranking';
 const baseBook = (overrides = {}) => ({
   id: overrides.id ?? `book-${Math.random().toString(36).slice(2)}`,
   title: 'Test',
-  cover_url: 'https://example.com/cover.jpg',
+  cover_images: {
+    default: 'https://example.com/cover.jpg',
+  },
   genre: 'fantasy',
   rating: 4.5,
   weekly_sales: 120,

@@ -7,6 +7,7 @@ import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { ChevronLeft, Sparkles, Loader2 } from 'lucide-react';
 import { useTranslation } from '../components/i18n/SimpleI18n';
+import { getCoverOrPlaceholder } from '@/lib/books/coverImages';
 
 const quizQuestions = [
   {
@@ -153,7 +154,7 @@ export default function BookQuiz() {
               ) : result ? (
                 <div className="flex flex-col items-center gap-4">
                   <img 
-                    src={result.cover_url || `https://picsum.photos/300/400?random=${result.id}`} 
+                    src={getCoverOrPlaceholder(result, `https://picsum.photos/seed/${result.id}/300/400`)}
                     alt={result.title} 
                     className="w-40 h-60 object-cover rounded-lg shadow-lg" 
                   />

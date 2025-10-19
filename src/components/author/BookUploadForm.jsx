@@ -399,6 +399,11 @@ export default function BookUploadForm({ onUploadSuccess }) {
       setUploadProgress(50);
       toast.loading('Создание книги...', { id: 'upload' });
       
+      const coverImages = {
+        default: coverUrl,
+        portrait_large: coverUrl,
+      };
+
       const bookData = {
         title: data.title,
         author: user?.full_name || 'Неизвестный автор',
@@ -408,7 +413,7 @@ export default function BookUploadForm({ onUploadSuccess }) {
         price_kas: parseFloat(data.price_kas),
         genre: selectedGenres[0],
         genres: selectedGenres,
-        cover_url: coverUrl,
+        cover_images: coverImages,
         languages: [
           {
             lang: originalLang,

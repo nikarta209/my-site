@@ -27,6 +27,7 @@ import { toast } from 'sonner';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { invalidateCache } from '@/components/utils/supabase';
+import { getCoverOrPlaceholder } from '@/lib/books/coverImages';
 
 export default function ModerationPage() {
   const { user, isAuthenticated, hasRole } = useAuth();
@@ -283,10 +284,7 @@ export default function ModerationPage() {
                       <AnimatePresence>
                         {filteredBooks.map((book) => {
                           const fallbackCover = `https://picsum.photos/80/120?random=${book.id}`;
-                          const coverUrl =
-                            book.cover_images?.default ||
-                            book.cover_url ||
-                            fallbackCover;
+                          const coverUrl = getCoverOrPlaceholder(book, fallbackCover);
 
                           return (
                             <motion.div

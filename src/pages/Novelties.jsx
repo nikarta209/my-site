@@ -9,6 +9,7 @@ import { Book } from '@/api/entities';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { toast } from 'sonner';
+import { getCoverOrPlaceholder } from '@/lib/books/coverImages';
 
 const GENRE_CATEGORIES = [
   { key: 'all', label: 'Все жанры', filter: {} },
@@ -140,9 +141,7 @@ function BookCard({ book, onAddToWishlist }) {
   const [isWishlisted, setIsWishlisted] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
 
-  const getCoverUrl = (book) => {
-    return book?.cover_images?.default || book?.cover_url || `https://picsum.photos/seed/${book.id}/300/400`;
-  };
+  const getCoverUrl = (book) => getCoverOrPlaceholder(book, `https://picsum.photos/seed/${book.id}/300/400`);
 
   const handleWishlistClick = (e) => {
     e.preventDefault();
