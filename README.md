@@ -47,3 +47,38 @@ npm run build
 ```
 
 For questions about the Supabase schema or deployment workflow, review the guides inside the `src/components/setup` directory.
+
+## Performance audit tooling
+
+The repository bundles a Lighthouse-based performance harness so audits can run the same way in CI and on local machines.
+
+### One-time setup
+
+1. Install Node dependencies after pulling the latest changes: `npm install`.
+2. Install the Chromium build that Playwright and Lighthouse will drive:
+   ```bash
+   npx playwright install chromium
+   ```
+   If you are running inside a Linux container you may also need shared library dependencies: `npx playwright install-deps chromium`.
+3. Expose a Chrome executable. By default the audit runner relies on the Chromium bundle shipped with Playwright. To use a custom Chrome or Chrome for Testing build, set the `CHROME_PATH` environment variable to the binary you want Lighthouse to launch.
+
+### Network and CPU throttling
+
+The audit harness supports throttling to reproduce lab conditions. You can override the defaults via environment variables when running the command:
+
+| Variable | Description |
+| --- | --- |
+| `PERF_AUDIT_CPU_SLOWDOWN` | CPU slowdown multiplier passed to Lighthouse (defaults to `4`). |
+| `PERF_AUDIT_DOWNLOAD_KBPS` | Simulated download speed in kbps (defaults to `1500`). |
+| `PERF_AUDIT_UPLOAD_KBPS` | Simulated upload speed in kbps (defaults to `750`). |
+| `PERF_AUDIT_LATENCY_MS` | Round-trip latency in milliseconds (defaults to `40`). |
+
+### Running an audit
+
+Use the dedicated npm script to generate a Lighthouse report, network HAR, and markdown summary:
+
+```bash
+npm run perf:audit -- --url https://example.com
+```
+
+The script writes artifacts to `tools/perf-audit/artifacts/` by default. You can override the target URL, output directory, and throttling variables described above either through CLI flags that the script accepts or by exporting the environment variables before invoking the command.
