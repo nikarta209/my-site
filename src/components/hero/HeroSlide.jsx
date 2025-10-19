@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/button';
 import { createPageUrl } from '@/utils';
 import { useTranslation } from '@/components/i18n/SimpleI18n';
 import { useCart } from '@/components/cart/CartContext';
+import { getBookCoverUrl } from '@/lib/books/coverImages';
 
 const ICON_MAP = {
   PenSquare,
@@ -35,18 +36,7 @@ const gradientOverlay = 'relative overflow-hidden rounded-3xl border border-bord
 const badgeClass =
   'inline-flex items-center gap-2 rounded-full border border-white/40 bg-white/10 px-4 py-1 text-sm font-medium tracking-wide text-white backdrop-blur';
 
-const pickCoverUrl = (book) => {
-  if (!book) return '';
-  const images = book.cover_images || book.coverImages || {};
-  return (
-    book.cover_url ||
-    images.portrait_large ||
-    images.square ||
-    images.default ||
-    images.landscape ||
-    ''
-  );
-};
+const pickCoverUrl = (book) => getBookCoverUrl(book, { variant: 'portrait', fallback: '' }) || '';
 
 const HeroBook = ({ book, onAddToCart, t }) => {
   if (!book) return null;

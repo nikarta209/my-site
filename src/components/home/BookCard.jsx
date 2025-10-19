@@ -10,6 +10,7 @@ import { useAuth, useSubscription } from '../auth/Auth';
 import { UserBookRating } from '@/api/entities';
 import { getPersonalizedReview } from '@/api/functions';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { getBookCoverUrl } from '@/lib/books/coverImages';
 // Assuming 'sonner' for toasts, if not available, change to console.log
 // import { toast } from 'sonner';
 
@@ -29,23 +30,30 @@ export default function BookCard({
   const [isLoadingReview, setIsLoadingReview] = useState(false);
 
   // ИСПРАВЛЕНО: Правильная логика выбора обложки из outline
-  const getCoverUrl = (book, targetSize) => {
-    if (!book) return `https://picsum.photos/300/450?random=${Math.random()}`;
-    
-    const images = book.cover_images || {};
-    
-    // Логика выбора обложки по размеру
-    switch (targetSize) {
-      case 'landscape':
-        return images.landscape || images.default || book.cover_url || `https://picsum.photos/seed/${book.id}/600/400`;
-      case 'portrait_large':
-        return images.portrait_large || images.default || book.cover_url || `https://picsum.photos/seed/${book.id}/300/450`;
-      case 'square':
-        return images.square || images.default || book.cover_url || `https://picsum.photos/seed/${book.id}/300/300`;
-      default:
-        return images.default || book.cover_url || `https://picsum.photos/seed/${book.id}/300/450`;
+  const getCoverUrl = useCallback((targetSize) => {
+    if (!book) {
+      return `https://picsum.photos/300/450?random=${Math.random()}`;
     }
-  };
+
+    const variantMap = {
+      landscape: 'landscape',
+      portrait_large: 'portrait',
+      square: 'square',
+      default: 'portrait',
+    };
+
+    const fallbackMap = {
+      landscape: `https://picsum.photos/seed/${book.id}/600/400`,
+      portrait_large: `https://picsum.photos/seed/${book.id}/300/450`,
+      square: `https://picsum.photos/seed/${book.id}/300/300`,
+      portrait: `https://picsum.photos/seed/${book.id}/300/450`,
+    };
+
+    const variant = variantMap[targetSize] || 'portrait';
+    const fallback = fallbackMap[variant] || fallbackMap.portrait;
+
+    return getBookCoverUrl(book, { variant, fallback });
+  }, [book]);
 
   // Removed: handleWishlistClick and handleAddToCart functions as their UI elements are removed in the new outline.
 
@@ -123,13 +131,13 @@ export default function BookCard({
         <Link to={createPageUrl(`BookDetails?id=${book.id}`)}>
           <div className={`relative overflow-hidden ${currentAspect}`}> {/* Using currentAspect as defined earlier */}
             <img
-              src={getCoverUrl(book, size)} 
+              src={getCoverUrl(size)}
               alt={book.title || "Book Cover"} // Added default alt text
               className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
               loading="lazy"
               onError={(e) => {
                 e.target.onerror = null; // Prevents infinite loop if fallback also fails
-                e.target.src = `https://picsum.photos/seed/${book.id || 'fallback'}/300/450`; // Updated fallback URL
+                e.target.src = getCoverUrl('portrait');
               }}
             />
             {/* Removed: Overlay with buttons (wishlist, add to cart, eye) based on the outline */}

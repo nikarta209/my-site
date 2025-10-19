@@ -21,6 +21,7 @@ import { toast } from 'sonner';
 import { Input } from '@/components/ui/input';
 import { invalidateCache } from '@/components/utils/supabase';
 import { moderateBook } from '@/api/moderation';
+import { getCoverOrPlaceholder } from '@/lib/books/coverImages';
 
 export default function ModerationTab() {
   const { user } = useAuth();
@@ -265,7 +266,7 @@ const BookTable = ({ books, onAction, status }) => {
                       >
                         <td className="p-4">
                           <img
-                            src={book.cover_url || '/api/placeholder/60/80'}
+                            src={getCoverOrPlaceholder(book, '/api/placeholder/60/80')}
                             alt={book.title}
                             className="w-12 h-16 object-cover rounded kasbook-rounded-lg"
                           />
@@ -335,7 +336,7 @@ const BookTable = ({ books, onAction, status }) => {
                 <CardContent className="p-4">
                   <div className="flex gap-4">
                     <img
-                      src={book.cover_url || '/api/placeholder/60/80'}
+                      src={getCoverOrPlaceholder(book, '/api/placeholder/60/80')}
                       alt={book.title}
                       className="w-16 h-20 object-cover rounded kasbook-rounded-lg flex-shrink-0"
                     />

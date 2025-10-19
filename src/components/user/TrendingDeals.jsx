@@ -4,6 +4,7 @@ import { createPageUrl } from '@/utils';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Zap, ShoppingCart, Heart } from 'lucide-react';
+import { getCoverOrPlaceholder } from '@/lib/books/coverImages';
 
 export default function TrendingDeals({ books, isLoading, onAddToCart, onAddToWishlist }) {
   if (isLoading) {
@@ -21,7 +22,7 @@ export default function TrendingDeals({ books, isLoading, onAddToCart, onAddToWi
       <div className="flex-shrink-0">
         <Link to={createPageUrl(`BookDetails?id=${featuredBook.id}`)}>
           <img
-            src={featuredBook.cover_url || `https://picsum.photos/300/400?random=${featuredBook.id}`}
+            src={getCoverOrPlaceholder(featuredBook, `https://picsum.photos/seed/${featuredBook.id}/300/400`)}
             alt={featuredBook.title}
             className="w-48 h-64 object-cover rounded-lg shadow-2xl transition-transform hover:scale-105"
           />

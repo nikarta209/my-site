@@ -11,6 +11,7 @@ import { Purchase } from '@/api/entities';
 import { SharedNote } from '@/api/entities';
 import { useAuth } from '../auth/Auth';
 import { toast } from 'sonner';
+import { getCoverOrPlaceholder } from '@/lib/books/coverImages';
 
 export default function UserNotesTab({ user }) {
   const { user: authUser } = useAuth();
@@ -197,7 +198,7 @@ export default function UserNotesTab({ user }) {
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-3">
                     <img 
-                      src={bookData.book.cover_url} 
+                      src={getCoverOrPlaceholder(bookData.book, `https://picsum.photos/seed/${bookData.book.id}/200/280`)}
                       alt={bookData.book.title}
                       className="w-12 h-16 object-cover rounded border border-amber-300 dark:border-slate-600"
                     />

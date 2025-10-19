@@ -38,7 +38,7 @@ const testMultiLangUpload = async () => {
       genres: ['fiction'],
       price_kas: 100,
       price_usd: 2.5,
-      cover_url: ruUpload.publicUrl, // Using one of the uploaded files for cover
+      cover_images: { default: ruUpload.publicUrl }, // Using one of the uploaded files for cover
       languages: [
         {
           lang: 'ru',

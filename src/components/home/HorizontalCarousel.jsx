@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ChevronLeft, ChevronRight, Star, TrendingUp } from 'lucide-react';
+import { getCoverOrPlaceholder } from '@/lib/books/coverImages';
 
 const BookCarouselItem = ({ book, index }) => (
   <motion.div
@@ -17,8 +18,8 @@ const BookCarouselItem = ({ book, index }) => (
     <Card className="overflow-hidden h-full shadow-sm hover:shadow-lg transition-all duration-300 cursor-pointer">
       <CardContent className="p-0">
         <div className="relative">
-          <img 
-            src={book.cover_url} 
+          <img
+            src={getCoverOrPlaceholder(book, `https://picsum.photos/seed/${book.id}/320/480`)}
             alt={book.title}
             className="w-full h-64 object-cover"
             loading="lazy"

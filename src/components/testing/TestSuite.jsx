@@ -20,6 +20,7 @@ import {
 import { supabase } from '../utils/supabase.jsx';
 import { useMobile, useTheme } from '../utils/hooks.jsx';
 import { useTranslation } from '../i18n/SimpleI18n';
+import { BOOK_FIELDS as PUBLIC_BOOK_FIELDS } from '@/api/books';
 
 export default function TestSuite() {
   const [testResults, setTestResults] = useState({});
@@ -174,8 +175,8 @@ export default function TestSuite() {
       const searchQuery = 'test';
       
       const { data, error } = await supabase
-        .from('books')
-        .select('*')
+        .from('v_books_public')
+        .select(PUBLIC_BOOK_FIELDS)
         .ilike('title', `%${searchQuery}%`)
         .limit(5);
 

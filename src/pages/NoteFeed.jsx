@@ -10,6 +10,7 @@ import { Book } from '@/api/entities';
 import { User } from '@/api/entities';
 import { Purchase } from '@/api/entities';
 import { toast } from 'sonner';
+import { getCoverOrPlaceholder } from '@/lib/books/coverImages';
 
 export default function NoteFeed() {
   const [sharedNotes, setSharedNotes] = useState([]);
@@ -28,10 +29,10 @@ export default function NoteFeed() {
         {
           id: '1',
           user: { full_name: 'Артем Антипин', email: 'artem@example.com', avatar_url: null },
-          book: { 
-            title: 'Дюна', 
+          book: {
+            title: 'Дюна',
             author: 'Фрэнк Герберт',
-            cover_url: 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=300&h=400&fit=crop'
+            cover_images: { default: 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=300&h=400&fit=crop' }
           },
           note: {
             selected_text: 'Страх — это убийца разума. Страх — это малая смерть, которая приносит полное забвение.',
@@ -48,8 +49,8 @@ export default function NoteFeed() {
           user: { full_name: 'Мария Иванова', email: 'maria@example.com', avatar_url: null },
           book: {
             title: 'Искусство войны',
-            author: 'Сунь-цзы', 
-            cover_url: 'https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=300&h=400&fit=crop'
+            author: 'Сунь-цзы',
+            cover_images: { default: 'https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=300&h=400&fit=crop' }
           },
           note: {
             selected_text: 'Высшее искусство войны — покорить врага без боя.',
@@ -162,8 +163,8 @@ export default function NoteFeed() {
 
                   <CardContent className="space-y-4">
                     <div className="flex items-start gap-3">
-                      <img 
-                        src={item.book.cover_url}
+                      <img
+                        src={getCoverOrPlaceholder(item.book, `https://picsum.photos/seed/${item.book.title}/200/280`)}
                         alt={item.book.title}
                         className="w-12 h-16 object-cover rounded border border-gray-200 dark:border-slate-600 flex-shrink-0"
                       />

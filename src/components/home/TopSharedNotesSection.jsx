@@ -7,6 +7,7 @@ import { createPageUrl } from '@/utils';
 import { Book, SharedNote, User as SupabaseUser } from '@/api/entities';
 import { formatDistanceToNow } from 'date-fns';
 import { ru } from 'date-fns/locale';
+import { getCoverOrPlaceholder } from '@/lib/books/coverImages';
 
 const createAvatarFallback = (value) =>
   `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(value || 'reader')}`;
@@ -94,7 +95,7 @@ export default function TopSharedNotesSection() {
               <div className="md:w-1/3 p-8 bg-muted/30 flex flex-col items-center justify-center">
                 <div className="w-48 mb-4">
                   <img
-                    src={book?.cover_url || `https://picsum.photos/300/400?random=${book?.id || 'note'}`}
+                    src={getCoverOrPlaceholder(book, `https://picsum.photos/seed/${book?.id || 'note'}/300/400`)}
                     alt={book?.title || 'Книга'}
                     className="w-full aspect-[3/4] object-cover rounded-lg shadow-lg"
                   />

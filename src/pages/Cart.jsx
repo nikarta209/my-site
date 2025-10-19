@@ -26,6 +26,7 @@ import { useTranslation } from '../components/i18n/SimpleI18n';
 import { toast } from 'sonner';
 import { useExchangeRate } from '../components/utils/ExchangeRateContext';
 import CryptoPaymentModal from '../components/payment/CryptoPaymentModal';
+import { getCoverOrPlaceholder } from '@/lib/books/coverImages';
 
 // SVG иллюстрация для пустой корзины
 const EmptyCartIllustration = () => (
@@ -74,21 +75,14 @@ export default function CartPage() {
   const getBookCoverUrl = React.useCallback((item) => {
     if (!item) return '/api/placeholder/80/112';
 
-    const coverImages = item.cover_images || item.coverImages;
-    const coverFromImages =
-      coverImages?.default ||
-      coverImages?.portrait_large ||
-      coverImages?.portrait ||
-      coverImages?.landscape;
-
     const directCover =
-      item.cover_url ||
-      item.coverUrl ||
       item.cover_image_url ||
       item.coverImageUrl ||
       item.cover;
 
-    return coverFromImages || directCover || `/api/placeholder/80/112`;
+    if (directCover) return directCover;
+
+    return getCoverOrPlaceholder(item, '/api/placeholder/80/112');
   }, []);
   
   const [isPaymentModalOpen, setIsPaymentModalOpen] = React.useState(false);

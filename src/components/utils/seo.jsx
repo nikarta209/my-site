@@ -1,5 +1,6 @@
 // SEO utilities for dynamic sitemap and robots.txt generation
 import { supabase } from './supabase.jsx';
+import { getBookCoverUrl } from '@/lib/books/coverImages';
 
 export const seoUtils = {
   // Generate dynamic sitemap.xml
@@ -10,7 +11,7 @@ export const seoUtils = {
       
       // Get all approved books for sitemap
       const { data: books } = await supabase
-        .from('books')
+        .from('v_books_public')
         .select('id, updated_at')
         .eq('status', 'approved');
 
@@ -108,11 +109,13 @@ Disallow: /`;
       return translation?.[field] || book[field] || '';
     };
 
+    const image = getBookCoverUrl(book, { fallback: null }) || '';
+
     return {
       title: getTranslated('title'),
       description: getTranslated('description'),
       keywords: `${book.genre}, ${book.author}, книги, ${getTranslated('title')}`,
-      image: book.cover_url,
+      image,
       url: `/book/${book.id}`,
       type: 'book',
       author: book.author,

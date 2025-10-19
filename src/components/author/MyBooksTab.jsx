@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import EditBookSheet from './EditBookSheet';
 import { toast } from 'sonner';
+import { getBookCoverUrl } from '@/lib/books/coverImages';
 
 export default function MyBooksTab() {
   const { user } = useAuth();
@@ -160,17 +161,26 @@ export default function MyBooksTab() {
                     <div className="flex gap-4">
                       {/* Book Cover */}
                       <div className="w-16 h-24 bg-muted kasbook-rounded-lg overflow-hidden flex-shrink-0">
-                        {book.cover_url ? (
-                          <img
-                            src={book.cover_url}
-                            alt={book.title}
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <div className="w-full h-full bg-gradient-to-br from-muted to-muted-foreground/20 flex items-center justify-center">
-                            <BookOpen className="w-6 h-6 text-muted-foreground" />
-                          </div>
-                        )}
+                        {(() => {
+                          const coverSrc = getBookCoverUrl(book, {
+                            variant: 'portrait',
+                            fallback: null,
+                          });
+                          if (!coverSrc) {
+                            return (
+                              <div className="w-full h-full bg-gradient-to-br from-muted to-muted-foreground/20 flex items-center justify-center">
+                                <BookOpen className="w-6 h-6 text-muted-foreground" />
+                              </div>
+                            );
+                          }
+                          return (
+                            <img
+                              src={coverSrc}
+                              alt={book.title}
+                              className="w-full h-full object-cover"
+                            />
+                          );
+                        })()}
                       </div>
 
                       {/* Book Info */}

@@ -11,6 +11,7 @@ import { useSubscription } from '../auth/Auth';
 import { InvokeLLM } from '@/api/integrations';
 import { Book } from '@/api/entities';
 import { toast } from 'sonner';
+import { getCoverOrPlaceholder } from '@/lib/books/coverImages';
 
 export default function PersonalizedAIRecommendations({ user }) {
   const subscription = useSubscription();
@@ -122,8 +123,7 @@ ${booksInfo}
   const RecCard = ({ recommendation, index }) => {
     const { book, personalizedDescription, layoutType } = recommendation;
     
-    const coverUrl = book.cover_images?.default || book.cover_url || 
-      `https://picsum.photos/seed/${book.id}/300/400`;
+    const coverUrl = getCoverOrPlaceholder(book, `https://picsum.photos/seed/${book.id}/300/400`);
 
     if (layoutType === 'text-left') {
       return (

@@ -38,6 +38,7 @@ import { Review } from '@/api/entities';
 import { useAuth } from '../components/auth/Auth';
 import ReviewsSection from '../components/book/ReviewsSection';
 import BookCarousel from '../components/home/BookCarousel';
+import { getBookCoverUrl } from '@/lib/books/coverImages';
 import PartialStar from '../components/book/PartialStar'; // Импортируем новый компонент
 import { useExchangeRate } from '../components/utils/ExchangeRateContext'; // Импортируем хук курса
 
@@ -213,12 +214,12 @@ export default function BookDetails() {
   }
 
   // --- ЛОГИКА ВЫБОРА ОБЛОЖЕК ---
-  // Приоритет: landscape > portrait_large > default > book.cover_url > placeholder
-  const bannerImageUrl = book.cover_images?.landscape || book.cover_images?.portrait_large || book.cover_images?.default || book.cover_url || `https://picsum.photos/800/600?random=${book.id}`;
-  // Приоритет: default > portrait_large > book.cover_url > placeholder
-  const mainCoverUrl = book.cover_images?.default || book.cover_images?.portrait_large || book.cover_url || `https://picsum.photos/400/600?random=${book.id}`;
-  // Универсальный плейсхолдер для случаев, когда все остальное не найдено
   const placeholderUrl = `https://picsum.photos/400/600?random=${book.id}`;
+  const mainCoverUrl = getBookCoverUrl(book, { variant: 'portrait', fallback: placeholderUrl });
+  const bannerImageUrl =
+    getBookCoverUrl(book, { variant: 'landscape', fallback: null }) ||
+    getBookCoverUrl(book, { variant: 'banner', fallback: null }) ||
+    mainCoverUrl;
 
   return (
     <div className="min-h-screen bg-background">

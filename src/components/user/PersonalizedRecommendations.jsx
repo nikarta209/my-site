@@ -9,6 +9,7 @@ import { Purchase } from '@/api/entities';
 import { User } from '@/api/entities';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
+import { getCoverOrPlaceholder } from '@/lib/books/coverImages';
 
 // Алгоритм скоринга: 0.4*sales + 0.3*likes + 0.3*rating
 const calculateRecommendationScore = (book) => {
@@ -125,7 +126,7 @@ const RecommendationCard = ({ book, onBookView }) => {
       <Link to={createPageUrl(`BookDetails?id=${book.id}`)} onClick={handleCardClick}>
         <div className="relative">
           <img
-            src={book.cover_url || 'https://via.placeholder.com/300x400'}
+            src={getCoverOrPlaceholder(book, `https://picsum.photos/seed/${book.id}/300/400`)}
             alt={book.title}
             className="w-full h-48 object-cover rounded-t-lg group-hover:scale-105 transition-transform duration-300"
             loading="lazy"

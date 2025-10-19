@@ -6,6 +6,7 @@ import { AlertCircle, Heart, Star, Eye, ShoppingCart } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { toast } from 'sonner';
+import { getCoverOrPlaceholder } from '@/lib/books/coverImages';
 
 export default function BookGrid({
   books,
@@ -147,7 +148,7 @@ function BookCard({ book, onAddToCart, onAddToWishlist, onPreview, targetLink })
         {/* Обложка книги */}
         <div className="relative overflow-hidden rounded-lg shadow-sm hover:shadow-md transition-all duration-200 aspect-[2/3]">
           <img
-            src={book.cover_url || `https://picsum.photos/seed/${book.id}/300/450`}
+            src={getCoverOrPlaceholder(book, `https://picsum.photos/seed/${book.id}/300/450`)}
             alt={book.title}
             className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
             loading="lazy"

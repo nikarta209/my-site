@@ -4,6 +4,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Star, Heart } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
+import { getCoverOrPlaceholder } from '@/lib/books/coverImages';
 
 const genreConfig = {
   'fiction': { title: 'Художественная литература', color: 'bg-purple-100 text-purple-800' },
@@ -25,8 +26,8 @@ const BookCard = ({ book, index }) => (
     <Card className="overflow-hidden h-full shadow-sm hover:shadow-lg transition-all duration-300 border-0 bg-white dark:bg-gray-800">
       <CardContent className="p-0">
         <div className="relative overflow-hidden">
-          <motion.img 
-            src={book.cover_url} 
+          <motion.img
+            src={getCoverOrPlaceholder(book, `https://picsum.photos/seed/${book.id}/320/480`)}
             alt={book.title}
             className="w-full h-48 object-cover transition-transform duration-300 group-hover:scale-110"
             loading="lazy"

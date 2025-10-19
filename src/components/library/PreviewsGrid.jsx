@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Eye, Star, ShoppingCart } from 'lucide-react';
 import { createPageUrl } from '@/utils';
+import { getCoverOrPlaceholder } from '@/lib/books/coverImages';
 
 export default function PreviewsGrid({ books, isLoading, onPreviewBook }) {
   
@@ -42,7 +43,7 @@ export default function PreviewsGrid({ books, isLoading, onPreviewBook }) {
         <Card key={book.id} className="hover:shadow-lg transition-shadow">
           <div className="relative">
             <img
-              src={book.cover_url || `https://picsum.photos/300/400?random=${book.id}`}
+              src={getCoverOrPlaceholder(book, `https://picsum.photos/seed/${book.id}/300/400`)}
               alt={book.title}
               className="w-full h-64 object-cover rounded-t-lg"
             />
