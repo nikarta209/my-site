@@ -44,52 +44,51 @@ import { useExchangeRate } from '../components/utils/ExchangeRateContext'; // И
 import { supabase } from '@/api/supabaseClient';
 
 function parseMaybeJSON(v) {
-  if (!v) return v;
   if (typeof v === 'string') {
-    try { return JSON.parse(v); } catch { return v; }
+    try {
+      return JSON.parse(v);
+    } catch (e) {
+      return v;
+    }
   }
   return v;
 }
 
 function parsePgArray(str) {
-  if (!str || Array.isArray(str)) return str || [];
-  // {"a","b"} -> ["a","b"]
+  if (!str) return [];
+  if (Array.isArray(str)) return str;
   return String(str)
     .replace(/^{|}$/g, '')
     .split(',')
-    .map(s => s.replace(/^"|"$/g, '').trim())
+    .map((s) => s.replace(/^"|"$/g, '').trim())
     .filter(Boolean);
 }
 
-// Преобразование книги к удобному для UI виду
 function normalizeBook(raw) {
+  if (!raw || typeof raw !== 'object') return raw;
   const languages = parseMaybeJSON(raw.languages) || [];
   const cover_images = parseMaybeJSON(raw.cover_images) || {};
   const genres = parsePgArray(raw.genres);
-
-  const price_kas = raw?.price_kas != null ? Number(raw.price_kas) : null;
-  const price_usd = raw?.price_usd != null ? Number(raw.price_usd) : null;
-
+  const price_kas = raw.price_kas != null ? Number(raw.price_kas) : null;
+  const price_usd = raw.price_usd != null ? Number(raw.price_usd) : null;
   return { ...raw, languages, cover_images, genres, price_kas, price_usd };
 }
 
-// Выбор описания: локализованное > общее
-function pickDescription(book, getCurrentLang = () => (navigator.language || 'ru').slice(0, 2)) {
-  const lang = getCurrentLang();
+function pickDescription(book) {
+  const lang = (navigator.language || 'ru').slice(0, 2);
   const loc = Array.isArray(book.languages)
-    ? (book.languages.find(l => l?.lang === lang) || book.languages[0])
+    ? book.languages.find((l) => l?.lang === lang) || book.languages[0]
     : null;
-
   return (loc && loc.description) || book.description || '';
 }
 
-// Формирование подписи цены
 function formatPrice(book) {
   const parts = [];
   if (typeof book.price_kas === 'number' && !Number.isNaN(book.price_kas)) {
     parts.push(`${book.price_kas} KAS`);
   }
-  if (book.is_usd_fixed && typeof book.price_usd === 'number' && !Number.isNaN(book.price_usd)) {
+  const isFixed = book.is_usd_fixed === true || book.is_usd_fixed === 'true';
+  if (isFixed && typeof book.price_usd === 'number' && !Number.isNaN(book.price_usd)) {
     parts.push(`$${book.price_usd}`);
   }
   return parts.join(' · ');
@@ -140,7 +139,7 @@ export default function BookDetails() {
   const [selectedFormat, setSelectedFormat] = useState('text');
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
 
-  const { language, t } = useTranslation();
+  const { t } = useTranslation();
   const { user, isAuthenticated } = useAuth();
   const { addToCart } = useCart();
   const { kasRate } = useExchangeRate(); // Получаем актуальный курс
@@ -282,16 +281,7 @@ export default function BookDetails() {
     };
   }, [book, id, isAuthenticated, user]);
 
-  const descriptionText = useMemo(() => (
-    book
-      ? pickDescription(book, () => {
-          const resolved = typeof language === 'string' && language
-            ? language
-            : (typeof navigator !== 'undefined' && navigator.language) || 'ru';
-          return resolved.slice(0, 2);
-        })
-      : ''
-  ), [book, language]);
+  const descriptionText = useMemo(() => (book ? pickDescription(book) : ''), [book]);
 
   const priceLabel = useMemo(() => (book ? formatPrice(book) : ''), [book]);
 
