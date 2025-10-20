@@ -1,6 +1,6 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
-import { useSearchParams, Link } from 'react-router-dom';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useParams, useLocation, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -72,10 +72,11 @@ function AIEvaluation({ text }) {
 
 
 export default function BookDetails() {
-  const [searchParams] = useSearchParams();
-  const id = searchParams.get('id');
-  
-  const [book, setBook] = useState(null);
+  const { id } = useParams();
+  const location = useLocation();
+  const locationStateBook = location.state?.book ?? null;
+
+  const [book, setBook] = useState(locationStateBook);
   const [reviews, setReviews] = useState([]);
   const [similarBooks, setSimilarBooks] = useState([]);
   const [isPurchased, setIsPurchased] = useState(false);
@@ -83,33 +84,57 @@ export default function BookDetails() {
   const [error, setError] = useState(null);
   const [selectedFormat, setSelectedFormat] = useState('text');
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
+  const bookRef = useRef(locationStateBook);
   
   const { language, t } = useTranslation();
   const { user, isAuthenticated } = useAuth();
   const { addToCart } = useCart();
   const { kasRate } = useExchangeRate(); // Получаем актуальный курс
 
+  useEffect(() => {
+    bookRef.current = book;
+  }, [book]);
+
+  useEffect(() => {
+    if (locationStateBook && locationStateBook.id === id) {
+      setBook(locationStateBook);
+    }
+  }, [id, locationStateBook]);
+
   const loadBookData = useCallback(async () => {
-    if (!id) return;
+    if (!id) {
+      setError('Идентификатор книги не указан');
+      setIsLoading(false);
+      return;
+    }
 
     setIsLoading(true);
     setError(null);
-    
-    try {
-      // 1. Загружаем книгу
-      const bookData = await Book.get(id);
-      if (!bookData) {
-        throw new Error('Книга не найдена');
-      }
-      setBook(bookData);
 
-      // 2. Проверяем покупку
+    try {
+      let bookData = bookRef.current;
+
+      if (!bookData || bookData.id !== id) {
+        if (locationStateBook && locationStateBook.id === id) {
+          bookData = locationStateBook;
+        } else {
+          bookData = await Book.get(id);
+        }
+
+        if (!bookData) {
+          throw new Error('Книга не найдена');
+        }
+
+        setBook(bookData);
+        bookRef.current = bookData;
+      }
+
       let purchased = false;
       if (isAuthenticated && user) {
         try {
-          const purchases = await Purchase.filter({ 
-            book_id: id, 
-            buyer_email: user.email 
+          const purchases = await Purchase.filter({
+            book_id: id,
+            buyer_email: user.email
           });
           purchased = purchases.length > 0;
         } catch (err) {
@@ -118,11 +143,10 @@ export default function BookDetails() {
       }
       setIsPurchased(purchased);
 
-      // 3. Загружаем отзывы
       try {
-        const bookReviews = await Review.filter({ 
-          book_id: id, 
-          status: 'approved' 
+        const bookReviews = await Review.filter({
+          book_id: id,
+          status: 'approved'
         }, '-created_date', 20);
         setReviews(bookReviews || []);
       } catch (err) {
@@ -130,29 +154,33 @@ export default function BookDetails() {
         setReviews([]);
       }
 
-      // 4. Загружаем похожие книги
       try {
-        if (bookData.genre) {
-          const similar = await Book.filter({ 
+        if (bookData?.genre) {
+          const similar = await Book.filter({
             status: 'approved',
             genre: bookData.genre,
             id: { '$ne': id }
           }, '-rating', 10);
           setSimilarBooks(similar || []);
+        } else {
+          setSimilarBooks([]);
         }
       } catch (err) {
         console.warn('Не удалось загрузить похожие книги:', err);
         setSimilarBooks([]);
       }
-
     } catch (err) {
       console.error('Ошибка загрузки данных книги:', err);
+      setBook(null);
+      setReviews([]);
+      setSimilarBooks([]);
+      setIsPurchased(false);
       setError(err.message);
       toast.error(`Ошибка загрузки: ${err.message}`);
     }
-    
+
     setIsLoading(false);
-  }, [id, isAuthenticated, user]);
+  }, [id, isAuthenticated, user, locationStateBook]);
 
   useEffect(() => {
     loadBookData();
@@ -166,6 +194,7 @@ export default function BookDetails() {
   };
 
   const handleReadBook = () => {
+    if (!book) return;
     const url = createPageUrl(`Reader?bookId=${book.id}${!isPurchased ? '&preview=true' : ''}`);
     window.location.href = url;
   };

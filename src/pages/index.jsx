@@ -176,7 +176,7 @@ function PagesContent() {
                 
                 <Route path="/UserHome" element={<UserHome />} />
                 
-                <Route path="/BookDetails" element={<BookDetails />} />
+                <Route path="/books/:id" element={<BookDetails />} />
                 
                 <Route path="/Profile" element={<Profile />} />
                 

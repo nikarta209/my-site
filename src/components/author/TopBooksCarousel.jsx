@@ -8,12 +8,13 @@ import {
   CarouselPrevious,
 } from "@/components/ui/carousel";
 import { Skeleton } from '@/components/ui/skeleton';
-import { Link } from 'react-router-dom';
-import { createPageUrl } from '@/utils';
+import { useNavigate } from 'react-router-dom';
 import { Award, BarChart } from 'lucide-react';
 import { getCoverOrPlaceholder } from '@/lib/books/coverImages';
 
 export default function TopBooksCarousel({ books, title, metric, metricLabel, isLoading }) {
+  const navigate = useNavigate();
+
   if (isLoading) {
       return (
           <Card>
@@ -53,7 +54,18 @@ export default function TopBooksCarousel({ books, title, metric, metricLabel, is
             <CarouselContent className="-ml-4">
               {books.map((book) => (
                 <CarouselItem key={book.id} className="pl-4 basis-1/2 sm:basis-1/3 md:basis-1/4 lg:basis-1/5">
-                  <Link to={createPageUrl(`BookDetails?id=${book.id}`)} className="group">
+                  <div
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => navigate(`/books/${book.id}`, { state: { book } })}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        navigate(`/books/${book.id}`, { state: { book } });
+                      }
+                    }}
+                    className="group cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/70"
+                  >
                     <div className="overflow-hidden rounded-lg">
                       <img
                         src={getCoverOrPlaceholder(book, `https://picsum.photos/seed/${book.id}/300/450`)}
@@ -66,7 +78,7 @@ export default function TopBooksCarousel({ books, title, metric, metricLabel, is
                       <BarChart className="w-3 h-3"/>
                       {book[metric]?.toFixed(metric === 'totalEarnings' ? 2 : 0)} {metricLabel}
                     </p>
-                  </Link>
+                  </div>
                 </CarouselItem>
               ))}
             </CarouselContent>
