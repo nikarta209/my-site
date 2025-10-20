@@ -82,6 +82,32 @@ function pickDescription(book) {
   return (loc && loc.description) || book.description || '';
 }
 
+function hasNonEmptyDescription(book) {
+  if (!book) return false;
+  if (typeof book.description === 'string' && book.description.trim().length > 0) {
+    return true;
+  }
+  if (Array.isArray(book.languages)) {
+    return book.languages.some(
+      (lang) => typeof lang?.description === 'string' && lang.description.trim().length > 0
+    );
+  }
+  return false;
+}
+
+function hasKasPrice(book) {
+  return (
+    !!book &&
+    typeof book.price_kas === 'number' &&
+    !Number.isNaN(book.price_kas)
+  );
+}
+
+function needsSupplementalDetails(book) {
+  if (!book) return true;
+  return !hasKasPrice(book) || !hasNonEmptyDescription(book);
+}
+
 function formatPrice(book) {
   const parts = [];
   if (typeof book.price_kas === 'number' && !Number.isNaN(book.price_kas)) {
@@ -131,6 +157,7 @@ export default function BookDetails() {
   const [book, setBook] = useState(
     locationStateBook ? normalizeBook(locationStateBook) : null
   );
+  const [hasFetchedDetails, setHasFetchedDetails] = useState(false);
   const [reviews, setReviews] = useState([]);
   const [similarBooks, setSimilarBooks] = useState([]);
   const [isPurchased, setIsPurchased] = useState(false);
@@ -149,8 +176,13 @@ export default function BookDetails() {
       setBook(normalizeBook(locationStateBook));
       setIsLoading(false);
       setError(null);
+      setHasFetchedDetails(false);
     }
   }, [id, locationStateBook]);
+
+  useEffect(() => {
+    setHasFetchedDetails(false);
+  }, [id]);
 
   useEffect(() => {
     if (!id) {
@@ -167,12 +199,18 @@ export default function BookDetails() {
     let ignore = false;
 
     async function load() {
-      if (book) {
+      const shouldFetch =
+        !book ||
+        book.id !== id ||
+        (!hasFetchedDetails && needsSupplementalDetails(book));
+
+      if (!shouldFetch) {
         setIsLoading(false);
         return;
       }
 
-      setIsLoading(true);
+      const showLoader = !book || book.id !== id;
+      setIsLoading(showLoader);
       setError(null);
 
       try {
@@ -203,6 +241,7 @@ export default function BookDetails() {
       } finally {
         if (!ignore) {
           setIsLoading(false);
+          setHasFetchedDetails(true);
         }
       }
     }
@@ -212,7 +251,7 @@ export default function BookDetails() {
     return () => {
       ignore = true;
     };
-  }, [id, book]);
+  }, [id, book, hasFetchedDetails]);
 
   useEffect(() => {
     let cancelled = false;
