@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { KeyboardEvent } from 'react';
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import type { Book } from '@/api/books';
 import clsx from 'clsx';
 
@@ -15,6 +15,7 @@ export function BookCarousel400({ id, title, books }: BookCarousel400Props) {
   const itemRefs = useRef<(HTMLDivElement | null)[]>([]);
   const observerRef = useRef<IntersectionObserver | null>(null);
   const [activeIndex, setActiveIndex] = useState(0);
+  const navigate = useNavigate();
 
   const onIntersect = useCallback((entries: IntersectionObserverEntry[]) => {
     const visible = entries
@@ -163,12 +164,20 @@ export function BookCarousel400({ id, title, books }: BookCarousel400Props) {
               {isPlaceholder ? (
                 card
               ) : (
-                <Link
-                  to={`/books/${book.id}`}
-                  className="block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
+                <div
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => navigate(`/books/${book.id}`, { state: { book } })}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      navigate(`/books/${book.id}`, { state: { book } });
+                    }
+                  }}
+                  className="block cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
                 >
                   {card}
-                </Link>
+                </div>
               )}
             </div>
           );
