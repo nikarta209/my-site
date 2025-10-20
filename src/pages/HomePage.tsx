@@ -2,11 +2,13 @@ import React, { useEffect, useMemo, useState } from 'react';
 import {
   fetchBannerBooks,
   fetchEditorsPicks,
+  fetchMainBannerBooks,
   fetchNewBooks,
   fetchPopularBooks,
+  type MainBannerBook,
   type PublicBook,
 } from '../api/books';
-import { TopSlider, type TopSliderSlide, type PromoSlide } from '../components/home/TopSlider';
+import MainBanner from '../components/home/MainBanner';
 import NewBooksCarousel, { type NewCarouselBook } from '../components/home/Carousels/NewBooksCarousel';
 import Carousel400Section from '../components/home/Carousels/Carousel400Section';
 import Carousel600Section from '../components/home/Carousels/Carousel600Section';
@@ -34,28 +36,6 @@ type HomeBook = NewCarouselBook & {
   notes: HomeNote[];
 };
 
-const PROMO_SLIDES: PromoSlide[] = [
-  {
-    id: 'promo-immersive-reading',
-    type: 'promo',
-    title: 'Читайте без границ',
-    description: 'Подписка KASBOOK открывает доступ к эксклюзивным релизам и заметкам сообщества.',
-    image:
-      'https://images.unsplash.com/photo-1521587760476-6c12a4b040da?auto=format&fit=crop&w=1600&q=80',
-    href: '/subscribe',
-  },
-  {
-    id: 'promo-sync',
-    type: 'promo',
-    title: 'Продолжайте чтение где угодно',
-    description: 'Синхронизируйте заметки и прогресс между вебом и приложением KASBOOK.',
-    image:
-      'https://images.unsplash.com/photo-1522199992905-038f3ca1d2f1?auto=format&fit=crop&w=1600&q=80',
-    href: '/app',
-  },
-];
-
-const MAX_SLIDER_BOOKS = 3;
 const MAX_BANNERS = 5;
 const MAX_PRIMARY_400 = 20;
 const MAX_SECONDARY_400 = 20;
@@ -73,16 +53,24 @@ const HomePage: React.FC = () => {
   const [popularBooks, setPopularBooks] = useState<PublicBook[]>([]);
   const [editorPicks, setEditorPicks] = useState<PublicBook[]>([]);
   const [bannerBooks, setBannerBooks] = useState<PublicBook[]>([]);
+  const [mainBannerBooks, setMainBannerBooks] = useState<MainBannerBook[]>([]);
 
   useEffect(() => {
     let isMounted = true;
 
     (async () => {
-      const [{ data: newData }, { data: popularData }, { data: editorsData }, { data: bannersData }] = await Promise.all([
+      const [
+        { data: newData },
+        { data: popularData },
+        { data: editorsData },
+        { data: bannersData },
+        { data: mainBannerData },
+      ] = await Promise.all([
         fetchNewBooks(),
         fetchPopularBooks(),
         fetchEditorsPicks(),
         fetchBannerBooks(),
+        fetchMainBannerBooks(),
       ]);
 
       if (!isMounted) return;
@@ -91,6 +79,7 @@ const HomePage: React.FC = () => {
       setPopularBooks(popularData ?? []);
       setEditorPicks(editorsData ?? []);
       setBannerBooks(bannersData ?? []);
+      setMainBannerBooks((mainBannerData ?? []).slice(0, 3));
     })();
 
     return () => {
@@ -100,7 +89,7 @@ const HomePage: React.FC = () => {
 
   const [activeTab, setActiveTab] = useState<TabKey>('novelties');
 
-  const { slides, sections } = useMemo(() => {
+  const sections = useMemo(() => {
     const normalizeBook = (book: PublicBook): HomeBook => {
       const rawCovers = book.cover_images ?? {};
       const coverRecord = rawCovers as Record<string, string | null | undefined>;
@@ -182,14 +171,6 @@ const HomePage: React.FC = () => {
       formats: Set<SectionFormat>;
     };
 
-    const cloneUsage = (usage: Map<string, UsageRecord>) => {
-      const clone = new Map<string, UsageRecord>();
-      usage.forEach((record, key) => {
-        clone.set(key, { count: record.count, formats: new Set(record.formats) });
-      });
-      return clone;
-    };
-
     const getCoverForFormat = (book: HomeBook, format: SectionFormat | 'slider') => {
       switch (format) {
         case 'slider':
@@ -256,52 +237,6 @@ const HomePage: React.FC = () => {
       return true;
     };
 
-    const baseUsage = new Map<string, UsageRecord>();
-
-    const sliderCandidates: HomeBook[] = [];
-    const sliderSources = [normalizedBanners, normalizedEditors, normalizedNew, normalizedPopular];
-    for (const source of sliderSources) {
-      for (const book of source) {
-        if (sliderCandidates.length >= MAX_SLIDER_BOOKS) break;
-        if (!getCoverForFormat(book, 'slider')) continue;
-        if (!useWithFormat(book, 'slider', baseUsage)) continue;
-        sliderCandidates.push(book);
-      }
-      if (sliderCandidates.length >= MAX_SLIDER_BOOKS) break;
-    }
-
-    const composeSlides = (books: HomeBook[]): TopSliderSlide[] => {
-      if (PROMO_SLIDES.length < 2) {
-        return books.slice(0, 5).map((book) => ({
-          id: `top-slide-${book.id}`,
-          type: 'book' as const,
-          book,
-        }));
-      }
-      const [leadPromo, trailPromo] = PROMO_SLIDES;
-      const slides: TopSliderSlide[] = [
-        { ...leadPromo, id: `${leadPromo.id}-lead` },
-        ...books.map((book) => ({ id: `top-slide-${book.id}`, type: 'book' as const, book })),
-        { ...trailPromo, id: `${trailPromo.id}-trail` },
-      ];
-
-      let fallbackIndex = 0;
-      while (slides.length < 5) {
-        const source = PROMO_SLIDES[fallbackIndex % PROMO_SLIDES.length];
-        slides.splice(slides.length - 1, 0, {
-          ...source,
-          id: `${source.id}-extra-${fallbackIndex}`,
-        });
-        fallbackIndex += 1;
-      }
-
-      return slides.slice(0, 5);
-    };
-
-    const slides = composeSlides(sliderCandidates);
-
-    const sliderUsage = cloneUsage(baseUsage);
-
     const collectFromSources = (
       sources: HomeBook[][],
       limit: number,
@@ -327,7 +262,7 @@ const HomePage: React.FC = () => {
     };
 
     const buildNovelties = () => {
-      const usage = cloneUsage(sliderUsage);
+      const usage = new Map<string, UsageRecord>();
       const primary400 = collectFromSources(
         [normalizedNew],
         MAX_PRIMARY_400,
@@ -368,7 +303,7 @@ const HomePage: React.FC = () => {
     };
 
     const buildTaste = () => {
-      const usage = cloneUsage(sliderUsage);
+      const usage = new Map<string, UsageRecord>();
       const items: TwinNoteItem[] = [];
       const noted = new Set<string>();
 
@@ -397,7 +332,7 @@ const HomePage: React.FC = () => {
       return { notes: items };
     };
 
-    return { slides, sections: { novelties: buildNovelties(), taste: buildTaste() } };
+    return { novelties: buildNovelties(), taste: buildTaste() };
   }, [bannerBooks, editorPicks, newBooks, popularBooks]);
 
   const novelties = sections.novelties;
@@ -405,7 +340,7 @@ const HomePage: React.FC = () => {
 
   return (
     <div className="homepage space-y-10 pb-16">
-      <TopSlider slides={slides} />
+      <MainBanner books={mainBannerBooks} />
       <div className="space-y-10">
         <TabsNav tabs={HOME_TABS} activeKey={activeTab} onChange={setActiveTab} />
         {activeTab === 'novelties' ? (
