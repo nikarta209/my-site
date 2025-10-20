@@ -68,6 +68,7 @@ import {
   BOOK_FIELDS,
   fetchBannerBooks,
   fetchEditorsPicks,
+  fetchMainBannerBooks,
   fetchNewBooks,
   fetchPopularBooks,
 } from '@/api/books';
@@ -145,6 +146,33 @@ describe('books api helpers', () => {
     expect(call.steps).toEqual(
       expect.arrayContaining([
         { method: 'limit', args: [3] },
+      ]),
+    );
+  });
+
+  it('fetches main banner books from materialized view', async () => {
+    await fetchMainBannerBooks();
+    const calls = (supabase as any).__getCalls?.() ?? [];
+    expect(calls).toHaveLength(1);
+    const [call] = calls;
+    expect(call.table).toBe('main_banner_books');
+    expect(call.steps).toEqual(
+      expect.arrayContaining([
+        { method: 'select', args: ['*'] },
+        { method: 'order', args: ['sales_count', { ascending: false, nullsLast: true }] },
+        { method: 'limit', args: [3] },
+      ]),
+    );
+  });
+
+  it('allows overriding main banner limit', async () => {
+    await fetchMainBannerBooks(2);
+    const calls = (supabase as any).__getCalls?.() ?? [];
+    expect(calls).toHaveLength(1);
+    const [call] = calls;
+    expect(call.steps).toEqual(
+      expect.arrayContaining([
+        { method: 'limit', args: [2] },
       ]),
     );
   });

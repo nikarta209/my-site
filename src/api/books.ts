@@ -45,6 +45,22 @@ type SupabaseBookResponse = PromiseLike<{ data: PublicBook[] | null; error: unkn
 type SupabaseSingleBookResponse = PromiseLike<{ data: PublicBook | null; error: unknown }>;
 
 const BOOKS_VIEW = 'v_books_public';
+const MAIN_BANNER_VIEW = 'main_banner_books';
+
+export interface MainBannerBook {
+  id: string;
+  title: string;
+  author: string | null;
+  main_banner_url: string | null;
+  sales_count: number | null;
+  description?: string | null;
+  summary?: string | null;
+  annotation?: string | null;
+  short_description?: string | null;
+  [key: string]: unknown;
+}
+
+type SupabaseMainBannerResponse = PromiseLike<{ data: MainBannerBook[] | null; error: unknown }>;
 
 /** Новинки: книги со статусом approved или public_domain, новые сначала */
 export function fetchNewBooks(): SupabaseBookResponse {
@@ -92,6 +108,15 @@ export function fetchBannerBooks(limit = 5): SupabaseBookResponse {
     .in('status', ['approved', 'public_domain'])
     .not('cover_images->>main_banner', 'is', null)
     .order('created_at', { ascending: false })
+    .limit(limit);
+}
+
+/** Главный баннер: книги из materialized view main_banner_books */
+export function fetchMainBannerBooks(limit = 3): SupabaseMainBannerResponse {
+  return supabase
+    .from(MAIN_BANNER_VIEW)
+    .select('*')
+    .order('sales_count', { ascending: false, nullsLast: true })
     .limit(limit);
 }
 
