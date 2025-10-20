@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useLocation, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import {
   ArrowLeft,
   ShoppingCart,
@@ -41,6 +41,59 @@ import BookCarousel from '../components/home/BookCarousel';
 import { getBookCoverUrl } from '@/lib/books/coverImages';
 import PartialStar from '../components/book/PartialStar'; // Импортируем новый компонент
 import { useExchangeRate } from '../components/utils/ExchangeRateContext'; // Импортируем хук курса
+import { supabase } from '@/api/supabaseClient';
+
+function parseMaybeJSON(v) {
+  if (!v) return v;
+  if (typeof v === 'string') {
+    try { return JSON.parse(v); } catch { return v; }
+  }
+  return v;
+}
+
+function parsePgArray(str) {
+  if (!str || Array.isArray(str)) return str || [];
+  // {"a","b"} -> ["a","b"]
+  return String(str)
+    .replace(/^{|}$/g, '')
+    .split(',')
+    .map(s => s.replace(/^"|"$/g, '').trim())
+    .filter(Boolean);
+}
+
+// Преобразование книги к удобному для UI виду
+function normalizeBook(raw) {
+  const languages = parseMaybeJSON(raw.languages) || [];
+  const cover_images = parseMaybeJSON(raw.cover_images) || {};
+  const genres = parsePgArray(raw.genres);
+
+  const price_kas = raw?.price_kas != null ? Number(raw.price_kas) : null;
+  const price_usd = raw?.price_usd != null ? Number(raw.price_usd) : null;
+
+  return { ...raw, languages, cover_images, genres, price_kas, price_usd };
+}
+
+// Выбор описания: локализованное > общее
+function pickDescription(book, getCurrentLang = () => (navigator.language || 'ru').slice(0, 2)) {
+  const lang = getCurrentLang();
+  const loc = Array.isArray(book.languages)
+    ? (book.languages.find(l => l?.lang === lang) || book.languages[0])
+    : null;
+
+  return (loc && loc.description) || book.description || '';
+}
+
+// Формирование подписи цены
+function formatPrice(book) {
+  const parts = [];
+  if (typeof book.price_kas === 'number' && !Number.isNaN(book.price_kas)) {
+    parts.push(`${book.price_kas} KAS`);
+  }
+  if (book.is_usd_fixed && typeof book.price_usd === 'number' && !Number.isNaN(book.price_usd)) {
+    parts.push(`$${book.price_usd}`);
+  }
+  return parts.join(' · ');
+}
 
 function AIEvaluation({ text }) {
   const { translatedText, isLoading } = useDynamicTranslation(text);
@@ -76,115 +129,180 @@ export default function BookDetails() {
   const location = useLocation();
   const locationStateBook = location.state?.book ?? null;
 
-  const [book, setBook] = useState(locationStateBook);
+  const [book, setBook] = useState(
+    locationStateBook ? normalizeBook(locationStateBook) : null
+  );
   const [reviews, setReviews] = useState([]);
   const [similarBooks, setSimilarBooks] = useState([]);
   const [isPurchased, setIsPurchased] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(!locationStateBook);
   const [error, setError] = useState(null);
   const [selectedFormat, setSelectedFormat] = useState('text');
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
-  const bookRef = useRef(locationStateBook);
-  
+
   const { language, t } = useTranslation();
   const { user, isAuthenticated } = useAuth();
   const { addToCart } = useCart();
   const { kasRate } = useExchangeRate(); // Получаем актуальный курс
 
   useEffect(() => {
-    bookRef.current = book;
-  }, [book]);
-
-  useEffect(() => {
     if (locationStateBook && locationStateBook.id === id) {
-      setBook(locationStateBook);
+      setBook(normalizeBook(locationStateBook));
+      setIsLoading(false);
+      setError(null);
     }
   }, [id, locationStateBook]);
 
-  const loadBookData = useCallback(async () => {
+  useEffect(() => {
     if (!id) {
       setError('Идентификатор книги не указан');
       setIsLoading(false);
       return;
     }
 
-    setIsLoading(true);
-    setError(null);
+    if (book && book.id !== id) {
+      setBook(null);
+      return;
+    }
 
-    try {
-      let bookData = bookRef.current;
+    let ignore = false;
 
-      if (!bookData || bookData.id !== id) {
-        if (locationStateBook && locationStateBook.id === id) {
-          bookData = locationStateBook;
-        } else {
-          bookData = await Book.get(id);
-        }
+    async function load() {
+      if (book) {
+        setIsLoading(false);
+        return;
+      }
 
-        if (!bookData) {
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        const { data, error: fetchError } = await supabase
+          .from('books')
+          .select('*')
+          .eq('id', id)
+          .single();
+
+        if (fetchError) throw fetchError;
+        if (!data) {
           throw new Error('Книга не найдена');
         }
 
-        setBook(bookData);
-        bookRef.current = bookData;
+        if (!ignore) {
+          setBook(normalizeBook(data));
+        }
+      } catch (e) {
+        if (!ignore) {
+          const message = e?.message || 'Не удалось загрузить книгу';
+          setBook(null);
+          setError(message);
+          setReviews([]);
+          setSimilarBooks([]);
+          setIsPurchased(false);
+          toast.error(`Ошибка загрузки: ${message}`);
+        }
+      } finally {
+        if (!ignore) {
+          setIsLoading(false);
+        }
+      }
+    }
+
+    load();
+
+    return () => {
+      ignore = true;
+    };
+  }, [id, book]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadRelatedData() {
+      if (!book || !id) {
+        return;
       }
 
-      let purchased = false;
       if (isAuthenticated && user) {
         try {
           const purchases = await Purchase.filter({
             book_id: id,
             buyer_email: user.email
           });
-          purchased = purchases.length > 0;
+          if (!cancelled) {
+            setIsPurchased(purchases.length > 0);
+          }
         } catch (err) {
           console.warn('Не удалось проверить покупку:', err);
         }
+      } else if (!cancelled) {
+        setIsPurchased(false);
       }
-      setIsPurchased(purchased);
 
       try {
         const bookReviews = await Review.filter({
           book_id: id,
           status: 'approved'
         }, '-created_date', 20);
-        setReviews(bookReviews || []);
+        if (!cancelled) {
+          setReviews(bookReviews || []);
+        }
       } catch (err) {
         console.warn('Не удалось загрузить отзывы:', err);
-        setReviews([]);
+        if (!cancelled) {
+          setReviews([]);
+        }
       }
 
       try {
-        if (bookData?.genre) {
+        if (book?.genre) {
           const similar = await Book.filter({
             status: 'approved',
-            genre: bookData.genre,
+            genre: book.genre,
             id: { '$ne': id }
           }, '-rating', 10);
-          setSimilarBooks(similar || []);
-        } else {
+          if (!cancelled) {
+            setSimilarBooks(similar || []);
+          }
+        } else if (!cancelled) {
           setSimilarBooks([]);
         }
       } catch (err) {
         console.warn('Не удалось загрузить похожие книги:', err);
-        setSimilarBooks([]);
+        if (!cancelled) {
+          setSimilarBooks([]);
+        }
       }
-    } catch (err) {
-      console.error('Ошибка загрузки данных книги:', err);
-      setBook(null);
-      setReviews([]);
-      setSimilarBooks([]);
-      setIsPurchased(false);
-      setError(err.message);
-      toast.error(`Ошибка загрузки: ${err.message}`);
     }
 
-    setIsLoading(false);
-  }, [id, isAuthenticated, user, locationStateBook]);
+    loadRelatedData();
 
-  useEffect(() => {
-    loadBookData();
-  }, [loadBookData]);
+    return () => {
+      cancelled = true;
+    };
+  }, [book, id, isAuthenticated, user]);
+
+  const descriptionText = useMemo(() => (
+    book
+      ? pickDescription(book, () => {
+          const resolved = typeof language === 'string' && language
+            ? language
+            : (typeof navigator !== 'undefined' && navigator.language) || 'ru';
+          return resolved.slice(0, 2);
+        })
+      : ''
+  ), [book, language]);
+
+  const priceLabel = useMemo(() => (book ? formatPrice(book) : ''), [book]);
+
+  const kasPriceValue = useMemo(() => {
+    if (!book || typeof book.price_kas !== 'number' || Number.isNaN(book.price_kas)) {
+      return null;
+    }
+    return book.price_kas;
+  }, [book]);
+
+  const hasLongDescription = Boolean(descriptionText && descriptionText.length > 500);
 
   const handleAddToCart = () => {
     if (book) {
@@ -197,6 +315,15 @@ export default function BookDetails() {
     if (!book) return;
     const url = createPageUrl(`Reader?bookId=${book.id}${!isPurchased ? '&preview=true' : ''}`);
     window.location.href = url;
+  };
+
+  const handleRetry = () => {
+    setError(null);
+    setBook(null);
+    setReviews([]);
+    setSimilarBooks([]);
+    setIsPurchased(false);
+    setIsLoading(true);
   };
 
   if (isLoading) {
@@ -233,7 +360,7 @@ export default function BookDetails() {
               Назад к каталогу
             </Button>
           </Link>
-          <Button onClick={loadBookData} variant="outline">
+          <Button onClick={handleRetry} variant="outline">
             <RefreshCw className="w-4 h-4 mr-2" />
             Попробовать снова
           </Button>
@@ -319,17 +446,21 @@ export default function BookDetails() {
               />
 
               {/* Gradient Price Block */}
-              <motion.div 
+              <motion.div
                 className="mb-6 p-4 bg-gradient-to-r from-purple-600 to-blue-600 rounded-lg text-center shadow-lg"
                 whileHover={{ scale: 1.02 }}
                 transition={{ duration: 0.2 }}
               >
                 <div className="text-white">
                   <div className="text-2xl font-bold mb-1">
-                    {book.price_kas} KAS
+                    {priceLabel || '—'}
                   </div>
                   <div className="text-white/80 text-sm">
-                    ≈ ${typeof kasRate === 'number' ? (book.price_kas * kasRate).toFixed(2) : (book.price_kas * 0.05).toFixed(2)} USD
+                    {kasPriceValue != null
+                      ? `≈ $${typeof kasRate === 'number'
+                        ? (kasPriceValue * kasRate).toFixed(2)
+                        : (kasPriceValue * 0.05).toFixed(2)} USD`
+                      : '—'}
                   </div>
                 </div>
               </motion.div>
@@ -466,13 +597,13 @@ export default function BookDetails() {
                     <div className="space-y-4">
                       <div className={`transition-all duration-300 ${!isDescriptionExpanded ? 'line-clamp-6' : ''}`}>
                         <p className="text-muted-foreground leading-relaxed">
-                          {book.description || 'Описание отсутствует.'}
+                          {descriptionText || 'Описание отсутствует.'}
                         </p>
                       </div>
-                      
-                      {book.description && book.description.length > 500 && (
-                        <Button 
-                          variant="ghost" 
+
+                      {hasLongDescription && (
+                        <Button
+                          variant="ghost"
                           onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)}
                           className="flex items-center gap-1 text-primary"
                         >
