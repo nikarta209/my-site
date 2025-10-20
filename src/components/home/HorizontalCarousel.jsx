@@ -6,6 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ChevronLeft, ChevronRight, Star, TrendingUp } from 'lucide-react';
 import { getCoverOrPlaceholder } from '@/lib/books/coverImages';
+import { Link } from 'react-router-dom';
+import { createPageUrl } from '@/utils';
 
 const BookCarouselItem = ({ book, index }) => (
   <motion.div
@@ -15,32 +17,37 @@ const BookCarouselItem = ({ book, index }) => (
     whileHover={{ scale: 1.05, y: -5 }}
     className="flex-none w-48 mr-4"
   >
-    <Card className="overflow-hidden h-full shadow-sm hover:shadow-lg transition-all duration-300 cursor-pointer">
-      <CardContent className="p-0">
-        <div className="relative">
-          <img
-            src={getCoverOrPlaceholder(book, `https://picsum.photos/seed/${book.id}/320/480`)}
-            alt={book.title}
-            className="w-full h-64 object-cover"
-            loading="lazy"
-          />
-          <div className="absolute top-2 right-2">
-            <Badge variant="secondary" className="bg-white/90 text-gray-800 text-xs">
-              <Star className="w-3 h-3 mr-1 fill-yellow-400 text-yellow-400" />
-              {book.rating}
-            </Badge>
+    <Link
+      to={createPageUrl(`BookDetails?id=${book.id}`)}
+      className="block h-full"
+    >
+      <Card className="overflow-hidden h-full shadow-sm hover:shadow-lg transition-all duration-300 cursor-pointer">
+        <CardContent className="p-0">
+          <div className="relative">
+            <img
+              src={getCoverOrPlaceholder(book, `https://picsum.photos/seed/${book.id}/320/480`)}
+              alt={book.title}
+              className="w-full h-64 object-cover"
+              loading="lazy"
+            />
+            <div className="absolute top-2 right-2">
+              <Badge variant="secondary" className="bg-white/90 text-gray-800 text-xs">
+                <Star className="w-3 h-3 mr-1 fill-yellow-400 text-yellow-400" />
+                {book.rating}
+              </Badge>
+            </div>
           </div>
-        </div>
-        <div className="p-3">
-          <h3 className="font-semibold text-sm mb-1 line-clamp-1">{book.title}</h3>
-          <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">{book.author}</p>
-          <div className="flex items-center justify-between">
-            <span className="font-bold text-[#4CAF50] text-sm">{book.price_kas} KAS</span>
-            <span className="text-xs text-gray-500">{book.likes} ❤️</span>
+          <div className="p-3">
+            <h3 className="font-semibold text-sm mb-1 line-clamp-1">{book.title}</h3>
+            <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">{book.author}</p>
+            <div className="flex items-center justify-between">
+              <span className="font-bold text-[#4CAF50] text-sm">{book.price_kas} KAS</span>
+              <span className="text-xs text-gray-500">{book.likes} ❤️</span>
+            </div>
           </div>
-        </div>
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+    </Link>
   </motion.div>
 );
 
