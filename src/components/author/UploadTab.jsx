@@ -13,7 +13,6 @@ import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from "@/components/ui/switch";
 import { Progress } from '@/components/ui/progress';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import {
   Upload,
@@ -48,6 +47,8 @@ import { getAuthorStats } from '@/api/functions'; // Added getAuthorStats
 import { detectLanguageFromFile, getLanguageMetadata, isSameLanguage } from '@/utils/languageDetection';
 import { buildSupabasePath } from '@/utils/storagePaths';
 import { createBook } from '../utils/supabase';
+import BookTranslationsManager from './BookTranslationsManager';
+import { LANGUAGE_OPTIONS } from '@/utils/languageOptions';
 
 const GENRES_DATA = [
     {
@@ -187,19 +188,6 @@ const MOODS = [
   { value: 'educational', label: 'Познавательное' },
   { value: 'emotional', label: 'Эмоциональное' },
   { value: 'thoughtful', label: 'Заставляющее думать' }
-];
-
-const LANGUAGES = [
-  { value: 'en', label: 'English', flag: '🇺🇸' },
-  { value: 'es', label: 'Español', flag: '🇪🇸' },
-  { value: 'fr', label: 'Français', flag: '🇫🇷' },
-  { value: 'de', label: 'Deutsch', flag: '🇩🇪' },
-  { value: 'it', label: 'Italiano', flag: '🇮🇹' },
-  { value: 'pt', label: 'Português', flag: '🇵🇹' },
-  { value: 'zh', label: '中文', flag: '🇨🇳' },
-  { value: 'ja', label: '日本語', flag: '🇯🇵' },
-  { value: 'ko', label: '한국어', flag: '🇰🇷' },
-  { value: 'ar', label: 'العربية', flag: '🇸🇦' }
 ];
 
 function DropZone({ onDrop, accept, multiple = false, maxSize, children, className = '' }) {
@@ -1024,6 +1012,7 @@ export default function UploadTab() {
   const [selectedLanguagesForTranslation, setSelectedLanguagesForTranslation] = useState([]);
   const [currentStep, setCurrentStep] = useState(1);
   const [uploadedBookId, setUploadedBookId] = useState(null);
+  const [createdBook, setCreatedBook] = useState(null);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [detectedLanguage, setDetectedLanguage] = useState(null);
   const [isDetectingLanguage, setIsDetectingLanguage] = useState(false);
@@ -1064,7 +1053,7 @@ export default function UploadTab() {
     [originalLanguage]
   );
   const translationLanguages = React.useMemo(
-    () => LANGUAGES.filter((lang) => !isSameLanguage(lang.value, originalLanguage)),
+    () => LANGUAGE_OPTIONS.filter((lang) => !isSameLanguage(lang.value, originalLanguage)),
     [originalLanguage]
   );
 
@@ -1328,34 +1317,14 @@ export default function UploadTab() {
         status: 'pending'
       };
 
-      const createdBook = await createBook(bookData);
-      setUploadedBookId(createdBook.id);
+      const createdBookRecord = await createBook(bookData);
+      setUploadedBookId(createdBookRecord.id);
+      setCreatedBook(createdBookRecord);
       setUploadProgress(100);
 
       toast.success('Книга успешно создана!', { id: toastId });
 
-      if (selectedLanguagesForTranslation.length > 0) {
-        setCurrentStep(3);
-      } else {
-        reset();
-        setSelectedGenres([]);
-        setCoverFiles({
-            default: null,
-            square: null,
-            portrait_large: null,
-            landscape: null,
-            notes_1: null,
-            notes_2: null,
-            library_hero: null,
-        });
-        setBookFile(null);
-        setDetectedLanguage(null);
-        setLanguageDetectionError(null);
-        setIsDetectingLanguage(false);
-        setLanguageDetectionInfo(null);
-        setSelectedLanguagesForTranslation([]);
-        setCurrentStep(1);
-      }
+      setCurrentStep(3);
 
     } catch (error) {
       console.error('Ошибка при создании книги:', error);
@@ -1385,24 +1354,17 @@ export default function UploadTab() {
     }
   };
 
-  const triggerTranslation = async () => {
-    if (!uploadedBookId || !bookFile || selectedLanguagesForTranslation.length === 0) {
-      toast.error('Недостаточно данных для перевода. Пожалуйста, попробуйте снова.');
-      setCurrentStep(1);
-      return;
-    }
-
-    toast.info('Автоматический перевод временно отключен. Мы сохранили выбранные языки для дальнейшей обработки.');
+  const handleTranslationsComplete = useCallback(() => {
     reset();
     setSelectedGenres([]);
     setCoverFiles({
-        default: null,
-        square: null,
-        portrait_large: null,
-        landscape: null,
-        notes_1: null,
-        notes_2: null,
-        library_hero: null,
+      default: null,
+      square: null,
+      portrait_large: null,
+      landscape: null,
+      notes_1: null,
+      notes_2: null,
+      library_hero: null,
     });
     setBookFile(null);
     setDetectedLanguage(null);
@@ -1411,8 +1373,10 @@ export default function UploadTab() {
     setLanguageDetectionInfo(null);
     setSelectedLanguagesForTranslation([]);
     setUploadedBookId(null);
+    setCreatedBook(null);
     setCurrentStep(1);
-  };
+    toast.success('Книга и переводы готовы к модерации!');
+  }, [reset]);
 
   const renderStepContent = () => {
     switch (currentStep) {
@@ -1423,77 +1387,91 @@ export default function UploadTab() {
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
             >
-              <Card className="bg-gradient-to-br from-blue-50 to-purple-50 border border-blue-200">
+              <Card className="border border-white/10 bg-[#181818] text-white shadow-[0_15px_60px_rgba(0,0,0,0.35)]">
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <FileText className="w-6 h-6 text-blue-600" />
+                  <CardTitle className="flex items-center gap-2 text-white">
+                    <FileText className="w-6 h-6 text-[#4f46e5]" />
                     Информация о книге
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                      <Label htmlFor="title">Название книги *</Label>
+                  <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="title" className="text-sm font-semibold text-white/80">
+                        Название книги *
+                      </Label>
                       <Input
                         id="title"
                         {...register('title', { required: 'Введите название книги' })}
-                        className="bg-white border-blue-200 focus:border-blue-400"
+                        className="bg-[#121212] border border-white/20 text-white placeholder:text-white/40 focus:border-white focus-visible:ring-0"
                         placeholder="Введите название книги"
                       />
-                      {errors.title && <p className="text-red-500 text-sm mt-1">{errors.title.message}</p>}
+                      {errors.title && <p className="text-sm text-rose-400">{errors.title.message}</p>}
                     </div>
 
-                    <div>
-                      <Label htmlFor="author">Автор</Label>
+                    <div className="space-y-2">
+                      <Label htmlFor="author" className="text-sm font-semibold text-white/80">
+                        Автор
+                      </Label>
                       <Input
                         id="author"
                         {...register('author')}
-                        className="bg-white border-blue-200 focus:border-blue-400"
+                        className="bg-[#121212] border border-white/20 text-white placeholder:text-white/40 focus:border-white focus-visible:ring-0"
                         placeholder={user?.full_name || 'Имя автора'}
                       />
                     </div>
                   </div>
 
-                  <div>
-                    <Label htmlFor="description">Описание книги *</Label>
+                  <div className="space-y-2">
+                    <Label htmlFor="description" className="text-sm font-semibold text-white/80">
+                      Описание книги *
+                    </Label>
                     <Textarea
                       id="description"
                       {...register('description', { required: 'Добавьте описание книги' })}
-                      className="bg-white border-blue-200 focus:border-blue-400 min-h-[120px]"
+                      className="min-h-[140px] bg-[#121212] border border-white/20 text-white placeholder:text-white/40 focus:border-white focus-visible:ring-0"
                       placeholder="Опишите сюжет, героев, основные темы..."
                     />
-                    {errors.description && <p className="text-red-500 text-sm mt-1">{errors.description.message}</p>}
-                  </div>
-                  
-                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                     <div>
-                        <Label htmlFor="page_count">Количество страниц</Label>
-                        <Input
-                          id="page_count"
-                          type="number"
-                          {...register('page_count', { valueAsNumber: true })}
-                          className="bg-white border-blue-200 focus:border-blue-400"
-                          placeholder="Например: 350"
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="mood">Настроение книги</Label>
-                        <Select onValueChange={(value) => setValue('mood', value)} value={watch('mood')}>
-                          <SelectTrigger className="bg-white border-blue-200">
-                            <SelectValue placeholder="Выберите настроение" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {MOODS.map(mood => (
-                              <SelectItem key={mood.value} value={mood.value}>{mood.label}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
+                    {errors.description && <p className="text-sm text-rose-400">{errors.description.message}</p>}
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-white rounded-lg border border-blue-200">
-                    <div>
-                      <Label htmlFor="price_kas">Цена в KAS *</Label>
+                  <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="page_count" className="text-sm font-semibold text-white/80">
+                        Количество страниц
+                      </Label>
+                      <Input
+                        id="page_count"
+                        type="number"
+                        {...register('page_count', { valueAsNumber: true })}
+                        className="bg-[#121212] border border-white/20 text-white placeholder:text-white/40 focus:border-white focus-visible:ring-0"
+                        placeholder="Например: 350"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="mood" className="text-sm font-semibold text-white/80">
+                        Настроение книги
+                      </Label>
+                      <Select onValueChange={(value) => setValue('mood', value)} value={watch('mood')}>
+                        <SelectTrigger className="border border-white/20 bg-[#121212] text-white focus:border-white">
+                          <SelectValue placeholder="Выберите настроение" />
+                        </SelectTrigger>
+                        <SelectContent className="border border-white/10 bg-[#181818] text-white">
+                          {MOODS.map(mood => (
+                            <SelectItem key={mood.value} value={mood.value}>
+                              {mood.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-4 rounded-xl border border-white/10 bg-[#141414] p-4 md:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="price_kas" className="text-sm font-semibold text-white/80">
+                        Цена в KAS *
+                      </Label>
                       <Input
                         id="price_kas"
                         type="number"
@@ -1502,30 +1480,32 @@ export default function UploadTab() {
                         {...register('price_kas', {
                           required: 'Укажите цену книги',
                           min: { value: 0.01, message: 'Минимальная цена 0.01 KAS' },
-                          valueAsNumber: true
+                          valueAsNumber: true,
                         })}
-                        className="bg-white"
+                        className="bg-[#121212] border border-white/20 text-white placeholder:text-white/40 focus:border-white focus-visible:ring-0"
                         disabled={isUsdFixed}
                       />
-                      <AnimatedPrice amount={parseFloat(priceKas || 0)} className="mt-2" />
-                      {errors.price_kas && <p className="text-red-500 text-sm mt-1">{errors.price_kas.message}</p>}
+                      <AnimatedPrice amount={parseFloat(priceKas || 0)} className="mt-2 text-sm text-white/70" />
+                      {errors.price_kas && <p className="text-sm text-rose-400">{errors.price_kas.message}</p>}
                     </div>
 
-                    <div className="flex items-center space-x-2 pt-6">
+                    <div className="flex items-center gap-3 rounded-lg bg-[#111111] px-4 py-3">
                       <Switch
                         id="is_usd_fixed"
                         checked={isUsdFixed}
                         onCheckedChange={(checked) => setValue('is_usd_fixed', checked)}
                       />
-                      <Label htmlFor="is_usd_fixed" className="cursor-pointer text-sm">
+                      <Label htmlFor="is_usd_fixed" className="cursor-pointer text-sm text-white/80">
                         Зафиксировать цену в USD
                       </Label>
                     </div>
                   </div>
 
-                  <div className="flex items-center space-x-2">
+                  <div className="flex items-center gap-3 rounded-lg bg-[#111111] px-4 py-3">
                     <Switch id="is_public_domain" {...register('is_public_domain')} />
-                    <Label htmlFor="is_public_domain">Книга является общественным достоянием</Label>
+                    <Label htmlFor="is_public_domain" className="cursor-pointer text-sm text-white/80">
+                      Книга является общественным достоянием
+                    </Label>
                   </div>
                 </CardContent>
               </Card>
@@ -1536,9 +1516,9 @@ export default function UploadTab() {
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.1 }}
             >
-              <Card className="bg-gradient-to-br from-green-50 to-teal-50 border border-green-200">
+              <Card className="border border-white/10 bg-[#181818] text-white">
                 <CardHeader>
-                  <CardTitle>Жанры (до 3-х)</CardTitle>
+                  <CardTitle className="text-white">Жанры (до 3-х)</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-6">
@@ -1552,7 +1532,7 @@ export default function UploadTab() {
                           />
                           <Label
                             htmlFor={`cat-${categoryData.category}`}
-                            className="text-lg font-semibold text-foreground/90 cursor-pointer"
+                            className="cursor-pointer text-lg font-semibold text-white"
                           >
                             {categoryData.category}
                           </Label>
@@ -1574,20 +1554,20 @@ export default function UploadTab() {
                                     whileTap={{ scale: 0.98 }}
                                     className="flex items-center space-x-2"
                                   >
-                                    <Checkbox
-                                      id={genre.value}
-                                      checked={selectedGenres.includes(genre.value)}
-                                      onCheckedChange={() => handleGenreToggle(genre.value)}
-                                      disabled={!selectedGenres.includes(genre.value) && selectedGenres.length >= 3}
-                                    />
-                                    <Label
-                                      htmlFor={genre.value}
-                                      className="text-sm cursor-pointer hover:text-green-700 transition-colors"
-                                    >
-                                      {genre.label}
-                                    </Label>
-                                  </motion.div>
-                                ))}
+                                  <Checkbox
+                                    id={genre.value}
+                                    checked={selectedGenres.includes(genre.value)}
+                                    onCheckedChange={() => handleGenreToggle(genre.value)}
+                                    disabled={!selectedGenres.includes(genre.value) && selectedGenres.length >= 3}
+                                  />
+                                  <Label
+                                    htmlFor={genre.value}
+                                    className="text-sm cursor-pointer text-white/80 hover:text-white"
+                                  >
+                                    {genre.label}
+                                  </Label>
+                                </motion.div>
+                              ))}
                               </div>
                             </motion.div>
                           )}
@@ -1597,12 +1577,12 @@ export default function UploadTab() {
                   </div>
                   {selectedGenres.length > 0 && (
                     <div className="mt-6 pt-4 border-t">
-                      <p className="text-sm text-muted-foreground mb-2">Выбранные жанры:</p>
+                      <p className="mb-2 text-sm text-white/60">Выбранные жанры:</p>
                       <div className="flex flex-wrap gap-2">
                         {selectedGenres.map(genreValue => {
                           const genre = GENRES_DATA.flatMap(c => c.genres).find(g => g.value === genreValue);
                           return (
-                            <Badge key={genreValue} className="bg-green-200 text-green-800">
+                            <Badge key={genreValue} className="bg-[#4f46e5]/20 text-[#c7d2fe] border border-[#4f46e5]/40">
                               {genre?.label || genreValue}
                             </Badge>
                           );
@@ -1618,7 +1598,7 @@ export default function UploadTab() {
               type="button"
               onClick={() => setCurrentStep(2)}
               disabled={!watch('title') || selectedGenres.length === 0}
-              className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+              className="w-full bg-[#4f46e5] text-white hover:bg-[#4338ca]"
               size="lg"
             >
               Продолжить к файлам
@@ -1707,61 +1687,13 @@ export default function UploadTab() {
 
       case 3:
         return (
-          <div className="space-y-6">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-            >
-              <div className="text-center space-y-4 mb-8">
-                <motion.div
-                  animate={{ rotate: 360 }}
-                  transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-                  className="w-16 h-16 mx-auto"
-                >
-                  <Bot className="w-16 h-16 text-blue-500" />
-                </motion.div>
-                <h2 className="text-2xl font-bold">Переводы будут обработаны позже</h2>
-                <p className="text-muted-foreground">
-                  Мы сохранили запрос на перевод на {selectedLanguagesForTranslation.length} языков. Как только команда запустит
-                  обработку, вы получите уведомление.
-                </p>
-                <p className="text-sm text-gray-500">
-                  Сейчас автоматический перевод временно отключен. Вы можете продолжать публиковать книги и вернуться к переводу
-                  позже.
-                </p>
-              </div>
-            </motion.div>
-
-            <Button
-              onClick={triggerTranslation}
-              className="w-full bg-green-600 hover:bg-green-700"
-            >
-              Готово
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => {
-                reset();
-                setSelectedGenres([]);
-                setCoverFiles({
-                    default: null,
-                    square: null,
-                    portrait_large: null,
-                    landscape: null,
-                    notes_1: null,
-                    notes_2: null,
-                    library_hero: null,
-                });
-                setBookFile(null);
-                setSelectedLanguagesForTranslation([]);
-                setUploadedBookId(null);
-                setCurrentStep(1);
-              }}
-              className="w-full"
-            >
-              Вернуться к загрузке новой книги
-            </Button>
-          </div>
+          <BookTranslationsManager
+            bookId={uploadedBookId}
+            baseBook={createdBook}
+            initialLanguages={selectedLanguagesForTranslation}
+            onBack={() => setCurrentStep(2)}
+            onComplete={handleTranslationsComplete}
+          />
         );
 
       default:
@@ -1770,17 +1702,17 @@ export default function UploadTab() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background to-muted/20">
+    <div className="min-h-screen bg-[#121212] text-white">
       <div className="container mx-auto px-4 py-8">
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           className="text-center mb-8"
         >
-          <h1 className="text-4xl font-bold mb-4 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+          <h1 className="mb-4 text-4xl font-bold text-white">
             Загрузить книгу
           </h1>
-          <p className="text-muted-foreground text-lg">
+          <p className="text-lg text-white/70">
             Создайте новую книгу и опубликуйте ее для читателей по всему миру
           </p>
         </motion.div>
@@ -1793,8 +1725,8 @@ export default function UploadTab() {
                   className={`
                     w-10 h-10 rounded-full flex items-center justify-center text-sm font-medium border-2 transition-all
                     ${step <= currentStep
-                      ? 'bg-blue-500 text-white border-blue-500'
-                      : 'bg-muted text-muted-foreground border-muted-foreground/30'
+                      ? 'bg-[#4f46e5] text-white border-[#4f46e5]'
+                      : 'bg-[#1f1f1f] text-white/50 border-white/10'
                     }
                   `}
                   animate={step === currentStep ? { scale: [1, 1.1, 1] } : {}}
@@ -1806,7 +1738,7 @@ export default function UploadTab() {
                 {step < 3 && (
                   <div className={`
                     w-12 h-0.5 mx-2 transition-colors
-                    ${step < currentStep ? 'bg-blue-500' : 'bg-muted-foreground/30'}
+                    ${step < currentStep ? 'bg-[#4f46e5]' : 'bg-white/15'}
                   `} />
                 )}
               </div>
