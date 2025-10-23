@@ -47,8 +47,8 @@ const CORS_HEADERS = {
   'Access-Control-Allow-Methods': 'GET,POST,OPTIONS'
 };
 
-const SUPABASE_URL = resolveEnvValue('SUPABASE_URL', 'VITE_SUPABASE_URL');
-const SUPABASE_SERVICE_ROLE_KEY = resolveEnvValue('SUPABASE_SERVICE_ROLE_KEY', 'VITE_SUPABASE_SERVICE_ROLE_KEY');
+const SUPABASE_URL = env.SUPABASE_URL;
+const SUPABASE_SERVICE_KEY = env.SUPABASE_SERVICE_KEY || env.SUPABASE_SERVICE_ROLE_KEY;
 const N8N_WEBHOOK_URL = resolveEnvValue('N8N_WEBHOOK_URL');
 const N8N_WEBHOOK_URL_TEST = resolveEnvValue('N8N_WEBHOOK_URL_TEST');
 const isProduction = (env.NODE_ENV || 'development') === 'production';
@@ -68,8 +68,8 @@ const normalizeRole = (value) => {
 
 let cachedSupabaseAdmin = null;
 const getSupabaseAdmin = () => {
-  if (!cachedSupabaseAdmin && SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY) {
-    cachedSupabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+  if (!cachedSupabaseAdmin && SUPABASE_URL && SUPABASE_SERVICE_KEY) {
+    cachedSupabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, {
       auth: {
         persistSession: false,
         autoRefreshToken: false

@@ -4,19 +4,24 @@ This Vite + React application uses Supabase as its primary backend for authentic
 
 ## Environment variables
 
-Create a `.env` file (see `.env.example`) and provide at least:
+Environment configuration is driven by GitHub Secrets (CI) and Railway Variables (production).
+Define the following secrets in those providers:
 
-```
-VITE_SUPABASE_URL=your-project-url
-VITE_SUPABASE_ANON_KEY=your-anon-key
-```
+- `SUPABASE_URL`
+- `SUPABASE_ANON_KEY`
+- `SUPABASE_SERVICE_KEY` (Railway only, used by the Node proxy)
+
+During the build step Vite consumes `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` which
+are automatically populated from the GitHub/Railway secrets. For local development, copy
+`.env.example` to `.env.local` and fill in the same variable names.
 
 Optional variables allow configuring OAuth login, storage buckets, and external webhooks.
 
 If you enable the CoinMarketCap proxy (`/api/coinmarketcap/kas-rate` or `/api/coingecko`),
 set `COINMARKETCAP_API_KEY` in the runtime environment for production. Locally you can
-define the same secret inside `.env`; the Node server now loads `.env` automatically and
-falls back to `VITE_COINMARKETCAP_API_KEY` when `COINMARKETCAP_API_KEY` is not provided.
+define the same secret inside `.env.local`; the Node server loads environment files
+automatically and falls back to `VITE_COINMARKETCAP_API_KEY` when `COINMARKETCAP_API_KEY`
+is not provided.
 
 Feature flags:
 
