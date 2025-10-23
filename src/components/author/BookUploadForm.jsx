@@ -28,6 +28,7 @@ import {
 
 import { useAuth } from '../auth/Auth';
 import { UploadFile } from '@/api/integrations';
+import { submitBookToTranslation } from '@/api/n8n';
 import { detectLanguageFromFile, getLanguageMetadata, isSameLanguage } from '@/utils/languageDetection';
 import { buildSupabasePath } from '@/utils/storagePaths';
 import { createBook } from '../utils/supabase';
@@ -385,24 +386,29 @@ export default function BookUploadForm({ onUploadSuccess }) {
         }
       }
 
-      // 1. Загрузка файлов
+      // 1. Загрузка обложки
       setUploadProgress(25);
-      toast.loading('Загрузка файлов...', { id: 'upload' });
+      toast.loading('Загрузка обложки...', { id: 'upload' });
 
       const originalLang = detectedLanguage || 'ru';
-      const [{ file_url: bookUrl }, { file_url: coverUrl }] = await Promise.all([
-        UploadFile({ file: fileToUpload, path: buildSupabasePath('books/originals', fileToUpload) }),
-        UploadFile({ file: coverFile, path: buildSupabasePath('books/covers', coverFile) })
-      ]);
+      const { file_url: coverUrl } = await UploadFile({
+        file: coverFile,
+        path: buildSupabasePath('books/covers', coverFile)
+      });
 
       // 2. Создание книги
       setUploadProgress(50);
       toast.loading('Создание книги...', { id: 'upload' });
-      
+
       const coverImages = {
         default: coverUrl,
         portrait_large: coverUrl,
       };
+
+      const parsedPriceKas = Number.parseFloat(data.price_kas);
+      const parsedPriceUsd = Number.parseFloat(data.price_usd);
+      const finalPriceKas = Number.isFinite(parsedPriceKas) ? parsedPriceKas : null;
+      const finalPriceUsd = Number.isFinite(parsedPriceUsd) ? parsedPriceUsd : null;
 
       const bookData = {
         title: data.title,
@@ -410,7 +416,7 @@ export default function BookUploadForm({ onUploadSuccess }) {
         author_email: user?.email,
         author_id: user?.id,
         description: data.description,
-        price_kas: parseFloat(data.price_kas),
+        price_kas: finalPriceKas,
         genre: selectedGenres[0],
         genres: selectedGenres,
         cover_images: coverImages,
@@ -419,7 +425,7 @@ export default function BookUploadForm({ onUploadSuccess }) {
             lang: originalLang,
             title: data.title,
             description: data.description,
-            file_url: bookUrl,
+            file_url: null,
             original: true,
             extension: uploadExtension,
             format: uploadFormat,
@@ -430,15 +436,50 @@ export default function BookUploadForm({ onUploadSuccess }) {
       };
 
       const createdBook = await createBook(bookData);
-      setUploadProgress(75);
 
-      if (selectedLanguages.length > 0) {
-        toast.info('Автоматический перевод временно отключен. Выбранные языки сохранены для последующей обработки.', { id: 'upload' });
-      }
+      // 3. Отправка файла книги в n8n
+      setUploadProgress(75);
+      toast.loading('Отправляем книгу в перевод...', { id: 'upload' });
+
+      const translationPricePerLanguage = selectedLanguages.length > 0
+        ? translationPrice / selectedLanguages.length
+        : 0;
+      const primaryTargetLang = selectedLanguages[0] || (originalLang === 'en' ? 'ru' : 'en');
+
+      await submitBookToTranslation({
+        file: fileToUpload,
+        title: data.title,
+        sourceLang: originalLang,
+        targetLang: primaryTargetLang,
+        userEmail: user?.email,
+        userId: user?.id,
+        bookId: createdBook.id,
+        metadata: {
+          selectedTranslationLanguages: selectedLanguages,
+          originalLanguage: originalLang,
+          genres: selectedGenres,
+          price: {
+            kas: finalPriceKas,
+            usd: finalPriceUsd,
+          },
+          translationPrice: {
+            perLanguageUsd: translationPricePerLanguage,
+            totalUsd: translationPrice,
+          },
+          fileFormat: {
+            extension: uploadExtension,
+            format: uploadFormat,
+            convertedToHtml: isHtmlAsset,
+          },
+          originalFileName: bookFile.name,
+          uploadedFileName: fileToUpload.name,
+          coverUrl,
+        },
+      });
 
       setUploadProgress(100);
-      toast.success('Книга успешно загружена!', { id: 'upload' });
-      
+      toast.success('Книга отправлена на перевод!', { id: 'upload' });
+
       // Сброс формы
       setBookFile(null);
       setCoverFile(null);
@@ -459,9 +500,22 @@ export default function BookUploadForm({ onUploadSuccess }) {
         toast.error('Сессия истекла. Пожалуйста, войдите снова, чтобы продолжить загрузку книги.', {
           id: 'upload'
         });
-      } else {
-        toast.error('Ошибка при загрузке книги: ' + error.message, { id: 'upload' });
+        return;
       }
+
+      let errorMessage = 'Ошибка при загрузке книги';
+      if (error instanceof Error) {
+        const messageText = error.message;
+        const normalized = messageText.toLowerCase();
+
+        if (normalized.includes('n8n') || normalized.includes('webhook') || messageText.includes('Не удалось отправить книгу')) {
+          errorMessage = `Ошибка отправки в перевод: ${messageText}`;
+        } else {
+          errorMessage = `Ошибка при загрузке книги: ${messageText}`;
+        }
+      }
+
+      toast.error(errorMessage, { id: 'upload' });
     } finally {
       setIsUploading(false);
       setUploadProgress(0);
