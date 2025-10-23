@@ -47,6 +47,7 @@ import { getAuthorStats } from '@/api/functions'; // Added getAuthorStats
 import { detectLanguageFromFile, getLanguageMetadata, isSameLanguage } from '@/utils/languageDetection';
 import { buildSupabasePath } from '@/utils/storagePaths';
 import { createBook } from '../utils/supabase';
+import { submitBookToTranslation } from '@/api/n8n';
 import BookTranslationsManager from './BookTranslationsManager';
 import { LANGUAGE_OPTIONS } from '@/utils/languageOptions';
 
@@ -1271,16 +1272,9 @@ export default function UploadTab() {
           coverImages.default = defaultCoverUrl;
       }
 
-      // 2. Загрузка основного файла
+      // 2. Подготовка языковых данных (файл будет отправлен в n8n)
       setUploadProgress(60);
-      toast.info('Загрузка файла книги...', { id: toastId });
-      const { file_url: mainBookUrl } = await UploadFile({
-        file: bookFile,
-        path: buildSupabasePath('books/originals', bookFile)
-      });
-
-      // 3. Подготовка языковых версий (только русский пока, остальные через AI)
-      setUploadProgress(80);
+      toast.info('Подготавливаем данные книги...', { id: toastId });
       const originalMeta = getLanguageMetadata(originalLanguage);
       const uploadedLanguages = [{
         lang: originalLanguage,
@@ -1288,16 +1282,19 @@ export default function UploadTab() {
         flag: originalMeta.flag,
         title: data.title,
         description: data.description,
-        file_url: mainBookUrl,
+        file_url: null,
         original: true
       }];
 
-      // 4. Создание записи в БД
-      setUploadProgress(95);
+      // 3. Создание записи в БД
+      setUploadProgress(80);
       toast.info('Создание записи в базе данных...', { id: toastId });
 
-      const finalPriceKas = parseFloat(data.price_kas);
-      const finalPriceUsd = parseFloat(data.price_usd);
+      const parsedPriceKas = Number.parseFloat(data.price_kas);
+      const parsedPriceUsd = Number.parseFloat(data.price_usd);
+      const finalPriceKas = Number.isFinite(parsedPriceKas) ? parsedPriceKas : null;
+      const finalPriceUsd = Number.isFinite(parsedPriceUsd) ? parsedPriceUsd : null;
+      const parsedPageCount = data.page_count ? Number.parseInt(data.page_count, 10) : null;
 
       const bookData = {
         title: data.title,
@@ -1311,7 +1308,7 @@ export default function UploadTab() {
         price_usd: finalPriceUsd,
         is_usd_fixed: data.is_usd_fixed,
         is_public_domain: data.is_public_domain,
-        page_count: data.page_count ? parseInt(data.page_count, 10) : null,
+        page_count: parsedPageCount,
         cover_images: coverImages,
         languages: uploadedLanguages,
         status: 'pending'
@@ -1320,9 +1317,47 @@ export default function UploadTab() {
       const createdBookRecord = await createBook(bookData);
       setUploadedBookId(createdBookRecord.id);
       setCreatedBook(createdBookRecord);
+      const translationPricePerLanguage = calculateTranslationPricePerLanguage();
+      const translationTotalPriceUsd = selectedLanguagesForTranslation.length * translationPricePerLanguage;
+      const targetLang =
+        selectedLanguagesForTranslation[0] ||
+        translationLanguages[0]?.value ||
+        originalLanguage;
+
+      setUploadProgress(90);
+      toast.info('Отправляем книгу в перевод...', { id: toastId });
+
+      await submitBookToTranslation({
+        file: bookFile,
+        title: data.title,
+        sourceLang: originalLanguage,
+        targetLang,
+        userEmail: user?.email,
+        userId: user?.id,
+        bookId: createdBookRecord.id,
+        metadata: {
+          selectedTranslationLanguages: selectedLanguagesForTranslation,
+          originalLanguage,
+          genres: selectedGenres,
+          mood: data.mood ?? null,
+          price: {
+            kas: finalPriceKas,
+            usd: finalPriceUsd,
+          },
+          isUsdFixed: Boolean(data.is_usd_fixed),
+          isPublicDomain: Boolean(data.is_public_domain),
+          page_count: parsedPageCount,
+          coverImages,
+          translationPrice: {
+            perLanguageUsd: translationPricePerLanguage,
+            totalUsd: translationTotalPriceUsd,
+          },
+          bookFileName: bookFile.name,
+        },
+      });
       setUploadProgress(100);
 
-      toast.success('Книга успешно создана!', { id: toastId });
+      toast.success('Книга отправлена на перевод!', { id: toastId });
 
       setCurrentStep(3);
 
@@ -1336,14 +1371,23 @@ export default function UploadTab() {
         return;
       }
 
-      let errorMessage = 'Не удалось создать книгу';
+      let errorMessage = 'Не удалось завершить загрузку книги';
       if (error instanceof Error) {
-        if (error.message.includes('DatabaseTimeout')) {
+        const messageText = error.message;
+        const normalized = messageText.toLowerCase();
+
+        if (messageText.includes('DatabaseTimeout')) {
           errorMessage = 'Превышено время ожидания базы данных. Попробуйте позже.';
-        } else if (error.message.includes('integration') || error.message.includes('file upload')) {
+        } else if (
+          normalized.includes('n8n') ||
+          normalized.includes('webhook') ||
+          messageText.includes('Не удалось отправить книгу')
+        ) {
+          errorMessage = `Ошибка отправки в перевод: ${messageText}`;
+        } else if (normalized.includes('integration') || normalized.includes('file upload')) {
           errorMessage = 'Ошибка загрузки файлов. Проверьте размер файлов или попробуйте снова.';
         } else {
-          errorMessage = `Ошибка: ${error.message}`;
+          errorMessage = `Ошибка: ${messageText}`;
         }
       }
 

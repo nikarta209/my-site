@@ -49,6 +49,16 @@ const CORS_HEADERS = {
 
 const SUPABASE_URL = resolveEnvValue('SUPABASE_URL', 'VITE_SUPABASE_URL');
 const SUPABASE_SERVICE_ROLE_KEY = resolveEnvValue('SUPABASE_SERVICE_ROLE_KEY', 'VITE_SUPABASE_SERVICE_ROLE_KEY');
+const N8N_WEBHOOK_URL = resolveEnvValue('N8N_WEBHOOK_URL');
+const N8N_WEBHOOK_URL_TEST = resolveEnvValue('N8N_WEBHOOK_URL_TEST');
+const isProduction = (env.NODE_ENV || 'development') === 'production';
+
+const resolveN8nWebhookUrl = () => {
+  if (isProduction) {
+    return N8N_WEBHOOK_URL || N8N_WEBHOOK_URL_TEST || null;
+  }
+  return N8N_WEBHOOK_URL_TEST || N8N_WEBHOOK_URL || null;
+};
 
 const normalizeRole = (value) => {
   if (!value || typeof value !== 'string') return null;
@@ -81,6 +91,80 @@ const sendJson = (res, statusCode, body) => {
     ...CORS_HEADERS
   });
   res.end(payload);
+};
+
+const collectRequestBuffer = async (req) => {
+  const chunks = [];
+  for await (const chunk of req) {
+    if (typeof chunk === 'string') {
+      chunks.push(Buffer.from(chunk));
+    } else if (chunk instanceof Buffer) {
+      chunks.push(chunk);
+    } else if (chunk instanceof Uint8Array) {
+      chunks.push(Buffer.from(chunk));
+    } else if (chunk) {
+      chunks.push(Buffer.from(String(chunk)));
+    }
+  }
+
+  return chunks.length > 0 ? Buffer.concat(chunks) : Buffer.alloc(0);
+};
+
+const parseMultipartFormData = async (req) => {
+  const contentType = req.headers?.['content-type'] || '';
+  if (!/multipart\/form-data/i.test(contentType)) {
+    throw new Error('Unsupported content type');
+  }
+
+  const boundaryMatch = contentType.match(/boundary=(?:"?)([^";]+)(?:"?)/i);
+  if (!boundaryMatch) {
+    throw new Error('Multipart boundary not found');
+  }
+
+  const boundary = boundaryMatch[1];
+  const buffer = await collectRequestBuffer(req);
+  const rawBody = buffer.toString('binary');
+  const boundaryMarker = `--${boundary}`;
+  const segments = rawBody.split(boundaryMarker);
+
+  const fields = {};
+  let file = null;
+
+  for (const segment of segments) {
+    const trimmed = segment.trim();
+    if (!trimmed || trimmed === '--') continue;
+
+    const [rawHeaders, ...rest] = trimmed.split('\r\n\r\n');
+    if (!rawHeaders || rest.length === 0) continue;
+
+    const bodySection = rest.join('\r\n\r\n');
+    const bodyContent = bodySection.endsWith('\r\n')
+      ? bodySection.slice(0, -2)
+      : bodySection;
+
+    const headerLines = rawHeaders.split('\r\n');
+    const dispositionLine = headerLines.find((line) => /^content-disposition:/i.test(line)) || '';
+    const nameMatch = dispositionLine.match(/name="?([^";]+)"?/i);
+    if (!nameMatch) continue;
+    const fieldName = nameMatch[1];
+
+    const filenameMatch = dispositionLine.match(/filename="?([^";]*)"?/i);
+    const contentTypeLine = headerLines.find((line) => /^content-type:/i.test(line));
+    const mimeType = contentTypeLine ? contentTypeLine.split(':')[1].trim() : 'application/octet-stream';
+
+    if (filenameMatch && filenameMatch[1]) {
+      file = {
+        fieldName,
+        filename: filenameMatch[1],
+        mimeType,
+        buffer: Buffer.from(bodyContent, 'binary')
+      };
+    } else {
+      fields[fieldName] = bodyContent;
+    }
+  }
+
+  return { fields, file };
 };
 
 const readRequestBody = async (req) => {
@@ -395,6 +479,69 @@ const handleCoinGeckoProxy = async (req, res) => {
   }
 };
 
+const handleN8nBookUpload = async (req, res) => {
+  try {
+    const { fields, file } = await parseMultipartFormData(req);
+
+    if (!file || !file.buffer || file.buffer.length === 0) {
+      sendJson(res, 400, { error: 'No file provided' });
+      return;
+    }
+
+    const title = (fields.title || '').trim();
+    if (!title) {
+      sendJson(res, 400, { error: 'Missing "title"' });
+      return;
+    }
+
+    const targetLang = (fields.target_lang || '').trim();
+    if (!targetLang) {
+      sendJson(res, 400, { error: 'Missing "target_lang"' });
+      return;
+    }
+
+    const webhookUrl = resolveN8nWebhookUrl();
+    if (!webhookUrl) {
+      sendJson(res, 500, { error: 'N8N_WEBHOOK_URL is not set' });
+      return;
+    }
+
+    const formData = new FormData();
+    const filename = file.filename || 'book.bin';
+    const mimeType = file.mimeType || 'application/octet-stream';
+    formData.append('file', new Blob([file.buffer], { type: mimeType }), filename);
+    formData.append('title', title);
+    if (fields.source_lang) formData.append('source_lang', fields.source_lang);
+    formData.append('target_lang', targetLang);
+    if (fields.user_email) formData.append('user_email', fields.user_email);
+    if (fields.user_id) formData.append('user_id', fields.user_id);
+    if (fields.book_id) formData.append('book_id', fields.book_id);
+    if (fields.metadata_json) formData.append('metadata_json', fields.metadata_json);
+
+    const n8nResponse = await fetch(webhookUrl, {
+      method: 'POST',
+      body: formData,
+    });
+
+    const responseText = await n8nResponse.text();
+    const contentType = n8nResponse.headers.get('content-type') || 'text/plain; charset=utf-8';
+    const contentLength = Buffer.byteLength(responseText);
+
+    res.writeHead(n8nResponse.status, {
+      'Content-Type': contentType,
+      'Content-Length': contentLength,
+      ...CORS_HEADERS,
+    });
+    res.end(responseText);
+  } catch (error) {
+    console.error('n8n proxy failed:', error);
+    sendJson(res, 500, {
+      error: 'n8n proxy failed',
+      details: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+};
+
 const server = createServer(async (req, res) => {
   const method = req.method || 'GET';
 
@@ -408,6 +555,11 @@ const server = createServer(async (req, res) => {
 
   if (method === 'GET' && requestUrl.pathname === '/api/coinmarketcap/kas-rate') {
     await handleKasRate(res);
+    return;
+  }
+
+  if (method === 'POST' && requestUrl.pathname === '/api/n8n/book-upload') {
+    await handleN8nBookUpload(req, res);
     return;
   }
 
