@@ -10,18 +10,14 @@ Define the following secrets in those providers:
 - `SUPABASE_URL`
 - `SUPABASE_ANON_KEY`
 - `SUPABASE_SERVICE_KEY` (Railway only, used by the Node proxy)
+- `COINMARKETCAP_API_KEY` (server worker, optional but recommended)
+- `COINGECKO_API_KEY` (optional, used when available as fallback)
 
 During the build step Vite consumes `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` which
 are automatically populated from the GitHub/Railway secrets. For local development, copy
 `.env.example` to `.env.local` and fill in the same variable names.
 
 Optional variables allow configuring OAuth login, storage buckets, and external webhooks.
-
-If you enable the CoinMarketCap proxy (`/api/coinmarketcap/kas-rate` or `/api/coingecko`),
-set `COINMARKETCAP_API_KEY` in the runtime environment for production. Locally you can
-define the same secret inside `.env.local`; the Node server loads environment files
-automatically and falls back to `VITE_COINMARKETCAP_API_KEY` when `COINMARKETCAP_API_KEY`
-is not provided.
 
 Feature flags:
 
@@ -30,6 +26,14 @@ NEXT_PUBLIC_FEATURE_SUBSCRIPTION=false
 ```
 
 Set to `true` to re-enable the Premium subscription banner and related navigation.
+
+## KAS ↔ USD exchange rate service
+
+- The Node worker polls CoinMarketCap every 5 minutes with ±60 seconds jitter and falls back to CoinGecko when necessary.
+- Rates are persisted to `public.exchange_rates` with `currency_pair = 'KAS_USD'` using the Supabase service role key.
+- All frontend consumers use `GET /api/rate`, which reads from the database and populates it on cold start if needed.
+- In-memory caching (60 seconds) ensures burst traffic does not trigger duplicate provider calls.
+- Disable the background worker by setting `DISABLE_RATE_WORKER=1` (useful for local development or emergencies).
 
 ## Install dependencies
 

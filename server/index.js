@@ -2,44 +2,10 @@
 
 import { createServer } from 'node:http';
 import { URL } from 'node:url';
-import { createClient } from '@supabase/supabase-js';
+import { env, resolveEnvValue, getSupabaseAdmin } from './lib/env.js';
+import { getRateApiResponse } from './routes/rate.js';
+import { startRatePoller } from './jobs/ratePoller.js';
 
-const nodeProcess = globalThis.process;
-nodeProcess?.loadEnvFile?.();
-const env = nodeProcess?.env ?? {};
-
-const resolveEnvValue = (...keys) => {
-  for (const key of keys) {
-    if (!key) continue;
-
-    if (env[key] !== undefined) {
-      return env[key];
-    }
-
-    if (!key.startsWith('VITE_')) {
-      const viteKey = `VITE_${key}`;
-      if (env[viteKey] !== undefined) {
-        return env[viteKey];
-      }
-    } else {
-      const unprefixed = key.slice(5);
-      if (unprefixed && env[unprefixed] !== undefined) {
-        return env[unprefixed];
-      }
-    }
-  }
-  return undefined;
-};
-
-const COINMARKETCAP_API_KEY = resolveEnvValue(
-  'COINMARKETCAP_API_KEY',
-  'CMC_API_KEY',
-  'VITE_COINMARKETCAP_API_KEY',
-  'VITE_CMC_API_KEY'
-);
-
-const COINMARKETCAP_BASE_URL = 'https://pro-api.coinmarketcap.com';
-const COINGECKO_URL = 'https://api.coingecko.com/api/v3/simple/price?ids=kaspa&vs_currencies=usd';
 const PORT = Number.parseInt(env.PORT || '4173', 10);
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -47,8 +13,6 @@ const CORS_HEADERS = {
   'Access-Control-Allow-Methods': 'GET,POST,OPTIONS'
 };
 
-const SUPABASE_URL = env.SUPABASE_URL;
-const SUPABASE_SERVICE_KEY = env.SUPABASE_SERVICE_KEY || env.SUPABASE_SERVICE_ROLE_KEY;
 const N8N_WEBHOOK_URL = resolveEnvValue('N8N_WEBHOOK_URL');
 const N8N_WEBHOOK_URL_TEST = resolveEnvValue('N8N_WEBHOOK_URL_TEST');
 const isProduction = (env.NODE_ENV || 'development') === 'production';
@@ -64,19 +28,6 @@ const normalizeRole = (value) => {
   if (!value || typeof value !== 'string') return null;
   const trimmed = value.trim().toLowerCase();
   return trimmed || null;
-};
-
-let cachedSupabaseAdmin = null;
-const getSupabaseAdmin = () => {
-  if (!cachedSupabaseAdmin && SUPABASE_URL && SUPABASE_SERVICE_KEY) {
-    cachedSupabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, {
-      auth: {
-        persistSession: false,
-        autoRefreshToken: false
-      }
-    });
-  }
-  return cachedSupabaseAdmin;
 };
 
 const encoder = new TextEncoder();
@@ -368,115 +319,9 @@ const handleBookModeration = async (req, res, bookId) => {
   }
 };
 
-const fetchKasRateFromCoinMarketCap = async () => {
-  if (!COINMARKETCAP_API_KEY) {
-    throw new Error('CoinMarketCap API key is not configured.');
-  }
-
-  const params = new URLSearchParams({ symbol: 'KAS', convert: 'USD' });
-  const response = await fetch(
-    `${COINMARKETCAP_BASE_URL}/v1/cryptocurrency/quotes/latest?${params.toString()}`,
-    {
-      headers: {
-        Accept: 'application/json',
-        'X-CMC_PRO_API_KEY': COINMARKETCAP_API_KEY
-      }
-    }
-  );
-
-  const data = await response.json().catch(() => null);
-  if (!response.ok) {
-    const message = data?.status?.error_message || `Failed to fetch CoinMarketCap data (status ${response.status})`;
-    throw new Error(message);
-  }
-
-  const kas = data?.data?.KAS;
-  const usdQuote = kas?.quote?.USD;
-  const rate = Number.parseFloat(usdQuote?.price);
-
-  if (!Number.isFinite(rate)) {
-    throw new Error('CoinMarketCap response did not include a valid rate.');
-  }
-
-  return {
-    success: true,
-    rate,
-    lastUpdated: usdQuote?.last_updated || null,
-    symbol: kas?.symbol || 'KAS',
-    name: kas?.name || 'Kaspa',
-    source: 'coinmarketcap'
-  };
-};
-
-const fetchKasRateFromCoinGecko = async () => {
-  const response = await fetch(COINGECKO_URL);
-  const data = await response.json().catch(() => null);
-
-  if (!response.ok) {
-    const message = data?.error || `CoinGecko request failed (status ${response.status})`;
-    throw new Error(message);
-  }
-
-  const rate = Number.parseFloat(data?.kaspa?.usd);
-  if (!Number.isFinite(rate)) {
-    throw new Error('CoinGecko response did not include a valid rate.');
-  }
-
-  return {
-    success: true,
-    rate,
-    lastUpdated: new Date().toISOString(),
-    symbol: 'KAS',
-    name: 'Kaspa',
-    source: 'coingecko'
-  };
-};
-
-const fallbackKasRate = () => ({
-  success: true,
-  rate: 0.025,
-  lastUpdated: new Date().toISOString(),
-  symbol: 'KAS',
-  name: 'Kaspa',
-  source: 'fallback'
-});
-
-const handleKasRate = async (res) => {
-  try {
-    const result = await fetchKasRateFromCoinMarketCap();
-    sendJson(res, 200, result);
-  } catch (error) {
-    console.error('[CoinMarketCap] primary request failed:', error);
-    try {
-      const fallback = await fetchKasRateFromCoinGecko();
-      sendJson(res, 200, fallback);
-    } catch (fallbackError) {
-      console.error('[CoinGecko] fallback failed:', fallbackError);
-      sendJson(res, 200, fallbackKasRate());
-    }
-  }
-};
-
-const handleCoinGeckoProxy = async (req, res) => {
-  const body = await readRequestBody(req);
-  if (!body || body.action !== 'getCurrentKasRate') {
-    sendJson(res, 400, { success: false, error: 'Unsupported action' });
-    return;
-  }
-
-  try {
-    const result = await fetchKasRateFromCoinMarketCap();
-    sendJson(res, 200, result);
-  } catch (error) {
-    console.error('[CoinGecko proxy] CoinMarketCap request failed:', error);
-    try {
-      const fallback = await fetchKasRateFromCoinGecko();
-      sendJson(res, 200, fallback);
-    } catch (fallbackError) {
-      console.error('[CoinGecko proxy] fallback failed:', fallbackError);
-      sendJson(res, 200, fallbackKasRate());
-    }
-  }
+const handleRateResponse = async (res) => {
+  const { status, body } = await getRateApiResponse();
+  sendJson(res, status, body);
 };
 
 const handleN8nBookUpload = async (req, res) => {
@@ -554,7 +399,12 @@ const server = createServer(async (req, res) => {
   const requestUrl = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`);
 
   if (method === 'GET' && requestUrl.pathname === '/api/coinmarketcap/kas-rate') {
-    await handleKasRate(res);
+    await handleRateResponse(res);
+    return;
+  }
+
+  if (method === 'GET' && requestUrl.pathname === '/api/rate') {
+    await handleRateResponse(res);
     return;
   }
 
@@ -564,7 +414,7 @@ const server = createServer(async (req, res) => {
   }
 
   if (method === 'POST' && requestUrl.pathname === '/api/coingecko') {
-    await handleCoinGeckoProxy(req, res);
+    await handleRateResponse(res);
     return;
   }
 
@@ -576,6 +426,14 @@ const server = createServer(async (req, res) => {
 
   sendJson(res, 404, { success: false, error: 'Not Found' });
 });
+
+if (isProduction) {
+  try {
+    startRatePoller();
+  } catch (error) {
+    console.error('[RatePoller] failed to start:', error instanceof Error ? error.message : error);
+  }
+}
 
 if ((env.NODE_ENV || 'development') !== 'test') {
   server.listen(PORT, () => {

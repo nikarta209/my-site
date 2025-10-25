@@ -28,39 +28,23 @@ export function CoinGeckoProvider({ children }) {
     try {
       setError(null);
       
-      // Пробуем получить цену из нашего backend (который использует CoinMarketCap)
-      const backendResponse = await fetch('/api/coingecko', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'getCurrentKasRate' }),
-      });
+      const response = await fetch('/api/rate');
+      const data = await response.json().catch(() => null);
 
-      if (backendResponse.ok) {
-        const data = await backendResponse.json();
-        if (data.rate && typeof data.rate === 'number' && data.rate > 0) {
-          setKasPrice(data.rate);
-          setLastUpdated(new Date());
-          setIsLoading(false);
-          return;
-        }
+      if (!response.ok) {
+        const message = data?.error || `API responded with status ${response.status}`;
+        throw new Error(message);
       }
 
-      // Если backend не работает, пробуем альтернативный API
-      const alternativeResponse = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=kaspa&vs_currencies=usd');
-      
-      if (alternativeResponse.ok) {
-        const altData = await alternativeResponse.json();
-        const price = altData?.kaspa?.usd;
-        
-        if (price && typeof price === 'number' && price > 0) {
-          setKasPrice(price);
-          setLastUpdated(new Date());
-          setIsLoading(false);
-          return;
-        }
+      const rate = data?.rate;
+      if (!rate || typeof rate !== 'number' || rate <= 0) {
+        throw new Error('Rate payload is invalid');
       }
 
-      throw new Error('No valid price data from any source');
+      setKasPrice(rate);
+      setLastUpdated(data?.updated_at ? new Date(data.updated_at) : new Date());
+      setIsLoading(false);
+      return;
       
     } catch (err) {
       console.error('Error fetching KAS price:', err);
