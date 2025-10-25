@@ -8,14 +8,18 @@ Environment configuration is driven by GitHub Secrets (CI) and Railway Variables
 Define the following secrets in those providers:
 
 - `SUPABASE_URL`
-- `SUPABASE_ANON_KEY`
-- `SUPABASE_SERVICE_KEY` (Railway only, used by the Node proxy)
-- `COINMARKETCAP_API_KEY` (server worker, optional but recommended)
-- `COINGECKO_API_KEY` (optional, used when available as fallback)
+- `SUPABASE_SERVICE_KEY` (Railway only, used by the Node proxy worker)
+- `COINMARKETCAP_API_KEY` (optional but recommended for higher rate accuracy)
+- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_ANON_KEY`
 
 During the build step Vite consumes `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` which
 are automatically populated from the GitHub/Railway secrets. For local development, copy
 `.env.example` to `.env.local` and fill in the same variable names.
+
+Optional operational flags:
+
+- `DISABLE_RATE_WORKER=1` — stop the background rate poller without redeploying.
 
 Optional variables allow configuring OAuth login, storage buckets, and external webhooks.
 
@@ -34,6 +38,11 @@ Set to `true` to re-enable the Premium subscription banner and related navigatio
 - All frontend consumers use `GET /api/rate`, which reads from the database and populates it on cold start if needed.
 - In-memory caching (60 seconds) ensures burst traffic does not trigger duplicate provider calls.
 - Disable the background worker by setting `DISABLE_RATE_WORKER=1` (useful for local development or emergencies).
+
+## Railway deployment
+
+- **Build Command**: `npm run build`
+- **Start Command**: `npm run start`
 
 ## Install dependencies
 
