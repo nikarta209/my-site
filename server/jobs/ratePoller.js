@@ -54,6 +54,7 @@ export const startRatePoller = () => {
     return;
   }
 
+  logMissingCMCKeyIfNeeded();
   isRunning = true;
   runRateUpdateOnce().catch((error) => {
     console.warn('[RatePoller] initial update failed:', error instanceof Error ? error.message : error);
@@ -68,4 +69,15 @@ export const stopRatePoller = () => {
     timer = null;
   }
   isRunning = false;
+};
+
+export const getPollerStatus = () => ({
+  isRunning,
+  timerActive: Boolean(timer),
+});
+
+export const logMissingCMCKeyIfNeeded = () => {
+  if (!process.env.COINMARKETCAP_API_KEY) {
+    console.warn('[RatePoller] fallback to Coingecko (CoinMarketCap key missing)');
+  }
 };

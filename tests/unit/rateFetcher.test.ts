@@ -28,7 +28,12 @@ describe('rateFetcher', () => {
       const url = input.toString();
       if (url.includes('coinmarketcap')) {
         return new Response(
-          JSON.stringify({ data: { KAS: { quote: { USD: { price: 0.051234 } } } } }),
+          JSON.stringify({
+            status: { error_code: 0 },
+            data: {
+              20396: { quote: { USD: { price: 0.051234 } } },
+            },
+          }),
           { status: 200, headers: { 'Content-Type': 'application/json' } }
         );
       }
@@ -71,6 +76,37 @@ describe('rateFetcher', () => {
 
     const rate = await getKasUsdRate({ bypassCache: true });
     expect(rate).toBeCloseTo(0.049);
+    expect(fetchSpy).toHaveBeenCalledTimes(3);
+    expect(fetchSpy.mock.calls.at(-1)?.[0].toString()).toContain('coingecko');
+
+    __clearRateCache();
+  });
+
+  it('falls back to CoinGecko when CoinMarketCap returns empty payload', async () => {
+    process.env.COINMARKETCAP_API_KEY = 'test-key';
+
+    const fetchSpy = mockFetch(async (input) => {
+      const url = input.toString();
+      if (url.includes('coinmarketcap')) {
+        return new Response(
+          JSON.stringify({ status: { error_code: 0 }, data: {} }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
+      if (url.includes('coingecko')) {
+        return new Response(
+          JSON.stringify({ kaspa: { usd: 0.052 } }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
+      throw new Error(`Unexpected URL ${url}`);
+    });
+
+    const module = await import('../../server/lib/rateFetcher.js');
+    const { getKasUsdRate, __clearRateCache } = module;
+
+    const rate = await getKasUsdRate({ bypassCache: true });
+    expect(rate).toBeCloseTo(0.052);
     expect(fetchSpy).toHaveBeenCalledTimes(3);
     expect(fetchSpy.mock.calls.at(-1)?.[0].toString()).toContain('coingecko');
 
