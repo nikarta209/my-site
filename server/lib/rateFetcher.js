@@ -1,7 +1,8 @@
 /* eslint-env node */
 import { env } from './env.js';
 
-const COINMARKETCAP_URL = 'https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest?symbol=KAS&convert=USD';
+const CMC_KAS_ID = '20396';
+const COINMARKETCAP_URL = `https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest?id=${CMC_KAS_ID}&convert=USD`;
 const COINGECKO_URL = 'https://api.coingecko.com/api/v3/simple/price?ids=kaspa&vs_currencies=usd';
 const COINGECKO_PRO_URL = 'https://pro-api.coingecko.com/api/v3/simple/price?ids=kaspa&vs_currencies=usd';
 const CACHE_TTL_MS = 60_000;
@@ -48,11 +49,22 @@ const fetchFromCMCOnce = async (signal) => {
 
   const payload = await response.json().catch(() => null);
   if (!response.ok) {
-    const message = payload?.status?.error_message || `CoinMarketCap request failed (${response.status})`;
-    throw new Error(message);
+    const reason = payload?.status?.error_message || `CoinMarketCap request failed (${response.status})`;
+    throw new Error(reason);
   }
 
-  const rate = parsePrice(payload?.data?.KAS?.quote?.USD?.price, 'CoinMarketCap');
+  if (!payload?.status || Number(payload.status.error_code) !== 0) {
+    const errorCode = payload?.status?.error_code ?? 'unknown';
+    const errorMessage = payload?.status?.error_message || 'no status message';
+    throw new Error(`CoinMarketCap error_code=${errorCode} message=${errorMessage}`);
+  }
+
+  const asset = payload?.data?.[CMC_KAS_ID];
+  if (!asset) {
+    throw new Error('CoinMarketCap payload missing asset data');
+  }
+
+  const rate = parsePrice(asset?.quote?.USD?.price, 'CoinMarketCap');
   return rate;
 };
 
@@ -111,7 +123,8 @@ export const getKasUsdRate = async ({ bypassCache = false } = {}) => {
         try {
           rate = await fetchFromCMC();
         } catch (error) {
-          console.warn('[RateFetcher] CoinMarketCap failed:', error instanceof Error ? error.message : error);
+          const reason = error instanceof Error ? error.message : String(error);
+          console.warn('[RateFetcher] CoinMarketCap fallback:', reason);
         }
       }
 

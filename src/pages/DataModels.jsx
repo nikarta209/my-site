@@ -99,10 +99,10 @@ const bookSchema = new mongoose.Schema({
 bookSchema.pre('save', async function(next) {
   if (this.isModified('priceKAS') || this.isNew) {
     try {
-      const response = await axios.get('https://api.coingecko.com/api/v3/simple/price?ids=kaspa&vs_currencies=usd');
-      const kasPriceUSD = response.data.kaspa.usd;
+      const response = await axios.get('/api/rate');
+      const kasPriceUSD = response.data.rate ?? response.data?.kaspa?.usd;
       const usdValue = this.priceKAS * kasPriceUSD;
-      
+
       const MIN_USD_PRICE = 5; // Minimum price of $5
       if (usdValue < MIN_USD_PRICE) {
         const requiredKas = (MIN_USD_PRICE / kasPriceUSD).toFixed(2);
@@ -110,7 +110,7 @@ bookSchema.pre('save', async function(next) {
         return next(err);
       }
     } catch (error) {
-      console.error('CoinGecko API error, skipping USD price validation:', error.message);
+      console.error('Rate API error, skipping USD price validation:', error.message);
     }
   }
   next();
