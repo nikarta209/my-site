@@ -832,16 +832,16 @@ const CACHE_EXPIRATION = 3600; // 1 hour in seconds
 
 exports.getKasUsdRate = async () => {
   const cacheKey = 'kas_usd_rate';
-  
+
   // 1. Check cache first
   const cachedRate = await redisClient.get(cacheKey);
   if (cachedRate) {
     return JSON.parse(cachedRate);
   }
 
-  // 2. If not in cache, fetch from API
-  const response = await axios.get('https://api.coingecko.com/api/v3/simple/price?ids=kaspa&vs_currencies=usd');
-  const rate = response.data.kaspa.usd;
+  // 2. If not in cache, fetch from backend API
+  const response = await axios.get('/api/rate');
+  const rate = response.data.rate ?? response.data?.kaspa?.usd;
 
   // 3. Store in cache with expiration
   await redisClient.setEx(cacheKey, CACHE_EXPIRATION, JSON.stringify(rate));

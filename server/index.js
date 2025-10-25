@@ -1,21 +1,23 @@
-/* eslint-env node */
+import express from 'express';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-import { createServer } from 'node:http';
-import { URL } from 'node:url';
 import { env, resolveEnvValue, getSupabaseAdmin } from './lib/env.js';
-import { getRateApiResponse } from './routes/rate.js';
+import { registerRateRoutes } from './routes/rate.js';
 import { startRatePoller } from './jobs/ratePoller.js';
 
-const PORT = Number.parseInt(env.PORT || '4173', 10);
+const PORT = Number.parseInt(env.PORT || process.env.PORT || '4173', 10);
+const isProduction = (env.NODE_ENV || 'development') === 'production';
+const hasCMCKey = Boolean(process.env.COINMARKETCAP_API_KEY);
+
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-  'Access-Control-Allow-Methods': 'GET,POST,OPTIONS'
+  'Access-Control-Allow-Methods': 'GET,POST,PATCH,OPTIONS',
 };
 
 const N8N_WEBHOOK_URL = resolveEnvValue('N8N_WEBHOOK_URL');
 const N8N_WEBHOOK_URL_TEST = resolveEnvValue('N8N_WEBHOOK_URL_TEST');
-const isProduction = (env.NODE_ENV || 'development') === 'production';
 
 const resolveN8nWebhookUrl = () => {
   if (isProduction) {
@@ -28,20 +30,6 @@ const normalizeRole = (value) => {
   if (!value || typeof value !== 'string') return null;
   const trimmed = value.trim().toLowerCase();
   return trimmed || null;
-};
-
-const encoder = new TextEncoder();
-const decoder = new TextDecoder();
-
-const sendJson = (res, statusCode, body) => {
-  const payload = JSON.stringify(body);
-  const contentLength = encoder.encode(payload).length;
-  res.writeHead(statusCode, {
-    'Content-Type': 'application/json; charset=utf-8',
-    'Content-Length': contentLength,
-    ...CORS_HEADERS
-  });
-  res.end(payload);
 };
 
 const collectRequestBuffer = async (req) => {
@@ -108,7 +96,7 @@ const parseMultipartFormData = async (req) => {
         fieldName,
         filename: filenameMatch[1],
         mimeType,
-        buffer: Buffer.from(bodyContent, 'binary')
+        buffer: Buffer.from(bodyContent, 'binary'),
       };
     } else {
       fields[fieldName] = bodyContent;
@@ -116,33 +104,6 @@ const parseMultipartFormData = async (req) => {
   }
 
   return { fields, file };
-};
-
-const readRequestBody = async (req) => {
-  const chunks = [];
-  let totalLength = 0;
-  for await (const chunk of req) {
-    const view = typeof chunk === 'string' ? encoder.encode(chunk) : new Uint8Array(chunk);
-    chunks.push(view);
-    totalLength += view.byteLength;
-  }
-  if (totalLength === 0) return null;
-
-  const merged = new Uint8Array(totalLength);
-  let offset = 0;
-  for (const view of chunks) {
-    merged.set(view, offset);
-    offset += view.byteLength;
-  }
-
-  const raw = decoder.decode(merged);
-  if (!raw) return null;
-  try {
-    return JSON.parse(raw);
-  } catch (error) {
-    console.warn('[server] Failed to parse JSON body', error);
-    return null;
-  }
 };
 
 const extractBearerToken = (authorizationHeader) => {
@@ -238,8 +199,8 @@ const getModeratorFromRequest = async (req) => {
         id: supabaseUser.id,
         email,
         isAdmin,
-        isModerator
-      }
+        isModerator,
+      },
     };
   } catch (error) {
     console.error('[server] Failed to validate moderator request:', error);
@@ -247,28 +208,29 @@ const getModeratorFromRequest = async (req) => {
   }
 };
 
-const handleBookModeration = async (req, res, bookId) => {
+const handleBookModeration = async (req, res) => {
+  const bookId = req.params.bookId || req.params.id;
   if (!bookId) {
-    sendJson(res, 400, { success: false, error: 'Book ID is required.' });
+    res.status(400).json({ success: false, error: 'Book ID is required.' });
     return;
   }
 
   const adminClient = getSupabaseAdmin();
   if (!adminClient) {
-    sendJson(res, 500, { success: false, error: 'Supabase service role key is not configured.' });
+    res.status(500).json({ success: false, error: 'Supabase service role key is not configured.' });
     return;
   }
 
   const authResult = await getModeratorFromRequest(req);
   if (authResult.error) {
-    sendJson(res, authResult.status, { success: false, error: authResult.error });
+    res.status(authResult.status).json({ success: false, error: authResult.error });
     return;
   }
 
-  const body = (await readRequestBody(req)) || {};
+  const body = req.body || {};
   const action = normalizeRole(body.action);
   if (!action || !['approved', 'rejected'].includes(action)) {
-    sendJson(res, 400, { success: false, error: 'Unsupported moderation action.' });
+    res.status(400).json({ success: false, error: 'Unsupported moderation action.' });
     return;
   }
 
@@ -303,25 +265,20 @@ const handleBookModeration = async (req, res, bookId) => {
 
     if (error) {
       console.error('[server] Failed to update book status:', error);
-      sendJson(res, 500, { success: false, error: error.message || 'Failed to update book status.' });
+      res.status(500).json({ success: false, error: error.message || 'Failed to update book status.' });
       return;
     }
 
     if (!data) {
-      sendJson(res, 404, { success: false, error: 'Book not found.' });
+      res.status(404).json({ success: false, error: 'Book not found.' });
       return;
     }
 
-    sendJson(res, 200, { success: true, data });
+    res.status(200).json({ success: true, data });
   } catch (error) {
     console.error('[server] Unexpected error during moderation:', error);
-    sendJson(res, 500, { success: false, error: 'Unexpected error while moderating the book.' });
+    res.status(500).json({ success: false, error: 'Unexpected error while moderating the book.' });
   }
-};
-
-const handleRateResponse = async (res) => {
-  const { status, body } = await getRateApiResponse();
-  sendJson(res, status, body);
 };
 
 const handleN8nBookUpload = async (req, res) => {
@@ -329,25 +286,25 @@ const handleN8nBookUpload = async (req, res) => {
     const { fields, file } = await parseMultipartFormData(req);
 
     if (!file || !file.buffer || file.buffer.length === 0) {
-      sendJson(res, 400, { error: 'No file provided' });
+      res.status(400).json({ error: 'No file provided' });
       return;
     }
 
     const title = (fields.title || '').trim();
     if (!title) {
-      sendJson(res, 400, { error: 'Missing "title"' });
+      res.status(400).json({ error: 'Missing "title"' });
       return;
     }
 
     const targetLang = (fields.target_lang || '').trim();
     if (!targetLang) {
-      sendJson(res, 400, { error: 'Missing "target_lang"' });
+      res.status(400).json({ error: 'Missing "target_lang"' });
       return;
     }
 
     const webhookUrl = resolveN8nWebhookUrl();
     if (!webhookUrl) {
-      sendJson(res, 500, { error: 'N8N_WEBHOOK_URL is not set' });
+      res.status(500).json({ error: 'N8N_WEBHOOK_URL is not set' });
       return;
     }
 
@@ -370,76 +327,68 @@ const handleN8nBookUpload = async (req, res) => {
 
     const responseText = await n8nResponse.text();
     const contentType = n8nResponse.headers.get('content-type') || 'text/plain; charset=utf-8';
-    const contentLength = Buffer.byteLength(responseText);
 
-    res.writeHead(n8nResponse.status, {
-      'Content-Type': contentType,
-      'Content-Length': contentLength,
-      ...CORS_HEADERS,
-    });
-    res.end(responseText);
+    res.status(n8nResponse.status);
+    res.set('Content-Type', contentType);
+    res.send(responseText);
   } catch (error) {
     console.error('n8n proxy failed:', error);
-    sendJson(res, 500, {
+    res.status(500).json({
       error: 'n8n proxy failed',
       details: error instanceof Error ? error.message : 'Unknown error',
     });
   }
 };
 
-const server = createServer(async (req, res) => {
-  const method = req.method || 'GET';
+const app = express();
+app.disable('x-powered-by');
 
-  if (method === 'OPTIONS') {
-    res.writeHead(204, CORS_HEADERS);
-    res.end();
+app.use((req, res, next) => {
+  res.set(CORS_HEADERS);
+  if (req.method === 'OPTIONS') {
+    res.sendStatus(204);
     return;
   }
-
-  const requestUrl = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`);
-
-  if (method === 'GET' && requestUrl.pathname === '/api/coinmarketcap/kas-rate') {
-    await handleRateResponse(res);
-    return;
-  }
-
-  if (method === 'GET' && requestUrl.pathname === '/api/rate') {
-    await handleRateResponse(res);
-    return;
-  }
-
-  if (method === 'POST' && requestUrl.pathname === '/api/n8n/book-upload') {
-    await handleN8nBookUpload(req, res);
-    return;
-  }
-
-  if (method === 'POST' && requestUrl.pathname === '/api/coingecko') {
-    await handleRateResponse(res);
-    return;
-  }
-
-  if (method === 'PATCH' && requestUrl.pathname.startsWith('/api/moderation/books/')) {
-    const bookId = requestUrl.pathname.replace('/api/moderation/books/', '').trim();
-    await handleBookModeration(req, res, bookId);
-    return;
-  }
-
-  sendJson(res, 404, { success: false, error: 'Not Found' });
+  next();
 });
 
-if (isProduction) {
-  try {
-    startRatePoller();
-  } catch (error) {
-    console.error('[RatePoller] failed to start:', error instanceof Error ? error.message : error);
-  }
-}
+app.use(express.json());
 
+registerRateRoutes(app);
+app.post('/api/n8n/book-upload', handleN8nBookUpload);
+app.patch('/api/moderation/books/:bookId', handleBookModeration);
+app.use((req, res, next) => {
+  if (req.path?.startsWith('/api/')) {
+    res.status(404).json({ success: false, error: 'Not Found' });
+    return;
+  }
+  next();
+});
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const distDir = path.resolve(__dirname, '../dist');
+app.use(express.static(distDir));
+app.get('*', (_req, res) => {
+  res.sendFile(path.join(distDir, 'index.html'));
+});
+
+console.log(`[Server] prod=${isProduction} hasCMCKey=${hasCMCKey}`);
+
+let serverInstance = null;
 if ((env.NODE_ENV || 'development') !== 'test') {
-  server.listen(PORT, () => {
-    console.log(`Server listening on http://0.0.0.0:${PORT}`);
+  if (isProduction && process.env.DISABLE_RATE_WORKER !== '1') {
+    try {
+      startRatePoller();
+    } catch (error) {
+      console.error('[RatePoller] failed to start:', error instanceof Error ? error.message : error);
+    }
+  }
+
+  serverInstance = app.listen(PORT, () => {
+    console.log(`[Server] listening on ${PORT}`);
   });
 }
 
-export default server;
 export { resolveEnvValue };
+export const server = serverInstance;
+export default app;
